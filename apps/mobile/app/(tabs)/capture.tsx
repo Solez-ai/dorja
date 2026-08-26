@@ -1,4 +1,5 @@
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Icon } from '../../components/Icons';
 
@@ -41,8 +42,10 @@ const ACTIONS = [
 ];
 
 export default function CaptureScreen() {
+  const insets = useSafeAreaInsets();
+
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.sheet}>
         <Text style={styles.sheetTitle}>Actions</Text>
         <Text style={styles.sheetSubtitle}>What would you like to do?</Text>
@@ -51,6 +54,7 @@ export default function CaptureScreen() {
           <TouchableOpacity
             key={action.id}
             style={styles.action}
+            activeOpacity={0.7}
             onPress={() => router.push(action.route as any)}
           >
             <View style={styles.actionIcon}>
@@ -70,16 +74,27 @@ export default function CaptureScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#FBF8F2', justifyContent: 'center', padding: 24 },
-  sheet: { backgroundColor: 'white', borderRadius: 8, borderWidth: 1, borderColor: '#D9CCB9', padding: 24 },
+  sheet: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E8E0D0',
+    padding: 24,
+    shadowColor: '#0B1F33',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
+  },
   sheetTitle: { fontSize: 24, fontWeight: '700', color: '#0B1F33', fontFamily: 'Space Grotesk', marginBottom: 4 },
   sheetSubtitle: { fontSize: 14, color: '#17324D', fontFamily: 'IBM Plex Sans', marginBottom: 24 },
   action: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
-    borderRadius: 4,
+    borderRadius: 10,
     borderWidth: 1,
-    borderColor: '#E8E0D0',
+    borderColor: '#F2EDE3',
     marginBottom: 10,
     backgroundColor: '#FBF8F2',
   },

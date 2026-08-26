@@ -1,32 +1,92 @@
+import { useEffect } from 'react';
+import { Platform } from 'react-native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { Icon } from '../components/Icons';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import * as SplashScreen from 'expo-splash-screen';
+import {
+  useFonts,
+  SpaceGrotesk_400Regular,
+  SpaceGrotesk_600SemiBold,
+  SpaceGrotesk_700Bold,
+  IBMPlexSans_400Regular,
+  IBMPlexSans_500Medium,
+  IBMPlexSans_600SemiBold,
+  IBMPlexMono_400Regular,
+  IBMPlexMono_500Medium,
+} from '@expo-google-fonts/dev';
+import { BackendGate } from '../components/BackendGate';
 
-const COLORS = {
-  ink950: '#0B1F33',
-  jol600: '#007C78',
-  paper50: '#FBF8F2',
-  sand300: '#D9CCB9',
-};
+// Keep splash screen visible while loading fonts
+SplashScreen.preventAutoHideAsync().catch(() => {});
 
 export default function RootLayout() {
-  return (
-    <>
-      <StatusBar style="dark" />
-      <Stack screenOptions={{ headerShown: false }}>
-        {/* Tab navigator */}
-        <Stack.Screen name="(tabs)" />
+  const [fontsLoaded] = useFonts({
+    SpaceGrotesk: SpaceGrotesk_700Bold,
+    'Space Grotesk': SpaceGrotesk_700Bold,
+    'IBM Plex Sans': IBMPlexSans_400Regular,
+    'IBM Plex Mono': IBMPlexMono_400Regular,
+  });
 
-        {/* Full-screen routes */}
-        <Stack.Screen name="property/[slug]" options={{ headerShown: false }} />
-        <Stack.Screen name="property/tour/[slug]" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
-        <Stack.Screen name="listing/create" options={{ headerShown: false }} />
-        <Stack.Screen name="capture/start" options={{ headerShown: false }} />
-        <Stack.Screen name="capture/scan" options={{ headerShown: false }} />
-        <Stack.Screen name="capture/check-pass" options={{ headerShown: false }} />
-        <Stack.Screen name="capture/scan-room" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
-        <Stack.Screen name="chat/[conversationId]" options={{ headerShown: false, presentation: 'modal' }} />
-      </Stack>
-    </>
+  useEffect(() => {
+    if (fontsLoaded) {
+      SplashScreen.hideAsync().catch(() => {});
+    }
+  }, [fontsLoaded]);
+
+  if (!fontsLoaded) return null;
+
+  return (
+    <SafeAreaProvider>
+      {/* Full screen: hide status bar, transparent on Android */}
+      <StatusBar
+        style="light"
+        backgroundColor="transparent"
+        translucent={Platform.OS === 'android'}
+      />
+      <BackendGate>
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            animation: 'slide_from_bottom',
+            contentStyle: { backgroundColor: '#0B1F33' },
+          }}
+        >
+          <Stack.Screen name="(tabs)" />
+          <Stack.Screen
+            name="property/[slug]"
+            options={{ animation: 'slide_from_right' }}
+          />
+          <Stack.Screen
+            name="property/tour/[slug]"
+            options={{ animation: 'fade', presentation: 'fullScreenModal' }}
+          />
+          <Stack.Screen
+            name="listing/create"
+            options={{ animation: 'slide_from_bottom' }}
+          />
+          <Stack.Screen
+            name="capture/start"
+            options={{ animation: 'slide_from_bottom' }}
+          />
+          <Stack.Screen
+            name="capture/scan"
+            options={{ animation: 'slide_from_bottom' }}
+          />
+          <Stack.Screen
+            name="capture/check-pass"
+            options={{ animation: 'slide_from_bottom' }}
+          />
+          <Stack.Screen
+            name="capture/scan-room"
+            options={{ animation: 'slide_from_bottom', presentation: 'fullScreenModal' }}
+          />
+          <Stack.Screen
+            name="chat/[conversationId]"
+            options={{ animation: 'slide_from_bottom', presentation: 'modal' }}
+          />
+        </Stack>
+      </BackendGate>
+    </SafeAreaProvider>
   );
 }

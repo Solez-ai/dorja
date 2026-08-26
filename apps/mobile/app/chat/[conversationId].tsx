@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { View, Text, TextInput, ScrollView, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Icon, Badge } from '../../components/Icons';
-
-const API_URL = 'http://localhost:4000';
+import { ensureAuth, authFetch } from '../../lib/api';
 
 interface Message {
   id: string;
@@ -15,6 +15,7 @@ interface Message {
 }
 
 export default function ChatScreen() {
+  const insets = useSafeAreaInsets();
   const { conversationId } = useLocalSearchParams<{ conversationId: string }>();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -23,50 +24,19 @@ export default function ChatScreen() {
   const scrollRef = useRef<ScrollView>(null);
 
   useEffect(() => {
-    // Get user ID from localStorage
-    try {
-      const stored = localStorage.getItem('dorja_user');
-      if (stored) {
-        const u = JSON.parse(stored);
-        setMyUserId(u.id || '');
-      }
-    } catch {}
-
     if (!conversationId) return;
 
-    // Auto-auth and fetch messages
     const load = async () => {
       try {
-        // Auto-login if needed
-        let token = '';
-        try { token = localStorage.getItem('dorja_token') || ''; } catch {}
-        if (!token) {
-          await fetch(API_URL + '/v1/auth/otp/start', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ phone: '+8801700000001' }),
-          });
-          const vr = await fetch(API_URL + '/v1/auth/otp/verify', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ phone: '+8801700000001', code: '123456' }),
-          });
-          const vd = await vr.json();
-          token = vd.data?.accessToken || '';
-          if (token) {
-            try { localStorage.setItem('dorja_token', token); } catch {}
-            const u = { name: 'Rahim Ahmed', phone: '+8801700000001', role: 'SEEKER', id: '' };
-            try { localStorage.setItem('dorja_user', JSON.stringify(u)); } catch {}
-          }
-        }
+        const auth = await ensureAuth();
+        if (auth?.user) setMyUserId(auth.user.id);
 
-        if (token) {
-          const res = await fetch(`${API_URL}/v1/chat/conversations/${conversationId}/messages`, {
-            headers: { Authorization: 'Bearer ' + token },
-          });
+        if (auth?.token) {
+          const res = await authFetch(`/v1/chat/conversations/${conversationId}/messages`);
           const data = await res.json();
           if (data.data) {
             setMessages(data.data);
-            // Get my user ID from the first message I sent
-            const myMsg = data.data.find((m: Message) => m.sender?.displayName === 'Rahim Ahmed');
+            const myMsg = data.data.find((m: Message) => m.sender?.displayName === auth.user.name);
             if (myMsg) setMyUserId(myMsg.senderUserId);
           }
         }
@@ -100,18 +70,13 @@ export default function ChatScreen() {
     setMessages(prev => [...prev, optimistic]);
 
     try {
-      let token = '';
-      try { token = localStorage.getItem('dorja_token') || ''; } catch {}
-      if (token) {
-        const res = await fetch(`${API_URL}/v1/chat/conversations/${conversationId}/messages`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-          body: JSON.stringify({ body: text }),
-        });
-        const data = await res.json();
-        if (data.data) {
-          setMessages(prev => prev.map(m => m.id === optimistic.id ? data.data : m));
-        }
+      const res = await authFetch(`/v1/chat/conversations/${conversationId}/messages`, {
+        method: 'POST',
+        body: JSON.stringify({ body: text }),
+      });
+      const data = await res.json();
+      if (data.data) {
+        setMessages(prev => prev.map(m => m.id === optimistic.id ? data.data : m));
       }
     } catch (e) {
       console.log('Failed to send:', e);

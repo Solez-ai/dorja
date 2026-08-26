@@ -1,9 +1,18 @@
 import { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, StyleSheet, ActivityIndicator, Dimensions } from 'react-native';
+import {
+  View,
+  Text,
+  ScrollView,
+  TouchableOpacity,
+  StyleSheet,
+  ActivityIndicator,
+  Dimensions,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Icon, Badge } from '../../components/Icons';
+import { API_URL } from '../../config';
 
-const API_URL = 'http://localhost:4000';
 const SCREEN_W = Dimensions.get('window').width;
 
 interface Room {
@@ -29,22 +38,25 @@ interface ListingDetail {
 }
 
 export default function PropertyDetailScreen() {
+  const insets = useSafeAreaInsets();
   const { slug } = useLocalSearchParams<{ slug: string }>();
   const [listing, setListing] = useState<ListingDetail | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!slug) return;
-    fetch(API_URL + '/v1/listings/' + slug)
-      .then(r => r.json())
-      .then(d => { if (d.data) setListing(d.data); })
+    fetch(`${API_URL}/v1/listings/${slug}`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.data) setListing(d.data);
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [slug]);
 
   if (loading) {
     return (
-      <View style={s.center}>
+      <View style={[s.center, { paddingTop: insets.top }]}>
         <ActivityIndicator size="large" color="#007C78" />
         <Text style={s.loadingText}>Loading passport...</Text>
       </View>
@@ -53,7 +65,7 @@ export default function PropertyDetailScreen() {
 
   if (!listing) {
     return (
-      <View style={s.center}>
+      <View style={[s.center, { paddingTop: insets.top }]}>
         <Icon name="alert" size={32} color="#D9CCB9" />
         <Text style={s.errorText}>Property not found</Text>
         <TouchableOpacity onPress={() => router.back()}>
@@ -63,21 +75,28 @@ export default function PropertyDetailScreen() {
     );
   }
 
-  const roomGroups = listing.rooms.reduce((acc: Record<string, Room[]>, r) => {
-    (acc[r.roomType] = acc[r.roomType] || []).push(r);
-    return acc;
-  }, {});
+  const roomGroups = listing.rooms.reduce(
+    (acc: Record<string, Room[]>, r) => {
+      (acc[r.roomType] = acc[r.roomType] || []).push(r);
+      return acc;
+    },
+    {}
+  );
 
   return (
     <ScrollView style={s.container} showsVerticalScrollIndicator={false}>
       {/* Header */}
-      <View style={s.header}>
+      <View style={[s.header, { paddingTop: insets.top + 12 }]}>
         <TouchableOpacity onPress={() => router.back()} style={s.backBtn}>
           <Icon name="back" size={16} color="#007C78" />
           <Text style={s.backText}>Back</Text>
         </TouchableOpacity>
         <View style={s.badgeRow}>
-          <Badge text={listing.intent === 'RENT' ? 'FOR RENT' : 'FOR SALE'} bgColor="#0B1F33" textColor="white" />
+          <Badge
+            text={listing.intent === 'RENT' ? 'FOR RENT' : 'FOR SALE'}
+            bgColor="#0B1F33"
+            textColor="white"
+          />
           {listing.pulseStatus === 'ACTIVE' && (
             <View style={s.liveBadge}>
               <View style={s.pulseDot} />
@@ -92,11 +111,15 @@ export default function PropertyDetailScreen() {
         <Text style={s.title}>{listing.title}</Text>
         <Text style={s.price}>
           ৳{listing.priceAmount.toLocaleString()}
-          <Text style={s.pricePeriod}>{listing.intent === 'RENT' ? ' /month' : ' total'}</Text>
+          <Text style={s.pricePeriod}>
+            {listing.intent === 'RENT' ? ' /month' : ' total'}
+          </Text>
         </Text>
         <View style={s.locationRow}>
           <Icon name="mapPin" size={14} color="#17324D" />
-          <Text style={s.locationText}>{listing.publicArea} · {listing.propertyType}</Text>
+          <Text style={s.locationText}>
+            {listing.publicArea} · {listing.propertyType}
+          </Text>
         </View>
       </View>
 
@@ -106,18 +129,27 @@ export default function PropertyDetailScreen() {
           <Icon name="cube" size={16} color="#007C78" />
           <Text style={s.sectionTitle}>3D Walkthrough</Text>
         </View>
-        <TouchableOpacity style={s.tourCard} onPress={() => router.push(`/property/tour/${listing.slug}`)}>
+        <TouchableOpacity
+          style={s.tourCard}
+          activeOpacity={0.7}
+          onPress={() => router.push(`/property/tour/${listing.slug}`)}
+        >
           <View style={s.tourPreview}>
             <Icon name="cube" size={40} color="#007C78" />
             <View style={s.tourOverlay}>
               <Text style={s.tourOverlayText}>Tap to enter 3D tour</Text>
               <View style={s.tourControls}>
-                <Text style={s.tourControlText}>Joystick to look around · Tap doors to walk</Text>
+                <Text style={s.tourControlText}>
+                  Joystick to look around · Tap doors to walk
+                </Text>
               </View>
             </View>
           </View>
           <View style={s.tourInfo}>
-            <Text style={s.tourInfoText}>{Object.keys(roomGroups).length} room types · {listing.rooms.length} rooms</Text>
+            <Text style={s.tourInfoText}>
+              {Object.keys(roomGroups).length} room types ·{' '}
+              {listing.rooms.length} rooms
+            </Text>
           </View>
         </TouchableOpacity>
       </View>
@@ -129,33 +161,21 @@ export default function PropertyDetailScreen() {
           <Text style={s.sectionTitle}>Reality Passport</Text>
         </View>
         <View style={s.passportCard}>
-          <View style={s.passportRow}>
-            <View style={s.passportIcon}>
-              <Icon name="check" size={16} color="#007C78" />
+          {[
+            { icon: 'check', label: 'Pulse Status', value: listing.pulseStatus },
+            { icon: 'camera', label: 'Capture Status', value: `${listing.rooms.length} rooms mapped` },
+            { icon: 'lock', label: 'Data Protection', value: 'AES-256-GCM encrypted' },
+          ].map((row) => (
+            <View key={row.label} style={s.passportRow}>
+              <View style={s.passportIcon}>
+                <Icon name={row.icon} size={16} color="#007C78" />
+              </View>
+              <View style={s.passportInfo}>
+                <Text style={s.passportLabel}>{row.label}</Text>
+                <Text style={s.passportValue}>{row.value}</Text>
+              </View>
             </View>
-            <View style={s.passportInfo}>
-              <Text style={s.passportLabel}>Pulse Status</Text>
-              <Text style={s.passportValue}>{listing.pulseStatus}</Text>
-            </View>
-          </View>
-          <View style={s.passportRow}>
-            <View style={s.passportIcon}>
-              <Icon name="camera" size={16} color="#007C78" />
-            </View>
-            <View style={s.passportInfo}>
-              <Text style={s.passportLabel}>Capture Status</Text>
-              <Text style={s.passportValue}>{listing.rooms.length} rooms mapped</Text>
-            </View>
-          </View>
-          <View style={s.passportRow}>
-            <View style={s.passportIcon}>
-              <Icon name="lock" size={16} color="#007C78" />
-            </View>
-            <View style={s.passportInfo}>
-              <Text style={s.passportLabel}>Data Protection</Text>
-              <Text style={s.passportValue}>AES-256-GCM encrypted</Text>
-            </View>
-          </View>
+          ))}
         </View>
       </View>
 
@@ -167,7 +187,12 @@ export default function PropertyDetailScreen() {
         </View>
         {Object.entries(roomGroups).map(([type, rooms]) => (
           <View key={type} style={s.roomGroup}>
-            <Text style={s.roomGroupTitle}>{type.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase())}</Text>
+            <Text style={s.roomGroupTitle}>
+              {type
+                .replace(/_/g, ' ')
+                .toLowerCase()
+                .replace(/\b\w/g, (c) => c.toUpperCase())}
+            </Text>
             <View style={s.roomList}>
               {rooms.map((room) => (
                 <View key={room.id} style={s.roomItem}>
@@ -182,19 +207,23 @@ export default function PropertyDetailScreen() {
 
       {/* Action buttons */}
       <View style={s.actions}>
-        <TouchableOpacity style={s.primaryBtn} onPress={() => router.push(`/property/tour/${listing.slug}`)}>
+        <TouchableOpacity
+          style={s.primaryBtn}
+          activeOpacity={0.7}
+          onPress={() => router.push(`/property/tour/${listing.slug}`)}
+        >
           <Icon name="cube" size={16} color="white" />
           <Text style={s.primaryBtnText}>Open 3D Tour</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={s.secondaryBtn}>
+        <TouchableOpacity style={s.secondaryBtn} activeOpacity={0.7}>
           <Icon name="star" size={16} color="#007C78" />
           <Text style={s.secondaryBtnText}>Add to Shortlist</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={s.secondaryBtn}>
+        <TouchableOpacity style={s.secondaryBtn} activeOpacity={0.7}>
           <Icon name="message" size={16} color="#007C78" />
           <Text style={s.secondaryBtnText}>Ask in Protected Chat</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={s.darkBtn}>
+        <TouchableOpacity style={s.darkBtn} activeOpacity={0.7}>
           <Icon name="calendar" size={16} color="white" />
           <Text style={s.darkBtnText}>Request a SafeView</Text>
         </TouchableOpacity>
@@ -204,7 +233,8 @@ export default function PropertyDetailScreen() {
       <View style={s.safetyNote}>
         <Icon name="alert" size={14} color="#C2710B" />
         <Text style={s.safetyText}>
-          Meet only through SafeView appointments. Never send money before physical inspection.
+          Meet only through SafeView appointments. Never send money before
+          physical inspection.
         </Text>
       </View>
 
@@ -224,7 +254,7 @@ const s = StyleSheet.create({
   backBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 12 },
   backText: { fontSize: 14, color: '#007C78', fontFamily: 'IBM Plex Sans' },
   badgeRow: { flexDirection: 'row', gap: 8, alignItems: 'center' },
-  liveBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#D7F1EE', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 2, gap: 4 },
+  liveBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#D7F1EE', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 4, gap: 4 },
   pulseDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#007C78' },
   liveText: { fontSize: 10, fontWeight: '700', color: '#006B68', fontFamily: 'IBM Plex Mono', letterSpacing: 0.8 },
 
@@ -239,7 +269,7 @@ const s = StyleSheet.create({
   sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
   sectionTitle: { fontSize: 16, fontWeight: '700', color: '#0B1F33', fontFamily: 'Space Grotesk' },
 
-  tourCard: { backgroundColor: '#1A1A1A', borderRadius: 10, overflow: 'hidden', borderWidth: 1, borderColor: '#333' },
+  tourCard: { backgroundColor: '#1A1A1A', borderRadius: 12, overflow: 'hidden' },
   tourPreview: { height: 200, alignItems: 'center', justifyContent: 'center', position: 'relative' },
   tourOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 12, backgroundColor: 'rgba(0,0,0,0.6)' },
   tourOverlayText: { color: 'white', fontSize: 14, fontWeight: '600', fontFamily: 'IBM Plex Sans' },
@@ -248,7 +278,7 @@ const s = StyleSheet.create({
   tourInfo: { padding: 12 },
   tourInfoText: { color: '#aaa', fontSize: 12, fontFamily: 'IBM Plex Mono' },
 
-  passportCard: { backgroundColor: 'white', borderRadius: 6, borderWidth: 1, borderColor: '#D9CCB9', padding: 16, gap: 16 },
+  passportCard: { backgroundColor: 'white', borderRadius: 10, borderWidth: 1, borderColor: '#E8E0D0', padding: 16, gap: 16 },
   passportRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   passportIcon: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#D7F1EE', alignItems: 'center', justifyContent: 'center' },
   passportInfo: { flex: 1 },
@@ -263,13 +293,13 @@ const s = StyleSheet.create({
   roomName: { fontSize: 14, color: '#0B1F33', fontFamily: 'IBM Plex Sans' },
 
   actions: { padding: 16, gap: 10 },
-  primaryBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#007C78', padding: 14, borderRadius: 2 },
+  primaryBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#007C78', padding: 14, borderRadius: 8 },
   primaryBtnText: { color: 'white', fontSize: 14, fontWeight: '600', fontFamily: 'IBM Plex Sans' },
-  secondaryBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: 'white', padding: 14, borderRadius: 2, borderWidth: 1, borderColor: '#D9CCB9' },
+  secondaryBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: 'white', padding: 14, borderRadius: 8, borderWidth: 1, borderColor: '#D9CCB9' },
   secondaryBtnText: { color: '#007C78', fontSize: 14, fontWeight: '600', fontFamily: 'IBM Plex Sans' },
-  darkBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#0B1F33', padding: 14, borderRadius: 2 },
+  darkBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, backgroundColor: '#0B1F33', padding: 14, borderRadius: 8 },
   darkBtnText: { color: 'white', fontSize: 14, fontWeight: '600', fontFamily: 'IBM Plex Sans' },
 
-  safetyNote: { margin: 16, padding: 12, backgroundColor: '#FEF3CD', borderRadius: 4, flexDirection: 'row', gap: 8, alignItems: 'flex-start' },
+  safetyNote: { margin: 16, padding: 12, backgroundColor: '#FEF3CD', borderRadius: 8, flexDirection: 'row', gap: 8, alignItems: 'flex-start' },
   safetyText: { flex: 1, fontSize: 12, color: '#17324D', fontFamily: 'IBM Plex Sans', lineHeight: 18 },
 });

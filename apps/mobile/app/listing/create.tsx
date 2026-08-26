@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { View, Text, TextInput, ScrollView, TouchableOpacity, StyleSheet, Alert, Image } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Icon, Badge } from '../../components/Icons';
-
-const API_URL = 'http://localhost:4000';
+import { ensureAuth, authFetch } from '../../lib/api';
+import { API_URL } from '../../config';
 
 const ROOM_TYPES = [
   { value: 'LIVING_ROOM', label: 'Living Room', icon: 'home' },
@@ -65,18 +66,9 @@ export default function CreateListingScreen() {
     }
     setLoading(true);
     try {
-      // Auto-auth
-      await fetch(API_URL + '/v1/auth/otp/start', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: '+8801700000001' }),
-      });
-      const vr = await fetch(API_URL + '/v1/auth/otp/verify', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: '+8801700000001', code: '123456' }),
-      });
-      const vd = await vr.json();
-      const token = vd.data?.accessToken;
-      if (!token) { Alert.alert('Auth failed', 'Could not authenticate.'); setLoading(false); return; }
+      const auth = await ensureAuth();
+      if (!auth?.token) { Alert.alert('Auth failed', 'Could not authenticate.'); setLoading(false); return; }
+      const token = auth.token;
 
       const lr = await fetch(API_URL + '/v1/listings', {
         method: 'POST',

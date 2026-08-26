@@ -1,5 +1,6 @@
 import { Tabs } from 'expo-router';
-import { Text, View } from 'react-native';
+import { View, Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '../../components/Icons';
 
 const COLORS = {
@@ -10,6 +11,8 @@ const COLORS = {
 };
 
 export default function TabsLayout() {
+  const insets = useSafeAreaInsets();
+
   return (
     <Tabs
       screenOptions={{
@@ -18,13 +21,14 @@ export default function TabsLayout() {
         tabBarStyle: {
           backgroundColor: COLORS.paper50,
           borderTopColor: COLORS.sand300,
-          height: 64,
-          paddingBottom: 8,
-          paddingTop: 4,
+          height: 60 + insets.bottom,
+          paddingBottom: insets.bottom + 4,
+          paddingTop: 6,
         },
         tabBarLabelStyle: {
           fontSize: 10,
           fontWeight: '600',
+          fontFamily: 'IBM Plex Sans',
         },
         headerStyle: {
           backgroundColor: COLORS.paper50,
@@ -34,6 +38,8 @@ export default function TabsLayout() {
           fontFamily: 'Space Grotesk',
           fontWeight: '700',
         },
+        headerShadowVisible: false,
+        headerLeftContainerStyle: { paddingLeft: 16 },
       }}
     >
       <Tabs.Screen
@@ -41,31 +47,42 @@ export default function TabsLayout() {
         options={{
           title: 'Explore',
           headerTitle: 'DORJA',
-          tabBarIcon: ({ color }) => <Icon name="explore" size={22} color={color} />,
+          tabBarIcon: ({ color, focused }) => (
+            <Icon name="explore" size={focused ? 24 : 22} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
         name="inbox"
         options={{
           title: 'Inbox',
-          tabBarIcon: ({ color }) => <Icon name="message" size={22} color={color} />,
+          tabBarIcon: ({ color, focused }) => (
+            <Icon name="message" size={focused ? 24 : 22} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
         name="capture"
         options={{
-          title: 'Capture',
+          title: 'Actions',
           headerTitle: 'Actions',
-          tabBarIcon: ({ color }) => (
-            <View style={{
-              backgroundColor: COLORS.jol600,
-              width: 48,
-              height: 48,
-              borderRadius: 24,
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginBottom: 16,
-            }}>
+          tabBarIcon: () => (
+            <View
+              style={{
+                backgroundColor: COLORS.jol600,
+                width: 48,
+                height: 48,
+                borderRadius: 24,
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginBottom: 16,
+                shadowColor: COLORS.jol600,
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.3,
+                shadowRadius: 8,
+                elevation: 6,
+              }}
+            >
               <Icon name="camera" size={22} color="white" />
             </View>
           ),
@@ -76,17 +93,20 @@ export default function TabsLayout() {
         name="visits"
         options={{
           title: 'Visits',
-          tabBarIcon: ({ color }) => <Icon name="calendar" size={22} color={color} />,
+          tabBarIcon: ({ color, focused }) => (
+            <Icon name="visits" size={focused ? 24 : 22} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
         name="account"
         options={{
           title: 'Account',
-          tabBarIcon: ({ color }) => <Icon name="user" size={22} color={color} />,
+          tabBarIcon: ({ color, focused }) => (
+            <Icon name="account" size={focused ? 24 : 22} color={color} />
+          ),
         }}
       />
-      {/* Hide auth from tab bar */}
       <Tabs.Screen name="auth" options={{ href: null }} />
     </Tabs>
   );
