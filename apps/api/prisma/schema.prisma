@@ -1,0 +1,1053 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// =============================================================================
+// ENUMS
+// =============================================================================
+
+enum UserRole {
+  SEEKER
+  OWNER
+  AGENT
+  REPRESENTATIVE
+  GUARD
+  REVIEWER
+  ADMIN
+}
+
+enum IdentityStatus {
+  UNVERIFIED
+  PHONE_CONFIRMED
+  IDENTITY_PENDING
+  IDENTITY_CONFIRMED
+  IDENTITY_REJECTED
+  IDENTITY_EXPIRED
+}
+
+enum ListingIntent {
+  RENT
+  SALE
+}
+
+enum PropertyType {
+  APARTMENT
+  HOUSE
+  ROOM
+  SUBLET
+  HOSTEL_SEAT
+  OFFICE
+  SHOP
+  LAND
+}
+
+enum ListingStatus {
+  DRAFT
+  AUTHORITY_REVIEW_PENDING
+  ACTIVE
+  VIEWING_HELD
+  UNCONFIRMED
+  RENTED_OR_SOLD
+  PAUSED
+  RESTRICTED
+  ARCHIVED
+}
+
+enum AuthorityStatus {
+  NOT_STARTED
+  PENDING
+  REVIEWED
+  REJECTED
+  EXPIRED
+}
+
+enum AuthorityRole {
+  OWNER
+  AUTHORISED_AGENT
+  BUILDING_REPRESENTATIVE
+}
+
+enum CaptureStatus {
+  IN_PROGRESS
+  UPLOADING
+  PROCESSING
+  NEEDS_RETAKE
+  READY_FOR_REVIEW
+  PUBLISHED_SELLER_CAPTURED
+  PUBLISHED_AGENT_VERIFIED
+  EXPIRED
+  ABANDONED
+}
+
+enum RoomType {
+  ENTRY
+  LIVING_ROOM
+  DINING_ROOM
+  BEDROOM
+  KITCHEN
+  BATHROOM
+  BALCONY
+  UTILITY
+  PARKING
+  OTHER
+}
+
+enum RealityReviewLevel {
+  INCOMPLETE
+  SELLER_CAPTURED
+  AGENT_VERIFIED
+  EXPIRED
+}
+
+enum MediaQualityStatus {
+  PENDING
+  ACCEPTED
+  RETAKE_SUGGESTED
+  REJECTED
+}
+
+enum MediaSourceType {
+  HOLD_TO_CAPTURE
+  GUIDED_SEQUENCE
+  IMPORTED_PANORAMA
+  PRO_SPATIAL_SCAN
+  PROOF_REQUEST
+}
+
+enum VerificationProviderType {
+  MANUAL_REVIEW
+  AUTHORISED_NID_PROVIDER
+  DISABLED
+}
+
+enum VerificationReviewStatus {
+  NOT_STARTED
+  PENDING
+  CONFIRMED
+  REJECTED
+  EXPIRED
+  CANCELLED
+}
+
+enum EvidenceKind {
+  IDENTITY_DOCUMENT
+  SELFIE_OR_LIVENESS_RESULT
+  PROPERTY_AUTHORITY_DOCUMENT
+  OWNER_AUTHORISATION
+  AGENCY_BUSINESS_DOCUMENT
+  BUILDING_MANAGER_CONFIRMATION
+  OPTIONAL_PCC
+}
+
+enum EvidenceReviewStatus {
+  UPLOADED
+  UNDER_REVIEW
+  ACCEPTED
+  REJECTED
+  EXPIRED
+  RETENTION_PURGED
+}
+
+enum ConversationStatus {
+  ACTIVE
+  BLOCKED
+  ARCHIVED
+}
+
+enum MessageKind {
+  TEXT
+  SYSTEM_NOTICE
+  PROOF_REQUEST
+  PROOF_RESPONSE
+  OFFER_CARD
+  VIEWING_CARD
+}
+
+enum OfferStatus {
+  DRAFT
+  SENT
+  COUNTERED
+  ACCEPTED
+  DECLINED
+  EXPIRED
+  WITHDRAWN
+}
+
+enum ViewingStatus {
+  REQUESTED
+  PROPOSED
+  CONFIRMED
+  CANCELLED
+  EXPIRED
+  CHECKED_IN
+  COMPLETED
+  SAFETY_FOLLOW_UP
+}
+
+enum ViewingPassStatus {
+  ISSUED
+  VIEWED
+  CHECKED_IN
+  INVALIDATED
+  EXPIRED
+}
+
+enum SafetyEventType {
+  ADDRESS_REVEALED
+  PASS_VIEWED
+  PASS_SCANNED
+  SEEKER_CHECKED_IN
+  HOST_CHECKED_IN
+  SEEKER_CHECKED_OUT
+  HOST_CHECKED_OUT
+  CHECKOUT_REMINDER_SENT
+  TRUSTED_CONTACT_ALERTED
+  SAFETY_CONCERN_REPORTED
+  APPOINTMENT_CANCELLED
+}
+
+enum SafetyReportCategory {
+  SUSPICIOUS_BEHAVIOUR
+  FALSE_LISTING
+  HARASSMENT
+  ADDRESS_MISUSE
+  NO_SHOW
+  IMMEDIATE_DANGER
+  OTHER
+}
+
+enum SafetyReportStatus {
+  OPEN
+  TRIAGED
+  ACTION_TAKEN
+  CLOSED
+}
+
+enum NotificationChannel {
+  IN_APP
+  PUSH
+  SMS
+  CONSOLE
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+  CANCELLED
+}
+
+enum AuditActorType {
+  USER
+  SYSTEM
+  REVIEWER
+  ADMIN
+}
+
+// =============================================================================
+// CORE MODELS
+// =============================================================================
+
+model User {
+  id                 String            @id @default(uuid())
+  phoneHash          String            @unique
+  phoneLast4         String
+  displayName        String
+  avatarUrl          String?
+  primaryRole        UserRole
+  identityStatus     IdentityStatus    @default(UNVERIFIED)
+  identityVerifiedAt DateTime?
+  identityExpiresAt  DateTime?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  listings           Listing[]         @relation("ListingOwner")
+  messages           Message[]
+  offersSent         Offer[]           @relation("OfferSender")
+  offersReceived     Offer[]           @relation("OfferRecipient")
+  visitsAsSeeker     Viewing[]         @relation("ViewingSeeker")
+  visitsAsHost       Viewing[]         @relation("ViewingHost")
+  identityVerifications IdentityVerification[]
+  captureSessions    CaptureSession[]
+  privateEvidence    PrivateEvidence[]
+  authoredAuditLogs  AuditLog[]          @relation("AuditActor")
+  notifications      Notification[]
+  conversationsAsSeeker Conversation[] @relation("ConversationSeeker")
+  conversationsAsHost   Conversation[] @relation("ConversationHost")
+  trustedContacts    TrustedContact[]
+  roomScans          RoomScan[]
+}
+
+model Listing {
+  id                    String          @id @default(uuid())
+  slug                  String          @unique
+  ownerId               String
+  owner                 User            @relation("ListingOwner", fields: [ownerId], references: [id])
+  title                 String
+  intent                ListingIntent
+  propertyType          PropertyType
+  status                ListingStatus   @default(DRAFT)
+  publicArea            String
+  exactAddressEncrypted Bytes?
+  exactLatEncrypted     Bytes?
+  exactLngEncrypted     Bytes?
+  approximateLat        Decimal?        @db.Decimal(9, 6)
+  approximateLng        Decimal?        @db.Decimal(9, 6)
+  mapsLink              String?
+  priceAmount           Int
+  currency              String          @default("BDT")
+  livePulseAt           DateTime?
+  livePulseExpiresAt    DateTime?
+  authorityStatus       AuthorityStatus @default(NOT_STARTED)
+  authorityExpiresAt    DateTime?
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+
+  rooms                 Room[]
+  captureSessions       CaptureSession[]
+  realityPassports      RealityPassport[]
+  offers                Offer[]
+  viewings              Viewing[]
+  authorityReviews      AuthorityReview[]
+  conversations         Conversation[]
+  availabilitySlots     AvailabilitySlot[]
+  safetyReports         SafetyReport[] @relation("SafetyReportListing")
+  handoverPassports     HandoverPassport[]
+  roomScans             RoomScan[]
+}
+
+model CaptureSession {
+  id                 String        @id @default(uuid())
+  listingId          String
+  listing            Listing       @relation(fields: [listingId], references: [id])
+  capturedByUserId   String
+  capturedByUser     User          @relation(fields: [capturedByUserId], references: [id])
+  routeVersion       Int
+  status             CaptureStatus @default(IN_PROGRESS)
+  coverageScore      Int           @default(0)
+  startedAt          DateTime      @default(now())
+  submittedAt        DateTime?
+  captureTimestamp   DateTime?
+  metadataJson       Json?
+
+  rooms              Room[]
+  mediaAssets        MediaAsset[]
+  captureRoomProgresses CaptureRoomProgress[]
+  spatialCheckpoints SpatialCheckpoint[]
+  realityPassports   RealityPassport[]
+}
+
+model Room {
+  id               String          @id @default(uuid())
+  listingId        String
+  captureSessionId String?
+  roomType         RoomType
+  displayName      String
+  ordinal          Int
+  captureSession   CaptureSession? @relation(fields: [captureSessionId], references: [id])
+  listing          Listing         @relation(fields: [listingId], references: [id])
+  tourNode         TourNode?
+}
+
+model MediaAsset {
+  id               String            @id @default(uuid())
+  captureSessionId String
+  captureSession   CaptureSession    @relation(fields: [captureSessionId], references: [id])
+  storageKey       String            @unique
+  sha256           String
+  mimeType         String
+  width            Int?
+  height           Int?
+  capturedAt       DateTime?
+  qualityStatus    MediaQualityStatus @default(PENDING)
+  sourceType       MediaSourceType
+  createdAt        DateTime          @default(now())
+}
+
+model RealityPassport {
+  id                 String            @id @default(uuid())
+  listingId          String
+  listing            Listing           @relation(fields: [listingId], references: [id])
+  captureSessionId   String
+  captureSession     CaptureSession    @relation(fields: [captureSessionId], references: [id])
+  reviewLevel        RealityReviewLevel @default(INCOMPLETE)
+  coverageScore      Int               @default(0)
+  publishedAt        DateTime?
+  expiresAt          DateTime?
+  publicStatus       String            @default("INCOMPLETE")
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+}
+
+// =============================================================================
+// SENSITIVE DATA MODELS
+// =============================================================================
+
+model IdentityVerification {
+  id                   String                   @id @default(uuid())
+  userId               String
+  user                 User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  providerType         VerificationProviderType
+  status               VerificationReviewStatus @default(NOT_STARTED)
+  consentVersion       String
+  consentedAt          DateTime
+  providerReferenceEnc Bytes?
+  verifiedNameEnc      Bytes?
+  portraitAssetId      String?
+  verificationDataEnc  Bytes?
+  reviewerId           String?
+  reviewerNoteEnc      Bytes?
+  verifiedAt           DateTime?
+  expiresAt            DateTime?
+  rejectedAt           DateTime?
+  createdAt            DateTime                 @default(now())
+  updatedAt            DateTime                 @updatedAt
+
+  @@index([userId, status])
+  @@index([status, expiresAt])
+}
+
+model SensitiveBlob {
+  id                  String   @id @default(uuid())
+  subjectType         String
+  subjectId           String
+  fieldName           String
+  keyVersion          Int
+  encryptedDek        Bytes
+  iv                  Bytes
+  ciphertext          Bytes
+  authTag             Bytes
+  aadVersion          Int      @default(1)
+  createdAt           DateTime @default(now())
+  rotatedAt           DateTime?
+  purgeAfter          DateTime?
+  purgedAt            DateTime?
+
+  @@unique([subjectType, subjectId, fieldName])
+  @@index([purgeAfter])
+}
+
+model PrivateEvidence {
+  id                  String               @id @default(uuid())
+  userId              String
+  user                User                 @relation(fields: [userId], references: [id])
+  listingId           String?
+  kind                EvidenceKind
+  status              EvidenceReviewStatus @default(UPLOADED)
+  storageKeyEncrypted Bytes
+  fileSha256          String
+  fileMimeType        String
+  fileSizeBytes       Int
+  uploadExpiresAt     DateTime?
+  reviewedByUserId    String?
+  reviewedAt          DateTime?
+  reviewNoteEnc       Bytes?
+  retentionUntil      DateTime
+  purgedAt            DateTime?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  @@index([userId, kind, status])
+  @@index([listingId, kind, status])
+  @@index([retentionUntil])
+}
+
+model AuthorityReview {
+  id                  String          @id @default(uuid())
+  listingId           String
+  listing             Listing         @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  applicantUserId     String
+  authorityRole       AuthorityRole
+  status              AuthorityStatus @default(PENDING)
+  reviewerId          String?
+  reviewedAt          DateTime?
+  expiresAt           DateTime?
+  privateSummaryEnc   Bytes?
+  publicLabel         String
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+
+  @@index([listingId, status])
+  @@index([applicantUserId, status])
+}
+
+model TrustedContact {
+  id                  String   @id @default(uuid())
+  ownerUserId         String
+  owner               User     @relation(fields: [ownerUserId], references: [id])
+  displayNameEnc      Bytes
+  phoneEncrypted      Bytes
+  phoneLast4          String
+  relationshipEnc     Bytes?
+  verifiedAt          DateTime?
+  isActive            Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([ownerUserId, isActive])
+}
+
+// =============================================================================
+// TRANSACTIONAL WORKFLOW MODELS
+// =============================================================================
+
+model AvailabilitySlot {
+  id                  String   @id @default(uuid())
+  listingId           String
+  listing             Listing  @relation(fields: [listingId], references: [id])
+  hostUserId          String
+  startsAt            DateTime
+  endsAt              DateTime
+  capacity            Int      @default(1)
+  confirmedCount      Int      @default(0)
+  isActive            Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([listingId, startsAt, isActive])
+  @@index([hostUserId, startsAt, isActive])
+}
+
+model Conversation {
+  id                  String             @id @default(uuid())
+  listingId           String
+  listing             Listing            @relation(fields: [listingId], references: [id])
+  seekerUserId        String
+  seeker              User               @relation("ConversationSeeker", fields: [seekerUserId], references: [id])
+  hostUserId          String
+  host                User               @relation("ConversationHost", fields: [hostUserId], references: [id])
+  status              ConversationStatus @default(ACTIVE)
+  lastMessageAt       DateTime?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+  messages            Message[]
+
+  @@unique([listingId, seekerUserId, hostUserId])
+  @@index([seekerUserId, lastMessageAt])
+  @@index([hostUserId, lastMessageAt])
+}
+
+model Message {
+  id                  String       @id @default(uuid())
+  conversationId      String
+  conversation        Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderUserId        String
+  sender              User         @relation(fields: [senderUserId], references: [id])
+  kind                MessageKind
+  bodyEncrypted       Bytes?
+  safePreview         String?
+  relatedEntityType   String?
+  relatedEntityId     String?
+  createdAt           DateTime     @default(now())
+  editedAt            DateTime?
+  deletedAt           DateTime?
+
+  @@index([conversationId, createdAt])
+}
+
+model Offer {
+  id                  String      @id @default(uuid())
+  listingId           String
+  listing             Listing     @relation(fields: [listingId], references: [id])
+  conversationId      String
+  senderUserId        String
+  sender              User        @relation("OfferSender", fields: [senderUserId], references: [id])
+  recipientUserId     String
+  recipient           User        @relation("OfferRecipient", fields: [recipientUserId], references: [id])
+  currentVersion      Int         @default(1)
+  status              OfferStatus @default(DRAFT)
+  expiresAt           DateTime?
+  acceptedAt          DateTime?
+  declinedAt          DateTime?
+  withdrawnAt         DateTime?
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+  versions            OfferVersion[]
+
+  @@index([listingId, status])
+  @@index([recipientUserId, status])
+  @@index([expiresAt, status])
+}
+
+model OfferVersion {
+  id                  String   @id @default(uuid())
+  offerId             String
+  offer               Offer    @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  version             Int
+  createdByUserId     String
+  termsJson           Json
+  noteEncrypted       Bytes?
+  createdAt           DateTime @default(now())
+
+  @@unique([offerId, version])
+}
+
+model Viewing {
+  id                  String        @id @default(uuid())
+  listingId           String
+  listing             Listing       @relation(fields: [listingId], references: [id])
+  seekerId            String
+  seeker              User          @relation("ViewingSeeker", fields: [seekerId], references: [id])
+  hostId              String
+  host                User          @relation("ViewingHost", fields: [hostId], references: [id])
+  status              ViewingStatus @default(REQUESTED)
+  startsAt            DateTime?
+  endsAt              DateTime?
+  attendeeCount       Int           @default(1)
+  companionName       String?
+  addressRevealAt     DateTime?
+  exactAddressViewedAt DateTime?
+  seekerCheckedInAt   DateTime?
+  hostCheckedInAt     DateTime?
+  seekerCheckedOutAt  DateTime?
+  hostCheckedOutAt    DateTime?
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+  pass                ViewingPass?
+  safetyEvents        SafetyEvent[]
+
+  @@index([listingId, status])
+  @@index([seekerId, status])
+  @@index([hostId, status])
+}
+
+model ViewingPass {
+  id                  String            @id @default(uuid())
+  viewingId           String            @unique
+  viewing             Viewing           @relation(fields: [viewingId], references: [id], onDelete: Cascade)
+  tokenHash           String            @unique
+  tokenVersion        Int               @default(1)
+  status              ViewingPassStatus @default(ISSUED)
+  issuedAt            DateTime          @default(now())
+  viewedAt            DateTime?
+  checkedInAt         DateTime?
+  invalidatedAt       DateTime?
+  expiresAt           DateTime
+  scanCount           Int               @default(0)
+  lastScannedByUserId String?
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+
+  @@index([expiresAt, status])
+}
+
+model SafetyEvent {
+  id                  String          @id @default(uuid())
+  viewingId           String
+  viewing             Viewing         @relation(fields: [viewingId], references: [id], onDelete: Cascade)
+  actorUserId         String?
+  eventType           SafetyEventType
+  occurredAt          DateTime        @default(now())
+  metadataEncrypted   Bytes?
+  createdAt           DateTime        @default(now())
+
+  @@index([viewingId, occurredAt])
+  @@index([eventType, occurredAt])
+}
+
+model SafetyReport {
+  id                  String             @id @default(uuid())
+  viewingId           String?
+  listingId           String?
+  listing             Listing?           @relation("SafetyReportListing", fields: [listingId], references: [id])
+  reporterUserId      String
+  reportedUserId      String?
+  category            SafetyReportCategory
+  status              SafetyReportStatus @default(OPEN)
+  descriptionEnc      Bytes
+  evidenceAssetIdsEnc Bytes?
+  triagedByUserId     String?
+  triagedAt           DateTime?
+  resolutionEnc       Bytes?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  @@index([status, createdAt])
+  @@index([reporterUserId, createdAt])
+}
+
+model Notification {
+  id                  String             @id @default(uuid())
+  userId              String
+  user                User               @relation(fields: [userId], references: [id])
+  channel             NotificationChannel
+  type                String
+  payloadJson         Json
+  status              NotificationStatus @default(PENDING)
+  scheduledFor        DateTime?
+  sentAt              DateTime?
+  failureReason       String?
+  dedupeKey           String?
+  createdAt           DateTime           @default(now())
+
+  @@unique([userId, dedupeKey])
+  @@index([status, scheduledFor])
+}
+
+model AuditLog {
+  id                  String         @id @default(uuid())
+  actorType           AuditActorType
+  actorUserId         String?
+  actor               User?          @relation("AuditActor", fields: [actorUserId], references: [id])
+  action              String
+  subjectType         String
+  subjectId           String
+  requestId           String?
+  ipHash              String?
+  userAgentHash       String?
+  publicMetadataJson  Json?
+  eventHash           String         @unique
+  previousEventHash   String?
+  createdAt           DateTime       @default(now())
+
+  @@index([subjectType, subjectId, createdAt])
+  @@index([actorUserId, createdAt])
+  @@index([action, createdAt])
+}
+
+// =============================================================================
+// CAPTURE CHECKPOINT MODELS
+// =============================================================================
+
+model CaptureRouteTemplate {
+  id                  String   @id @default(uuid())
+  version             Int      @unique
+  propertyType        PropertyType
+  displayName         String
+  templateJson        Json
+  isActive            Boolean  @default(true)
+  createdAt           DateTime @default(now())
+}
+
+model CaptureRoomProgress {
+  id                     String   @id @default(uuid())
+  captureSessionId       String
+  roomId                 String
+  ordinal                Int
+  requiredCheckpointCount Int
+  acceptedCheckpointCount Int   @default(0)
+  status                 String   @default("NOT_STARTED")
+  startedAt              DateTime?
+  completedAt            DateTime?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  captureSession         CaptureSession @relation(fields: [captureSessionId], references: [id])
+
+  @@unique([captureSessionId, roomId])
+}
+
+model SpatialCheckpoint {
+  id                  String   @id @default(uuid())
+  captureSessionId    String
+  captureSession      CaptureSession @relation(fields: [captureSessionId], references: [id])
+  roomId              String
+  checkpointKey       String
+  ordinal             Int
+  expectedDirection   String
+  holdDurationMs      Int
+  startedAt           DateTime?
+  completedAt         DateTime?
+  deviceHeadingDeg    Decimal? @db.Decimal(7, 3)
+  devicePitchDeg      Decimal? @db.Decimal(7, 3)
+  deviceRollDeg       Decimal? @db.Decimal(7, 3)
+  stabilityScore      Int?
+  brightnessScore     Int?
+  blurScore           Int?
+  coverageStatus      String   @default("PENDING")
+  primaryMediaAssetId String?
+  burstAssetIdsJson   Json?
+  rejectionReason     String?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@unique([captureSessionId, roomId, checkpointKey])
+  @@index([captureSessionId, ordinal])
+}
+
+model TourNode {
+  id                  String   @id @default(uuid())
+  roomId              String   @unique
+  room                Room     @relation(fields: [roomId], references: [id])
+  panoramaAssetId     String?
+  previewAssetId      String
+  mapX                Decimal? @db.Decimal(8, 4)
+  mapY                Decimal? @db.Decimal(8, 4)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  fromEdges            TourEdge[] @relation("FromNode")
+  toEdges              TourEdge[] @relation("ToNode")
+}
+
+model TourEdge {
+  id                  String   @id @default(uuid())
+  fromNodeId          String
+  fromNode            TourNode @relation("FromNode", fields: [fromNodeId], references: [id])
+  toNodeId            String
+  toNode              TourNode @relation("ToNode", fields: [toNodeId], references: [id])
+  doorwayLabel        String
+  hotspotYaw          Decimal? @db.Decimal(8, 4)
+  hotspotPitch        Decimal? @db.Decimal(8, 4)
+  createdAt           DateTime @default(now())
+
+  @@unique([fromNodeId, toNodeId])
+}
+
+// =============================================================================
+// DORJA HANDOVER MODULE
+// =============================================================================
+
+enum HandoverPassportStatus {
+  PREPARING
+  ACTIVE
+  HANDOVER_REVIEW
+  CLOSED
+}
+
+enum HandoverParticipantRole {
+  BUYER
+  DEVELOPER_REPRESENTATIVE
+  OWNER_REPRESENTATIVE
+  VIEWER
+}
+
+enum PromiseCategory {
+  HANDOVER_DATE
+  PAYMENT_TERM
+  PRICE_OR_FEE
+  UNIT_SIZE_OR_LAYOUT
+  PARKING
+  FITMENT_OR_MATERIAL
+  UTILITY_OR_SERVICE
+  REGISTRATION_OR_DOCUMENT
+  OTHER
+}
+
+enum PromiseStatus {
+  DRAFT
+  PENDING_ACKNOWLEDGEMENT
+  ACKNOWLEDGED
+  EVIDENCE_SUBMITTED
+  CHANGE_PROPOSED
+  REMEDY_OPEN
+  REMEDY_IN_PROGRESS
+  RESOLVED
+  CONTESTED
+  ARCHIVED
+}
+
+enum HandoverEvidenceType {
+  PHOTO
+  DOCUMENT
+  RECEIPT
+  PAYMENT_REFERENCE
+  MESSAGE_NOTE
+  EXISTING_DORJA_CAPTURE_REFERENCE
+  SITE_UPDATE
+  OTHER
+}
+
+enum RemedyPriority {
+  LOW
+  NORMAL
+  HIGH
+}
+
+enum RemedyStatus {
+  OPEN
+  ACKNOWLEDGED
+  REMEDY_PROPOSED
+  IN_PROGRESS
+  READY_FOR_REVIEW
+  RESOLVED
+  CONTESTED
+  CLOSED
+}
+
+enum HandoverEventType {
+  PASSPORT_CREATED
+  PROMISE_CREATED
+  PROMISE_ACKNOWLEDGED
+  PROMISE_CHANGE_PROPOSED
+  PROMISE_CONTESTED
+  EVIDENCE_ADDED
+  REMEDY_OPENED
+  REMEDY_DATE_PROPOSED
+  REMEDY_DATE_ACCEPTED
+  REMEDY_READY_FOR_REVIEW
+  REMEDY_RESOLVED
+  REMEDY_CONTESTED
+  EVIDENCE_PACK_EXPORTED
+}
+
+model HandoverPassport {
+  id                      String                @id @default(uuid())
+  listingId               String
+  listing                 Listing               @relation(fields: [listingId], references: [id])
+  status                  HandoverPassportStatus @default(PREPARING)
+  agreementDate           DateTime?
+  latestActivityAt        DateTime?
+  promiseResolvedCount    Int                   @default(0)
+  promiseTotalCount       Int                   @default(0)
+  createdAt               DateTime              @default(now())
+  updatedAt               DateTime              @updatedAt
+
+  participants            HandoverParticipant[]
+  promises                Promise[]
+  evidence                HandoverEvidence[]
+  remedies                RemedyIssue[]
+  events                  HandoverEvent[]
+
+  @@index([listingId])
+}
+
+model HandoverParticipant {
+  id                  String                   @id @default(uuid())
+  passportId          String
+  passport            HandoverPassport         @relation(fields: [passportId], references: [id], onDelete: Cascade)
+  userId              String
+  role                HandoverParticipantRole  @default(VIEWER)
+  invitedAt           DateTime                 @default(now())
+  acceptedAt          DateTime?
+
+  @@unique([passportId, userId])
+  @@index([passportId])
+  @@index([userId])
+}
+
+model Promise {
+  id                      String          @id @default(uuid())
+  passportId              String
+  passport                HandoverPassport @relation(fields: [passportId], references: [id], onDelete: Cascade)
+  category                PromiseCategory
+  title                   String
+  originalPromiseText     String
+  sourceReferenceLabel    String?
+  sourceDocumentUrl       String?
+  promisedDate            DateTime?
+  promisedAmount          Int?
+  currency                String          @default("BDT")
+  originallyCreatedByUserId String
+  currentStatus           PromiseStatus   @default(DRAFT)
+  acknowledgementStatus   String          @default("PENDING_ACKNOWLEDGEMENT")
+  acknowledgedByUserId    String?
+  acknowledgedAt          DateTime?
+  createdAt               DateTime        @default(now())
+  updatedAt               DateTime        @updatedAt
+
+  revisions               PromiseRevision[]
+  evidence                HandoverEvidence[]
+  remedies                RemedyIssue[]
+
+  @@index([passportId, currentStatus])
+  @@index([passportId, createdAt])
+}
+
+model PromiseRevision {
+  id              String   @id @default(uuid())
+  promiseId       String
+  promise         Promise  @relation(fields: [promiseId], references: [id], onDelete: Cascade)
+  revisionNumber  Int
+  proposedText    String?
+  proposedDate    DateTime?
+  proposedAmount  Int?
+  proposerUserId  String
+  note            String?
+  state           String   @default("PROPOSED")
+  createdAt       DateTime @default(now())
+
+  @@unique([promiseId, revisionNumber])
+  @@index([promiseId, createdAt])
+}
+
+model HandoverEvidence {
+  id              String                @id @default(uuid())
+  passportId      String
+  passport        HandoverPassport       @relation(fields: [passportId], references: [id], onDelete: Cascade)
+  promiseId       String?
+  promise         Promise?               @relation(fields: [promiseId], references: [id])
+  remedyId        String?
+  remedy          RemedyIssue?           @relation(fields: [remedyId], references: [id])
+  submitterUserId String
+  evidenceType    HandoverEvidenceType
+  label           String
+  storageKey      String?
+  visibleNote     String?
+  privateNote     String?
+  createdAt       DateTime              @default(now())
+
+  @@index([passportId, createdAt])
+  @@index([promiseId])
+  @@index([remedyId])
+}
+
+model RemedyIssue {
+  id                      String          @id @default(uuid())
+  passportId              String
+  passport                HandoverPassport @relation(fields: [passportId], references: [id], onDelete: Cascade)
+  linkedPromiseId         String?
+  linkedPromise           Promise?         @relation(fields: [linkedPromiseId], references: [id])
+  title                   String
+  description             String?
+  createdByUserId         String
+  priority                RemedyPriority  @default(NORMAL)
+  status                  RemedyStatus    @default(OPEN)
+  proposedCompletionAt    DateTime?
+  acceptedCompletionAt    DateTime?
+  closedAt                DateTime?
+  lastActorUserId         String?
+  createdAt               DateTime        @default(now())
+  updatedAt               DateTime        @updatedAt
+
+  evidence                HandoverEvidence[]
+
+  @@index([passportId, status])
+  @@index([linkedPromiseId])
+}
+
+model HandoverEvent {
+  id              String              @id @default(uuid())
+  passportId      String
+  passport        HandoverPassport     @relation(fields: [passportId], references: [id], onDelete: Cascade)
+  actorUserId     String?
+  eventType       HandoverEventType
+  entityType      String?
+  entityId        String?
+  publicMetadata  Json?
+  createdAt       DateTime            @default(now())
+
+  @@index([passportId, createdAt])
+  @@index([eventType, createdAt])
+}
+
+// =============================================================================
+// 3D ROOM SCANNING
+// =============================================================================
+
+model RoomScan {
+  id              String           @id @default(uuid())
+  listingId       String?
+  listing         Listing?         @relation(fields: [listingId], references: [id])
+  userId          String
+  user            User             @relation(fields: [userId], references: [id])
+  status          String           @default("PROCESSING")
+  roomType        String?
+  roomName        String?
+  frameCount      Int              @default(0)
+  coveragePercent Float?
+  scanData        Json?
+  modelUrl        String?
+  thumbnailUrl    String?
+  durationMs      Int?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@index([listingId])
+  @@index([userId])
+}

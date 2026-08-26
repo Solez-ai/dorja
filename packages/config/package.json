@@ -1,0 +1,12 @@
+{
+  "name": "@dorja/config",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./tsconfig.base": "./tsconfig.base.json"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0"
+  }
+}
