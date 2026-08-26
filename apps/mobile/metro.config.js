@@ -15,10 +15,11 @@ config.resolver.nodeModulesPaths = [
   path.resolve(monorepoRoot, 'node_modules'),
 ];
 
-// Ensure react-native-web is found from nested packages
+// Ensure react-native-web and @babel/runtime are found from nested packages
 config.resolver.extraNodeModules = {
   'react-native-web': path.resolve(projectRoot, 'node_modules/react-native-web'),
   'react-native': path.resolve(projectRoot, 'node_modules/react-native'),
+  '@babel/runtime': path.resolve(projectRoot, 'node_modules/@babel/runtime'),
 };
 
 module.exports = config;

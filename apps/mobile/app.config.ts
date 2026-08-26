@@ -5,12 +5,12 @@ const config: ExpoConfig = {
   slug: 'dorja',
   version: '1.0.0',
   orientation: 'portrait',
-  icon: '../Assets/android-app-icon-512.png',
+  icon: './assets/android-app-icon-512.png',
   scheme: 'dorja',
   userInterfaceStyle: 'light',
   newArchEnabled: true,
   splash: {
-    image: '../Assets/dorja-logo-512-transparent.png',
+    image: './assets/dorja-logo-512-transparent.png',
     resizeMode: 'contain',
     backgroundColor: '#FBF8F2',
   },
@@ -23,7 +23,7 @@ const config: ExpoConfig = {
   },
   android: {
     adaptiveIcon: {
-      foregroundImage: '../Assets/android-adaptive-foreground-432.png',
+      foregroundImage: './assets/android-adaptive-foreground-432.png',
       backgroundColor: '#FBF8F2',
     },
     package: 'com.dorja.app',
@@ -31,10 +31,15 @@ const config: ExpoConfig = {
     permissions: ['CAMERA', 'INTERNET', 'ACCESS_NETWORK_STATE'],
     backgroundColor: '#0B1F33',
   },
+  extra: {
+    eas: {
+      projectId: 'f944c233-7540-46c6-b3ba-c0f7fbcfe9db',
+    },
+  },
   web: {
     bundler: 'metro',
     output: 'static',
-    favicon: '../Assets/favicon.ico',
+    favicon: './assets/favicon.ico',
   },
   plugins: [
     'expo-router',
@@ -50,7 +55,7 @@ const config: ExpoConfig = {
     [
       'expo-splash-screen',
       {
-        image: '../Assets/dorja-logo-512-transparent.png',
+        image: './assets/dorja-logo-512-transparent.png',
         resizeMode: 'contain',
         backgroundColor: '#FBF8F2',
       },
