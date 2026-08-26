@@ -16,9 +16,13 @@ import {
   IBMPlexMono_500Medium,
 } from '@expo-google-fonts/dev';
 import { BackendGate } from '../components/BackendGate';
+import { loadSavedApiUrl } from '../config';
 
 // Keep splash screen visible while loading fonts
 SplashScreen.preventAutoHideAsync().catch(() => {});
+
+// Load any saved backend URL from AsyncStorage at startup
+loadSavedApiUrl().catch(() => {});
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({

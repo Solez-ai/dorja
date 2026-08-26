@@ -13,7 +13,7 @@ import { router } from 'expo-router';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Ionicons } from '@expo/vector-icons';
 import { ensureAuth, authFetch } from '../../lib/api';
-import { API_URL } from '../../config';
+
 import { checkDeviceCapabilities, DeviceCapabilities } from '../../lib/device';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 

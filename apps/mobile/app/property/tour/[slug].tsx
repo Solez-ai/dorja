@@ -13,7 +13,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { API_URL } from '../../../config';
+import { getApiUrl } from '../../../config';
 
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 const JOYSTICK_SIZE = 120;
@@ -81,7 +81,7 @@ export default function TourScreen() {
 
   useEffect(() => {
     if (!slug) return;
-    fetch(`${API_URL}/v1/listings/${slug}`)
+    fetch(`${getApiUrl()}/v1/listings/${slug}`)
       .then((r) => r.json())
       .then((d) => {
         if (d.data) setListing(d.data);

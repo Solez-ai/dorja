@@ -90,6 +90,108 @@ New-NetFirewallRule -DisplayName "Expo Dev Server" -Direction Inbound -LocalPort
 
 ---
 
+## Changing the Backend URL (Without Rebuilding)
+
+The mobile APK remembers the last backend URL you entered. **No rebuild needed** when you move to a different WiFi network.
+
+### On the Phone (Error Screen)
+
+If the app shows **"Server not found"**:
+
+1. Tap **"Change server URL"**
+2. Enter the new backend URL (e.g. `http://192.168.1.100:4000`)
+3. Tap **"Save & Test"**
+4. The app re-checks the connection and loads if successful
+
+### How to Find the Server's IP
+
+#### Option A: You're on YOUR OWN machine (easiest)
+
+**PowerShell:**
+
+```powershell
+ipconfig | findstr "IPv4"
+# Example output:
+#   IPv4 Address. . . . . . . : 192.168.68.101
+```
+
+Use that IP as: `http://192.168.68.101:4000`
+
+#### Option B: You're on SOMEONE ELSE's WiFi (you need their IP)
+
+Ask the person whose WiFi you're on to run this on their machine:
+
+```powershell
+ipconfig | findstr "IPv4"
+```
+
+They'll see something like:
+
+```text
+   IPv4 Address. . . . . . . : 192.168.1.42
+```
+
+**You then use:** `http://192.168.1.42:4000`
+
+> **Important:** Both your phone AND the server machine must be on the **same WiFi network**. If you're on `Friends_WiFi` and the server is on `Home_WiFi`, it won't work — join the same network first.
+
+#### Option C: The server isn't on your network at all
+
+If the API server is on a different network entirely (e.g. someone's house and you're elsewhere), you can't use a LAN IP. Options:
+
+1. **Expose the port** — use ngrok or Cloudflare Tunnel on the server machine:
+   ```powershell
+   # On the server machine:
+   ngrok http 4000
+   # Gives you a public URL like: https://abc123.ngrok-free.app
+   ```
+   Then enter that URL in the app.
+
+2. **Run your own server** — clone the repo and run the stack locally on your machine.
+
+3. **Use a VPN** — if both machines are on the same VPN (e.g. Tailscale), use the VPN IP.
+
+#### Option D: You're presenting at a venue and don't know the network
+
+1. Run the API server on your laptop
+2. Connect your laptop to the venue WiFi
+3. Run `ipconfig | findstr "IPv4"` to get your laptop's IP on that network
+4. Enter `http://YOUR_LAPTOP_IP:4000` in the app
+5. Make sure your phone is also on the venue WiFi
+
+> **Pro tip:** Before the demo, always test the connection from your phone to your laptop on the target network. Open the DORJA app → if you see "Server not found", tap "Change server URL" and enter the correct IP.
+
+### Where the URL is Stored
+
+- The URL is saved in **AsyncStorage** on the device (`@dorja/api_url`)
+- It persists across app restarts — you only need to enter it once per network
+- The app checks this saved URL first, then falls back to the build-time default
+
+### Setting the URL Before First Launch (EAS Build)
+
+For cloud-built APKs, set `EXPO_PUBLIC_API_URL` as an EAS secret so the APK ships with the correct URL:
+
+```powershell
+cd apps/mobile
+easel secrets:create EXPO_PUBLIC_API_URL --value http://YOUR_IP:4000
+```
+
+Then rebuild:
+
+eas build --platform android --profile preview
+
+On subsequent networks, the user can change it from the error screen.
+
+### Quick Reference: Common URLs
+
+| Network | Server IP | URL |
+|---------|-----------|-----|
+| Home WiFi | Find with `ipconfig` | `http://192.168.x.x:4000` |
+| Coffee shop | Your laptop hotspot | `http://192.168.43.1:4000` |
+| Expo tunnel | Auto-assigned | Use `npx expo start --tunnel` instead |
+
+---
+
 ## Building the Mobile App for Submission
 
 **NEVER build with Gradle locally.** Use EAS Build:
@@ -250,6 +352,67 @@ EAS builds in the cloud — no local Android SDK or Xcode needed.
 
 ---
 
+## 🚨 CRITICAL: Fix "Server not found" on Phone (Do This First)
+
+If your phone shows **"Server not found"** and you've confirmed the API server is running on your PC, the problem is **Windows Firewall blocking port 4000**. This is the #1 reason LAN connections fail on Windows.
+
+### Step 1: Open Windows Firewall (run ONCE)
+
+Open **PowerShell as Administrator** (right-click → "Run as administrator") and run:
+
+```powershell
+New-NetFirewallRule -DisplayName "DORJA API" -Direction Inbound -LocalPort 4000 -Protocol TCP -Action Allow
+```
+
+This creates a permanent firewall rule. You only need to do this **once**.
+
+### Step 2: Verify the server is reachable from your phone
+
+On your phone, open a browser and go to:
+
+```
+http://YOUR_PC_IP:4000/v1/health
+```
+
+Replace `YOUR_PC_IP` with your PC's LAN IP (find it with `ipconfig | findstr "IPv4"`).
+
+- ✅ If you see `{"status":"ok"}` → server is reachable, the firewall fix worked
+- ❌ If it times out → double-check you ran the firewall command as Administrator
+
+### Step 3: Make sure phone and PC are on the same WiFi
+
+Your phone **must** be connected to the **same WiFi network** as your PC. If your phone is on mobile data or a different WiFi, it can't reach your PC.
+
+### Step 4: Rebuild the APK (one time only)
+
+Your current APK was built **before** the runtime URL editor was added. You need **one rebuild** to get the "Change server URL" button on the error screen.
+
+```powershell
+cd apps/mobile
+
+# Set the EAS secret with your home IP
+easel secrets:create EXPO_PUBLIC_API_URL --value http://YOUR_HOME_IP:4000
+
+# Build the APK
+eas build --platform android --profile preview
+```
+
+After this **one rebuild**, the APK will:
+1. Ship with your home URL pre-configured
+2. Have the "Change server URL" button on the error screen
+3. Let you change the URL at runtime (no more rebuilds needed)
+
+### Step 5: When you go somewhere else
+
+1. Open the app → "Server not found" appears
+2. Tap **"Change server URL"**
+3. Enter `http://NEW_SERVER_IP:4000`
+4. Tap **"Save & Test"** → connected ✅
+
+The URL persists on the device — you only need to enter it once per network.
+
+---
+
 ## Troubleshooting
 
 | Problem | Fix |
@@ -259,9 +422,14 @@ EAS builds in the cloud — no local Android SDK or Xcode needed.
 | "ECONNREFUSED" on DB | `docker compose -f infra/docker-compose.yml up -d` |
 | Listing not showing | Check API is running, refresh the page |
 | 3D view black | Click a room tab to select a room |
-| Mobile can't reach API | Use `http://<your-ip>:4000` not `localhost` |
+| Mobile can't reach API | **Windows Firewall fix** (see section above). Then use `http://<your-ip>:4000` |
+| Mobile "Server not found" | 1) Run firewall command as Admin. 2) Verify phone + PC on same WiFi. 3) Tap "Change server URL" → enter correct IP |
+| Phone can reach API in browser but not in app | Rebuild the APK once to get the runtime URL editor (see Step 4 above) |
 | Prisma errors | `cd apps/api && npx prisma generate` |
 | Port 3000 busy | `npx next dev --port 3001` |
 | Mobile Expo won't start | `npx expo start --tunnel` |
 | Phone can't scan QR | Make sure same WiFi, or use tunnel mode |
 | Build APK locally failing | Use `eas build` instead — never Gradle locally |
+| APK URL is wrong | Tap "Change server URL" on the error screen — no rebuild needed |
+| Changed networks | Same as above — enter the new server IP from the error screen |
+| Still can't connect after firewall fix | Try `telnet YOUR_IP 4000` from another device on the same network to verify port is open |

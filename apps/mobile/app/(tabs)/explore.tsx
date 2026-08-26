@@ -12,7 +12,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Link } from 'expo-router';
 import { Icon, Badge } from '../../components/Icons';
-import { API_URL } from '../../config';
+import { getApiUrl } from '../../config';
 
 const FILTER_CHIPS = [
   { label: 'For rent', icon: 'home' },
@@ -47,7 +47,7 @@ export default function ExploreScreen() {
 
   const fetchListings = useCallback(async () => {
     try {
-      const res = await fetch(`${API_URL}/v1/listings`);
+      const res = await fetch(`${getApiUrl()}/v1/listings`);
       const data = await res.json();
       if (data.data?.items) {
         setListings(data.data.items);

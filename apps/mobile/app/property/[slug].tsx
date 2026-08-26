@@ -11,7 +11,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, router } from 'expo-router';
 import { Icon, Badge } from '../../components/Icons';
-import { API_URL } from '../../config';
+import { getApiUrl } from '../../config';
 
 const SCREEN_W = Dimensions.get('window').width;
 
@@ -45,7 +45,7 @@ export default function PropertyDetailScreen() {
 
   useEffect(() => {
     if (!slug) return;
-    fetch(`${API_URL}/v1/listings/${slug}`)
+    fetch(`${getApiUrl()}/v1/listings/${slug}`)
       .then((r) => r.json())
       .then((d) => {
         if (d.data) setListing(d.data);

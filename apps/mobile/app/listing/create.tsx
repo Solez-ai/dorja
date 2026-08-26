@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Icon, Badge } from '../../components/Icons';
 import { ensureAuth, authFetch } from '../../lib/api';
-import { API_URL } from '../../config';
+import { getApiUrl } from '../../config';
 
 const ROOM_TYPES = [
   { value: 'LIVING_ROOM', label: 'Living Room', icon: 'home' },
@@ -70,7 +70,7 @@ export default function CreateListingScreen() {
       if (!auth?.token) { Alert.alert('Auth failed', 'Could not authenticate.'); setLoading(false); return; }
       const token = auth.token;
 
-      const lr = await fetch(API_URL + '/v1/listings', {
+      const lr = await fetch(getApiUrl() + '/v1/listings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
         body: JSON.stringify({
@@ -85,7 +85,7 @@ export default function CreateListingScreen() {
         for (let i = 0; i < rooms.length; i++) {
           if (rooms[i].photo) {
             try {
-              await fetch(API_URL + '/v1/photos/upload', {
+              await fetch(getApiUrl() + '/v1/photos/upload', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
                 body: JSON.stringify({

@@ -1,43 +1,74 @@
 import Constants from 'expo-constants';
-import { Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-/**
- * API URL configuration.
- * On a real phone, localhost doesn't work — we need the PC's actual IP.
- * Set DORJA_API_URL env var or it auto-detects from Expo's manifest.
- *
- * For EAS builds or when running on a phone:
- *   - expo start --tunnel  (uses tunnel, set DORJA_API_URL to tunnel URL)
- *   - expo start           (same network, auto-detects local IP)
- */
 const DEV_PORT = 4000;
+const STORAGE_KEY = '@dorja/api_url';
 
-function getDevHost(): string {
-  // In Expo Go / dev client, the debugger host is set by Expo
-  const debuggerHost = Constants.expoConfig?.hostUri ?? Constants.manifest2?.extra?.expoGo?.debuggerHost;
+// ─── Default URL resolution (build-time) ───────────────────────────
+function getDefaultApiUrl(): string {
+  const envUrl = process.env.EXPO_PUBLIC_API_URL;
+  if (envUrl) return envUrl;
+
+  const debuggerHost =
+    Constants.expoConfig?.hostUri ??
+    Constants.manifest2?.extra?.expoGo?.debuggerHost;
   if (debuggerHost) {
-    // debuggerHost is like "192.168.1.5:19000" — we need just the IP
     const ip = debuggerHost.split(':')[0];
     if (ip && ip !== 'localhost' && ip !== '127.0.0.1') {
-      return ip;
+      return `http://${ip}:${DEV_PORT}`;
     }
   }
-  // Fallback for web or local development
-  return 'localhost';
+
+  return `http://localhost:${DEV_PORT}`;
 }
 
-const host = getDevHost();
-const isDev = host === 'localhost';
+// ─── Global-backed mutable state ───────────────────────────────────
+// Using a global object so every module that calls getApiUrl()
+// always sees the current value, even after setApiUrl() mutates it.
+const G = globalThis as Record<string, any>;
+if (!G.__DORJA_CONFIG__) {
+  G.__DORJA_CONFIG__ = { apiUrl: getDefaultApiUrl() };
+}
+const cfg: { apiUrl: string } = G.__DORJA_CONFIG__;
 
-export const API_URL = isDev
-  ? `http://localhost:${DEV_PORT}`
-  : `http://${host}:${DEV_PORT}`;
+/** Synchronous getter — returns the currently active backend URL. */
+export function getApiUrl(): string {
+  return cfg.apiUrl;
+}
 
-// For EAS builds or explicit override
-export const EXPO_API_URL = process.env.EXPO_PUBLIC_API_URL || API_URL;
+/** Read the persisted URL from AsyncStorage (call once at startup). */
+export async function loadSavedApiUrl(): Promise<string> {
+  try {
+    const saved = await AsyncStorage.getItem(STORAGE_KEY);
+    if (saved && saved.trim().length > 0) {
+      cfg.apiUrl = saved.trim();
+    }
+  } catch {
+    // AsyncStorage unavailable — keep default
+  }
+  return cfg.apiUrl;
+}
+
+/** Persist a new backend URL and update the in-memory value. */
+export async function setApiUrl(url: string): Promise<void> {
+  const trimmed = url.trim().replace(/\/+$/, '');
+  cfg.apiUrl = trimmed;
+  await AsyncStorage.setItem(STORAGE_KEY, trimmed);
+}
+
+/** Clear saved URL and revert to the build-time default. */
+export async function resetApiUrl(): Promise<void> {
+  cfg.apiUrl = getDefaultApiUrl();
+  await AsyncStorage.removeItem(STORAGE_KEY);
+}
+
+// ─── Legacy named export for backwards compat ──────────────────────
+// NOTE: This is evaluated once at import time.  Prefer getApiUrl()
+// for any code that needs the *current* value after a runtime change.
+export const API_URL: string = cfg.apiUrl;
 
 export default {
-  API_URL: EXPO_API_URL,
+  get API_URL() { return cfg.apiUrl; },
   appName: 'DORJA',
   colors: {
     ink950: '#0B1F33',
