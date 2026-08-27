@@ -31,6 +31,7 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -52,6 +53,8 @@ import com.example.ui.components.DorjaBadge
 import com.example.ui.theme.DorjaColors
 import com.example.ui.util.Formatters
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @Composable
 fun ChatThreadScreen(
@@ -66,8 +69,22 @@ fun ChatThreadScreen(
     val messages by repository.getMessagesByConversation(conversationId).collectAsState(initial = emptyList())
     var inputText by remember { mutableStateOf("") }
 
-    val otherPartyName = if (userId == "u1") "Karim Hassan" else "Rahim Ahmed"
-    val otherPartyPhone = if (userId == "u1") "+880 1812-***678" else "+880 1712-***678"
+    var otherPartyName by remember { mutableStateOf("") }
+    var otherPartyPhone by remember { mutableStateOf("") }
+    var otherPartyId by remember { mutableStateOf("") }
+    LaunchedEffect(conversationId) {
+        withContext(Dispatchers.IO) {
+            val conv = DorjaApp.instance.repository.getConversationById(conversationId)
+            if (conv != null) {
+                otherPartyId = if (userId == conv.hostUserId) conv.seekerUserId else conv.hostUserId
+                val otherUser = DorjaApp.instance.repository.getUserById(otherPartyId)
+                withContext(Dispatchers.Main) {
+                    otherPartyName = otherUser?.displayName?.ifBlank { otherUser.username } ?: otherPartyId
+                    otherPartyPhone = otherUser?.phone ?: ""
+                }
+            }
+        }
+    }
 
     Column(
         modifier = Modifier

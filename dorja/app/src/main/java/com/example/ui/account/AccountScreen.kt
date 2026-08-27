@@ -70,6 +70,9 @@ import com.example.ui.components.DorjaOutlinedButton
 import com.example.ui.theme.DorjaColors
 import kotlinx.coroutines.launch
 import androidx.compose.material3.CircularProgressIndicator
+import com.example.R
+import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
 
 @Composable
 fun AccountScreen(
@@ -261,17 +264,27 @@ fun AccountScreen(
                 .background(DorjaColors.CanvasBg)
                 .padding(top = 44.dp, start = 16.dp, end = 16.dp, bottom = 12.dp)
         ) {
-            Text(
-                text = "My Dorja Account",
-                style = MaterialTheme.typography.titleLarge,
-                color = DorjaColors.Ink950,
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                text = "Identity & Real Estate Credentials • Local Persistence",
-                style = MaterialTheme.typography.bodySmall,
-                color = DorjaColors.Gray700
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Image(
+                    painter = painterResource(id = R.drawable.ic_dorja_logo),
+                    contentDescription = "Dorja Logo",
+                    modifier = Modifier.size(36.dp)
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Column {
+                    Text(
+                        text = "My Dorja Account",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = DorjaColors.Ink950,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "Identity & Real Estate Credentials • Local Persistence",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = DorjaColors.Gray700
+                    )
+                }
+            }
         }
 
         LazyColumn(

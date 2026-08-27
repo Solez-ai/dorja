@@ -103,7 +103,7 @@ fun DorjaNavHost() {
         composable(Screen.Splash.route) {
             SplashScreen(
                 onTimeout = {
-                    navController.navigate(Screen.Main.route) {
+                    navController.navigate(Screen.Auth.route) {
                         popUpTo(Screen.Splash.route) { inclusive = true }
                     }
                 }

@@ -26,6 +26,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -40,6 +44,10 @@ import com.example.ui.components.DorjaBadge
 import com.example.ui.components.DorjaCard
 import com.example.ui.theme.DorjaColors
 import com.example.ui.util.Formatters
+import com.example.R
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.res.painterResource
 
 @Composable
 fun InboxScreen(
@@ -68,18 +76,26 @@ fun InboxScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
-                    Text(
-                        text = "Encrypted Inbox",
-                        style = MaterialTheme.typography.titleLarge,
-                        color = DorjaColors.Ink950,
-                        fontWeight = FontWeight.Bold
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Image(
+                        painter = painterResource(id = R.drawable.ic_dorja_logo),
+                        contentDescription = "Dorja Logo",
+                        modifier = Modifier.size(36.dp)
                     )
-                    Text(
-                        text = "Zero-leak real estate messaging channel",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = DorjaColors.Gray700
-                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column {
+                        Text(
+                            text = "Encrypted Inbox",
+                            style = MaterialTheme.typography.titleLarge,
+                            color = DorjaColors.Ink950,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Zero-leak real estate messaging channel",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = DorjaColors.Gray700
+                        )
+                    }
                 }
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -136,8 +152,20 @@ fun InboxScreen(
                 modifier = Modifier.fillMaxSize()
             ) {
                 items(conversations, key = { it.id }) { conv ->
-                    val otherPartyName = if (userId == conv.hostUserId) "Karim Hassan" else "Rahim Ahmed"
-                    val otherRole = if (userId == conv.hostUserId) "BUYER" else "HOST / OWNER"
+                    // Resolve other party from DB
+                    val otherId = if (userId == conv.hostUserId) conv.seekerUserId else conv.hostUserId
+                    var otherName by remember(conv.id) { mutableStateOf("") }
+                    var otherRole by remember(conv.id) { mutableStateOf("") }
+                    val scope = rememberCoroutineScope()
+                    remember(conv.id) {
+                        scope.launch(Dispatchers.IO) {
+                            val otherUser = DorjaApp.instance.repository.getUserById(otherId)
+                            withContext(Dispatchers.Main) {
+                                otherName = otherUser?.displayName?.ifBlank { otherUser.username } ?: otherId
+                                otherRole = otherUser?.role ?: ""
+                            }
+                        }
+                    }
 
                     DorjaCard(
                         modifier = Modifier
@@ -149,7 +177,7 @@ fun InboxScreen(
                             modifier = Modifier.padding(14.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            DorjaAvatar(name = otherPartyName, size = 44.dp)
+                            DorjaAvatar(name = otherName.ifBlank { otherId }, size = 44.dp)
                             Spacer(modifier = Modifier.width(12.dp))
                             Column(modifier = Modifier.weight(1f)) {
                                 Row(
@@ -158,7 +186,7 @@ fun InboxScreen(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Text(
-                                        text = otherPartyName,
+                                        text = otherName.ifBlank { otherId },
                                         style = MaterialTheme.typography.titleSmall,
                                         color = DorjaColors.Ink950,
                                         fontWeight = FontWeight.Bold
@@ -172,7 +200,7 @@ fun InboxScreen(
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     DorjaBadge(
-                                        text = otherRole,
+                                        text = otherRole.ifBlank { "USER" },
                                         backgroundColor = DorjaColors.Sand100,
                                         textColor = DorjaColors.Ink950
                                     )

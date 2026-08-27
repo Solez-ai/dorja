@@ -54,6 +54,8 @@ import com.example.ui.theme.DorjaColors
 import com.example.ui.util.Formatters
 import com.example.ui.util.QrCodeGenerator
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @Composable
 fun ViewingPassScreen(
@@ -64,12 +66,23 @@ fun ViewingPassScreen(
     val scope = rememberCoroutineScope()
     var viewing by remember { mutableStateOf<Viewing?>(null) }
     var qrBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
+    var listingTitle by remember { mutableStateOf("") }
+    var listingAddress by remember { mutableStateOf("") }
+    var listingArea by remember { mutableStateOf("") }
 
     LaunchedEffect(viewingId) {
         val loaded = repository.getViewingById(viewingId)
         viewing = loaded
         if (loaded != null) {
             qrBitmap = QrCodeGenerator.generateQrImageBitmap(loaded.passToken, 512)
+            withContext(Dispatchers.IO) {
+                val listing = repository.getListingById(loaded.listingId)
+                withContext(Dispatchers.Main) {
+                    listingTitle = listing?.title ?: "Property"
+                    listingAddress = listing?.exactAddress?.ifBlank { "Address revealed upon check-in" } ?: "Address revealed upon check-in"
+                    listingArea = listing?.publicArea ?: ""
+                }
+            }
         }
     }
 
@@ -224,7 +237,7 @@ fun ViewingPassScreen(
                                         fontWeight = FontWeight.Bold
                                     )
                                     Text(
-                                        text = "House 42, Road 7, Block C, Mirpur 11, Dhaka 1216",
+                                        text = listingAddress,
                                         style = MaterialTheme.typography.bodySmall,
                                         color = DorjaColors.Gray700
                                     )
@@ -235,9 +248,10 @@ fun ViewingPassScreen(
                         Spacer(modifier = Modifier.height(16.dp))
 
                         // Details Summary
+                        PassDetailRow(label = "Property", value = listingTitle)
                         PassDetailRow(label = "Time Slot", value = "${Formatters.formatTimeOnly(pass.startsAt)} - ${Formatters.formatTimeOnly(pass.endsAt)}")
                         PassDetailRow(label = "Date", value = Formatters.formatDateOnly(pass.startsAt))
-                        PassDetailRow(label = "GPS Geofence", value = "Active & Verified (Mirpur 11)")
+                        PassDetailRow(label = "GPS Geofence", value = if (listingArea.isNotBlank()) "Active & Verified ($listingArea)" else "Active & Verified")
 
                         if (pass.status != "CHECKED_IN") {
                             Spacer(modifier = Modifier.height(20.dp))

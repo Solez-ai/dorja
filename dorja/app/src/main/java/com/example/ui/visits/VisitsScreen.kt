@@ -33,9 +33,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -54,7 +58,13 @@ import com.example.ui.components.DorjaOutlinedButton
 import com.example.ui.components.PulseDot
 import com.example.ui.theme.DorjaColors
 import com.example.ui.util.Formatters
+import com.example.R
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.ui.res.painterResource
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @Composable
 fun VisitsScreen(
@@ -90,37 +100,47 @@ fun VisitsScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
-                    Text(
-                        text = if (isHost) "Visitor Passes" else "My Viewing Passes",
-                        style = MaterialTheme.typography.titleLarge,
-                        color = DorjaColors.Ink950,
-                        fontWeight = FontWeight.Bold
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Image(
+                        painter = painterResource(id = R.drawable.ic_dorja_logo),
+                        contentDescription = "Dorja Logo",
+                        modifier = Modifier.size(36.dp)
                     )
-                    Text(
-                        text = if (isHost) "Scheduled appointments for your listed properties" else "SafeView geofenced access tokens",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = DorjaColors.Gray700
-                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column {
+                        Text(
+                            text = if (isHost) "Visitor Passes" else "My Viewing Passes",
+                            style = MaterialTheme.typography.titleLarge,
+                            color = DorjaColors.Ink950,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = if (isHost) "Scheduled appointments for your listed properties" else "SafeView geofenced access tokens",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = DorjaColors.Gray700
+                        )
+                    }
                 }
 
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(DorjaColors.BentoGreenBg)
-                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = DorjaColors.BentoGreenBg,
+                    border = BorderStroke(1.dp, DorjaColors.BentoGreenIcon.copy(alpha = 0.3f))
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                    ) {
                         Icon(
                             imageVector = Icons.Default.Shield,
                             contentDescription = null,
                             tint = DorjaColors.BentoGreenIcon,
                             modifier = Modifier.size(14.dp)
                         )
-                        Spacer(modifier = Modifier.width(4.dp))
+                        Spacer(modifier = Modifier.width(5.dp))
                         Text(
                             text = "GPS GATED",
-                            style = MaterialTheme.typography.labelSmall,
+                            style = MaterialTheme.typography.labelMedium,
                             color = DorjaColors.BentoGreenText,
                             fontWeight = FontWeight.Bold
                         )
@@ -242,6 +262,16 @@ private fun ActiveViewingBentoCard(
     onOpenPass: () -> Unit,
     onCheckIn: () -> Unit
 ) {
+    var listingTitle by remember(viewing.listingId) { mutableStateOf("Listing #${viewing.listingId}") }
+    LaunchedEffect(viewing.listingId) {
+        withContext(Dispatchers.IO) {
+            val listing = DorjaApp.instance.repository.getListingById(viewing.listingId)
+            withContext(Dispatchers.Main) {
+                listingTitle = listing?.title ?: "Listing #${viewing.listingId}"
+            }
+        }
+    }
+
     BentoCard(
         modifier = Modifier
             .fillMaxWidth()
@@ -275,7 +305,7 @@ private fun ActiveViewingBentoCard(
             Spacer(modifier = Modifier.height(12.dp))
 
             Text(
-                text = "Listing #${viewing.listingId}",
+                text = listingTitle,
                 style = MaterialTheme.typography.titleMedium,
                 color = DorjaColors.Ink950,
                 fontWeight = FontWeight.Bold
@@ -327,6 +357,16 @@ private fun ActiveViewingBentoCard(
 
 @Composable
 private fun PastViewingBentoCard(viewing: Viewing) {
+    var listingTitle by remember(viewing.listingId) { mutableStateOf("Listing #${viewing.listingId}") }
+    LaunchedEffect(viewing.listingId) {
+        withContext(Dispatchers.IO) {
+            val listing = DorjaApp.instance.repository.getListingById(viewing.listingId)
+            withContext(Dispatchers.Main) {
+                listingTitle = listing?.title ?: "Listing #${viewing.listingId}"
+            }
+        }
+    }
+
     BentoCard(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.padding(14.dp),
@@ -349,7 +389,7 @@ private fun PastViewingBentoCard(viewing: Viewing) {
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Listing #${viewing.listingId}",
+                    text = listingTitle,
                     style = MaterialTheme.typography.titleSmall,
                     color = DorjaColors.Ink950,
                     fontWeight = FontWeight.Bold

@@ -40,6 +40,9 @@ class DorjaRepository(private val database: DorjaDatabase) {
         }
     }
 
+    // User lookups
+    suspend fun getUserById(userId: String): User? = userDao.getUserById(userId)
+
     // Active User Management
     fun switchUser(userId: String) {
         CoroutineScope(Dispatchers.IO).launch {
@@ -202,6 +205,7 @@ class DorjaRepository(private val database: DorjaDatabase) {
 
     // Chat & Conversations
     fun getConversationsForUser(userId: String): Flow<List<Conversation>> = conversationDao.getConversationsForUser(userId)
+    suspend fun getConversationById(id: String): Conversation? = conversationDao.getConversationById(id)
     fun getMessagesByConversation(conversationId: String): Flow<List<Message>> = messageDao.getMessagesByConversation(conversationId)
 
     suspend fun getOrCreateConversation(listingId: String, seekerId: String, hostId: String): Conversation {
