@@ -1959,6 +1959,7 @@ fun CreateListingScreen(
                                 if (newPromiseTitle.isNotBlank()) {
                                     customPromises.add(
                                         Promise(
+                                            id = "p_" + UUID.randomUUID().toString().take(8),
                                             listingId = "pending",
                                             category = newPromiseCategory,
                                             title = newPromiseTitle,
