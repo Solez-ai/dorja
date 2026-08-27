@@ -423,9 +423,9 @@ fun CreateListingScreen(
                             val y = (bitmap.height - cropH) / 2
                             val cropped = Bitmap.createBitmap(bitmap, max(0, x), max(0, y), min(cropW, bitmap.width), min(cropH, bitmap.height))
 
-                            val ctx = context
+                            val ctx = LocalContext.current
                             val file = java.io.File(ctx.cacheDir, "cropped_${System.currentTimeMillis()}.jpg")
-                            java.io.FileOutputStream(file).use { out ->
+                            java.io.FileOutputStream(file).use { out: java.io.FileOutputStream ->
                                 cropped.compress(Bitmap.CompressFormat.JPEG, 92, out)
                             }
 

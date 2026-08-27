@@ -62,6 +62,7 @@ import com.example.DorjaApp
 import com.example.ui.components.DorjaBadge
 import com.example.ui.components.DorjaButton
 import com.example.ui.theme.DorjaColors
+import kotlinx.coroutines.launch
 
 @Composable
 fun TourViewerScreen(
