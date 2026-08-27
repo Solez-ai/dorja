@@ -100,6 +100,7 @@ import com.example.ui.theme.DorjaColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.foundation.layout.offset
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.abs
@@ -873,7 +874,7 @@ private fun GyroReticleCanvas(
         }
 
         // Compass ring
-        drawCircle(Color(0xFF007C78).copy(alpha = 0.3f), radius, Offset(cx, cy), style = Stroke(1.5.dp.toPx(), PathEffect.dashPathEffect(floatArrayOf(8f, 8f))))
+        drawCircle(Color(0xFF007C78).copy(alpha = 0.3f), radius, Offset(cx, cy), style = Stroke(width = 1.5.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 8f))))
 
         // Progress nodes around ring
         for (i in 0 until total) {
