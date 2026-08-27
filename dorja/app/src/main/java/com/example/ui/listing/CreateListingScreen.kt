@@ -482,7 +482,7 @@ fun CreateListingScreen(
                         }
                     }
 
-                    val ctx = context
+                    val ctx = LocalContext.current
                     val cameraLauncher = rememberLauncherForActivityResult(
                         contract = ActivityResultContracts.TakePicturePreview()
                     ) { bitmap ->
