@@ -32,7 +32,7 @@ jobs:
       - name: Generate dummy google-services.json
         working-directory: dorja/app
         run: |
-          cat > google-services.json << 'EOF'
+          cat > google-services.json << 'ENDJSON'
           {
             "project_info": {
               "project_number": "000000000000",
@@ -47,7 +47,11 @@ jobs:
                     "package_name": "com.dorja.app"
                   }
                 },
-                "api_key": [],
+                "api_key": [
+                  {
+                    "current_key": "AIzaSyDummyKeyForCiBuildOnly"
+                  }
+                ],
                 "services": {
                   "appinvite_service": {
                     "other_platform_oauth_client": []
@@ -57,7 +61,7 @@ jobs:
             ],
             "configuration_version": "1"
           }
-          EOF
+          ENDJSON
 
       - name: Decode keystore from GitHub secret
         run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > dorja/release.keystore
