@@ -36,8 +36,10 @@ import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.SquareFoot
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.VerifiedUser
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ViewInAr
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -106,39 +108,42 @@ fun ExploreScreen(
             .background(DorjaColors.CanvasBg)
             .testTag("explore_screen")
     ) {
-        // Top Header
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(DorjaColors.CanvasBg)
-                .padding(top = 44.dp, start = 16.dp, end = 16.dp, bottom = 8.dp)
+        // Top Header with Gradient Background
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            color = DorjaColors.Ink950
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 44.dp, start = 16.dp, end = 16.dp, bottom = 14.dp)
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Image(
-                        painter = painterResource(id = R.drawable.ic_dorja_logo),
-                        contentDescription = "Dorja Logo",
-                        modifier = Modifier.size(40.dp)
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Column {
-                        Text(
-                            text = "Dorja Properties",
-                            style = MaterialTheme.typography.titleLarge,
-                            color = DorjaColors.Ink950,
-                            fontWeight = FontWeight.Bold
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Image(
+                            painter = painterResource(id = R.drawable.ic_dorja_logo),
+                            contentDescription = "Dorja Logo",
+                            modifier = Modifier.size(44.dp)
                         )
-                        Text(
-                            text = "Verified Bangladeshi Homes • SafeView Access",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = DorjaColors.Gray700
-                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                text = "Dorja Properties",
+                                style = MaterialTheme.typography.titleLarge,
+                                color = DorjaColors.White,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "Verified Bangladeshi Homes • SafeView Access",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = DorjaColors.Sand300
+                            )
+                        }
                     }
-                }
 
                 Surface(
                     shape = RoundedCornerShape(20.dp),
@@ -165,9 +170,15 @@ fun ExploreScreen(
                     }
                 }
             }
+        }
 
-            Spacer(modifier = Modifier.height(12.dp))
-
+        // Search and Filters
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(DorjaColors.CanvasBg)
+                .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 8.dp)
+        ) {
             // Search Box Bento Input
             OutlinedTextField(
                 value = searchQuery,
@@ -180,9 +191,19 @@ fun ExploreScreen(
                         tint = DorjaColors.BentoBlueIcon
                     )
                 },
+                trailingIcon = {
+                    if (searchQuery.isNotBlank()) {
+                        IconButton(onClick = { searchQuery = "" }) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Clear search",
+                                tint = DorjaColors.Gray500
+                            )
+                        }
+                    }
+                },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(52.dp)
                     .testTag("explore_search_field"),
                 singleLine = true,
                 shape = RoundedCornerShape(14.dp),

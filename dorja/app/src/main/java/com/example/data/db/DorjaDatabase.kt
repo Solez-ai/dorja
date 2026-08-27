@@ -30,7 +30,7 @@ import kotlinx.coroutines.launch
         Promise::class,
         LegalDocument::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 abstract class DorjaDatabase : RoomDatabase() {
@@ -80,23 +80,23 @@ abstract class DorjaDatabase : RoomDatabase() {
             // Only create default user accounts — no fake listings, rooms, scans, or documents
             val hostUser = User(
                 id = "u1",
-                username = "host",
-                displayName = "",
+                username = "shovro",
+                displayName = "Shovro",
                 role = "SELLER",
-                phone = "",
+                phone = "+880 1712-345678",
                 email = "",
-                bio = "",
-                location = ""
+                bio = "Verified Host on Dorja",
+                location = "Dhaka, Bangladesh"
             )
             val buyerUser = User(
                 id = "u2",
-                username = "buyer",
-                displayName = "",
+                username = "samin",
+                displayName = "Samin Yeasar",
                 role = "BUYER",
-                phone = "",
+                phone = "+880 1812-345678",
                 email = "",
-                bio = "",
-                location = ""
+                bio = "Property Seeker",
+                location = "Dhaka, Bangladesh"
             )
             userDao.insertAll(listOf(hostUser, buyerUser))
         }

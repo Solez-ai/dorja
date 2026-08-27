@@ -216,7 +216,7 @@ fun AuthScreen(
 
                     // Seller Quick Login
                     DorjaButton(
-                        text = "Login as Seller: Rahim Ahmed",
+                        text = "Login as Seller: Shovro",
                         onClick = {
                             repository.switchUser("u1")
                             onLoginSuccess()
@@ -230,7 +230,7 @@ fun AuthScreen(
 
                     // Buyer Quick Login
                     DorjaButton(
-                        text = "Login as Buyer: Karim Hassan",
+                        text = "Login as Buyer: Samin Yeasar",
                         onClick = {
                             repository.switchUser("u2")
                             onLoginSuccess()
@@ -242,7 +242,7 @@ fun AuthScreen(
                 }
             }
 
-            // Bottom trust notice
+            // Bottom branding
             Row(
                 modifier = Modifier.padding(top = 24.dp, bottom = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -255,7 +255,7 @@ fun AuthScreen(
                 )
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
-                    text = "Encrypted • Offline-First • Zero Cloud Leak",
+                    text = "DORJA • Verified Bangladeshi Real Estate",
                     style = MaterialTheme.typography.labelSmall,
                     color = DorjaColors.Gray500
                 )

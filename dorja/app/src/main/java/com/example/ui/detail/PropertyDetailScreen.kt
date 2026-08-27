@@ -688,6 +688,42 @@ fun PropertyDetailScreen(
                         // SafeView Protected Address Shield
                         SafeAddressShield(approximateArea = safeListing.publicArea)
 
+                        // Open in Google Maps button
+                        Spacer(modifier = Modifier.height(6.dp))
+                        BentoCard(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    val lat = safeListing.approximateLat ?: 23.8041
+                                    val lng = safeListing.approximateLng ?: 90.3468
+                                    val uri = Uri.parse("https://www.google.com/maps?q=$lat,$lng")
+                                    val intent = Intent(Intent.ACTION_VIEW, uri)
+                                    context.startActivity(intent)
+                                }
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.LocationOn,
+                                    contentDescription = null,
+                                    tint = DorjaColors.BentoBlueIcon,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "Open Location in Google Maps",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = DorjaColors.BentoBlueText,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
+
                         if (isOwner && safeListing.exactAddress.isNotBlank()) {
                             Spacer(modifier = Modifier.height(6.dp))
                             Surface(
