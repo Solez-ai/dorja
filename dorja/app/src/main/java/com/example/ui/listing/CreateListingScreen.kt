@@ -482,17 +482,18 @@ fun CreateListingScreen(
                         }
                     }
 
+                    val ctx = context
                     val cameraLauncher = rememberLauncherForActivityResult(
                         contract = ActivityResultContracts.TakePicturePreview()
                     ) { bitmap ->
                         if (bitmap != null) {
-                            val file = java.io.File(context.cacheDir, "camera_photo_${System.currentTimeMillis()}.jpg")
+                            val file = java.io.File(ctx.cacheDir, "camera_photo_${System.currentTimeMillis()}.jpg")
                             java.io.FileOutputStream(file).use { out ->
                                 bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, out)
                             }
                             photoAssignments.add(
                                 PhotoAssignmentItem(
-                                    url = file.toURI().toString(),
+                                    url = "file://${file.absolutePath}",
                                     caption = customCaptionInput.ifBlank { "Camera Photo ${photoAssignments.size + 1}" },
                                     assignedRoomId = selectedRoomForNewPhoto
                                 )
