@@ -43,6 +43,7 @@ import com.example.ui.handover.HandoverPassportScreen
 import com.example.ui.listing.CreateListingScreen
 import com.example.ui.pass.ViewingPassScreen
 import com.example.ui.scanner.RoomScannerScreen
+import androidx.compose.runtime.collectAsState
 import com.example.ui.seller.HostListingsScreen
 import com.example.ui.splash.SplashScreen
 import com.example.ui.theme.DorjaColors
@@ -94,6 +95,8 @@ enum class BuyerTab(val title: String, val icon: ImageVector, val tag: String) {
 @Composable
 fun DorjaNavHost() {
     val navController = rememberNavController()
+    val repository = DorjaApp.instance.repository
+    val currentUser by repository.currentUser.collectAsState()
 
     NavHost(
         navController = navController,
@@ -228,6 +231,7 @@ fun DorjaNavHost() {
             val viewingId = backStackEntry.arguments?.getString("viewingId") ?: "v1"
             ViewingPassScreen(
                 viewingId = viewingId,
+                isHost = currentUser?.role == "SELLER",
                 onBack = { navController.popBackStack() }
             )
         }

@@ -60,6 +60,7 @@ import kotlinx.coroutines.withContext
 @Composable
 fun ViewingPassScreen(
     viewingId: String,
+    isHost: Boolean = false,
     onBack: () -> Unit
 ) {
     val repository = DorjaApp.instance.repository
@@ -253,10 +254,10 @@ fun ViewingPassScreen(
                         PassDetailRow(label = "Date", value = Formatters.formatDateOnly(pass.startsAt))
                         PassDetailRow(label = "GPS Geofence", value = if (listingArea.isNotBlank()) "Active & Verified ($listingArea)" else "Active & Verified")
 
-                        if (pass.status != "CHECKED_IN") {
+                        if (pass.status != "CHECKED_IN" && isHost) {
                             Spacer(modifier = Modifier.height(20.dp))
                             DorjaButton(
-                                text = "Host Check-In & Validate Pass",
+                                text = "Host: Verify QR & Check In",
                                 onClick = {
                                     scope.launch {
                                         repository.checkInViewing(pass.id)
@@ -266,6 +267,50 @@ fun ViewingPassScreen(
                                 icon = Icons.Default.CheckCircle,
                                 testTag = "validate_pass_button"
                             )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "Present this QR code at the property entrance. The host scans it to verify your SafeView pass and complete check-in.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = DorjaColors.Gray700,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                            )
+                        }
+
+                        if (pass.status != "CHECKED_IN" && !isHost) {
+                            Spacer(modifier = Modifier.height(20.dp))
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = DorjaColors.BentoBlueBg,
+                                border = androidx.compose.foundation.BorderStroke(1.dp, DorjaColors.BentoBlueIcon.copy(alpha = 0.3f)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.QrCode,
+                                        contentDescription = null,
+                                        tint = DorjaColors.BentoBlueIcon,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                    Column {
+                                        Text(
+                                            text = "Show this QR code to the host at the property",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = DorjaColors.BentoBlueText,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                        Text(
+                                            text = "The host must scan and verify this pass to complete check-in. You cannot check in yourself.",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = DorjaColors.Gray700,
+                                            fontSize = 11.sp
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 }

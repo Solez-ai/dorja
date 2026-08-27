@@ -373,21 +373,15 @@ fun AccountScreen(
                 }
             }
 
-            // Quick Role Switch Bento Card
+            // Quick Account Switch Bento Card
             item {
+                val targetUserId = if (user.role == "SELLER") "u2" else "u1"
+                val targetUserLabel = if (user.role == "SELLER") "Samin (Buyer)" else "Shovro (Host)"
                 BentoCard(
                     modifier = Modifier.fillMaxWidth(),
                     onClick = {
-                        val newRole = if (user.role == "SELLER") "BUYER" else "SELLER"
                         scope.launch {
-                            repository.updateUserProfile(
-                                displayName = user.displayName,
-                                phone = user.phone,
-                                email = user.email,
-                                location = user.location,
-                                bio = user.bio,
-                                role = newRole
-                            )
+                            repository.switchUser(targetUserId)
                         }
                     }
                 ) {
@@ -412,13 +406,13 @@ fun AccountScreen(
                         Spacer(modifier = Modifier.width(12.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = if (user.role == "SELLER") "Switch to Buyer Mode" else "Switch to Host Mode",
+                                text = if (user.role == "SELLER") "Switch to Buyer Account" else "Switch to Host Account",
                                 style = MaterialTheme.typography.titleSmall,
                                 color = DorjaColors.Ink950,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = if (user.role == "SELLER") "Explore & visit listings as a property seeker" else "Manage your properties and review visitor passes as a host",
+                                text = "Switch to $targetUserLabel to chat & explore as the other party",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = DorjaColors.Gray700
                             )

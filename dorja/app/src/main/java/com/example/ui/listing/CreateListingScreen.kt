@@ -394,8 +394,6 @@ fun CreateListingScreen(
 
     // MULTI-PHOTO SELECTION MODAL
     if (showMultiPhotoSelectorDialog) {
-        val selectedPhotoUrls = remember { mutableStateListOf<String>() }
-        var customUrlInput by remember { mutableStateOf("") }
         var customCaptionInput by remember { mutableStateOf("") }
         var selectedRoomForNewPhoto by remember { mutableStateOf<String?>(null) }
 
@@ -419,101 +417,38 @@ fun CreateListingScreen(
                         color = DorjaColors.Gray700
                     )
 
-                    // Quick Room Photo Slot Generators
-                    Text(
-                        text = "QUICK ADD ROOM PHOTO SLOTS",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = DorjaColors.Gray500,
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold
-                    )
+                    // Room filter for assignment
+                    if (customRooms.isNotEmpty()) {
+                        Text(
+                            text = "ASSIGN TO ROOM (optional)",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = DorjaColors.Gray500,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold
+                        )
 
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        customRooms.forEach { room ->
-                            val alreadyHasPhoto = photoAssignments.any { it.assignedRoomId == room.id }
-                            Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = if (alreadyHasPhoto) DorjaColors.BentoBlueBg else DorjaColors.Sand100,
-                                border = BorderStroke(1.dp, if (alreadyHasPhoto) DorjaColors.Jol600 else DorjaColors.BentoCardBorder),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        photoAssignments.add(
-                                            PhotoAssignmentItem(
-                                                url = "local://${room.roomType.lowercase()}_photo_${photoAssignments.size + 1}",
-                                                caption = "${room.displayName} View",
-                                                assignedRoomId = room.id
-                                            )
-                                        )
-                                    }
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(10.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(
-                                            imageVector = Icons.Default.MeetingRoom,
-                                            contentDescription = null,
-                                            tint = DorjaColors.Jol600,
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Column {
-                                            Text(
-                                                text = "+ Add ${room.displayName} Photo",
-                                                style = MaterialTheme.typography.bodySmall,
-                                                fontWeight = FontWeight.Bold,
-                                                color = DorjaColors.Ink950
-                                            )
-                                            Text(
-                                                text = if (alreadyHasPhoto) "Photo slot active" else "Tap to add room photo slot",
-                                                style = MaterialTheme.typography.bodySmall,
-                                                color = DorjaColors.Gray500,
-                                                fontSize = 11.sp
-                                            )
-                                        }
-                                    }
-                                    if (alreadyHasPhoto) {
-                                        Icon(
-                                            Icons.Default.CheckCircle,
-                                            contentDescription = "Added",
-                                            tint = DorjaColors.Jol600,
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                    }
-                                }
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            DorjaChip(
+                                selected = selectedRoomForNewPhoto == null,
+                                label = "General / Cover",
+                                onClick = { selectedRoomForNewPhoto = null }
+                            )
+                            customRooms.forEach { room ->
+                                DorjaChip(
+                                    selected = selectedRoomForNewPhoto == room.id,
+                                    label = room.displayName,
+                                    onClick = { selectedRoomForNewPhoto = room.id }
+                                )
                             }
                         }
                     }
 
                     Spacer(modifier = Modifier.height(4.dp))
 
-                    // Native Image Picker Buttons
-                    val galleryLauncher = rememberLauncherForActivityResult(
-                        contract = ActivityResultContracts.GetContent()
-                    ) { uri ->
-                        if (uri != null) {
-                            photoAssignments.add(
-                                PhotoAssignmentItem(
-                                    url = uri.toString(),
-                                    caption = customCaptionInput.ifBlank { "Property Photo ${photoAssignments.size + 1}" },
-                                    assignedRoomId = selectedRoomForNewPhoto
-                                )
-                            )
-                            customCaptionInput = ""
-                        }
-                    }
-
-                    Text(
-                        text = "ADD FROM DEVICE",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = DorjaColors.Gray500,
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold
-                    )
-
+                    // Caption input
                     OutlinedTextField(
                         value = customCaptionInput,
                         onValueChange = { customCaptionInput = it },
@@ -529,7 +464,42 @@ fun CreateListingScreen(
                         )
                     )
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    // Pick buttons
+                    val galleryLauncher = rememberLauncherForActivityResult(
+                        contract = ActivityResultContracts.GetContent()
+                    ) { uri ->
+                        if (uri != null) {
+                            photoAssignments.add(
+                                PhotoAssignmentItem(
+                                    url = uri.toString(),
+                                    caption = customCaptionInput.ifBlank { "Property Photo ${photoAssignments.size + 1}" },
+                                    assignedRoomId = selectedRoomForNewPhoto
+                                )
+                            )
+                            customCaptionInput = ""
+                        }
+                    }
+
+                    val cameraLauncher = rememberLauncherForActivityResult(
+                        contract = ActivityResultContracts.TakePicturePreview()
+                    ) { bitmap ->
+                        if (bitmap != null) {
+                            val file = java.io.File(context.cacheDir, "camera_photo_${System.currentTimeMillis()}.jpg")
+                            java.io.FileOutputStream(file).use { out ->
+                                bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, out)
+                            }
+                            photoAssignments.add(
+                                PhotoAssignmentItem(
+                                    url = file.toURI().toString(),
+                                    caption = customCaptionInput.ifBlank { "Camera Photo ${photoAssignments.size + 1}" },
+                                    assignedRoomId = selectedRoomForNewPhoto
+                                )
+                            )
+                            customCaptionInput = ""
+                        }
+                    }
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -543,17 +513,7 @@ fun CreateListingScreen(
                         )
                         DorjaOutlinedButton(
                             text = "Camera",
-                            onClick = {
-                                // Add a placeholder for camera capture
-                                photoAssignments.add(
-                                    PhotoAssignmentItem(
-                                        url = "camera://${System.currentTimeMillis()}",
-                                        caption = customCaptionInput.ifBlank { "Camera Photo ${photoAssignments.size + 1}" },
-                                        assignedRoomId = selectedRoomForNewPhoto
-                                    )
-                                )
-                                customCaptionInput = ""
-                            },
+                            onClick = { cameraLauncher.launch(null) },
                             icon = Icons.Default.CameraAlt,
                             modifier = Modifier.weight(1f)
                         )

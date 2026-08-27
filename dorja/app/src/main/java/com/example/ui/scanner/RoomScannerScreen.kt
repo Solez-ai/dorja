@@ -123,6 +123,11 @@ import java.util.UUID
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.random.Random
+import android.hardware.Sensor
+import android.hardware.SensorEvent
+import android.hardware.SensorEventListener
+import android.hardware.SensorManager
+import androidx.compose.runtime.DisposableEffect
 
 enum class PanoramaScanPhase {
     HOUSE_ROOM_SELECT,
@@ -210,10 +215,37 @@ fun RoomScannerScreen(
     var currentTargetIndex by remember { mutableIntStateOf(0) }
     val capturedSlices = remember { mutableStateListOf<Int>() }
 
-    // Sensor / Targeting Simulation
-    var simulatedYaw by remember { mutableFloatStateOf(0f) }
-    var simulatedPitch by remember { mutableFloatStateOf(0f) }
+    // Sensor / Gyroscope-driven targeting
+    var realYaw by remember { mutableFloatStateOf(0f) }
+    var realPitch by remember { mutableFloatStateOf(0f) }
     var isReticleAligned by remember { mutableStateOf(false) }
+
+    // Real gyroscope integration
+    val sensorManager = context.getSystemService(android.content.Context.SENSOR_SERVICE) as? SensorManager
+    val gyroListener = remember {
+        object : SensorEventListener {
+            override fun onSensorChanged(event: SensorEvent?) {
+                if (event?.sensor?.type == Sensor.TYPE_ROTATION_VECTOR) {
+                    val rotMatrix = FloatArray(9)
+                    SensorManager.getRotationMatrixFromVector(rotMatrix, event.values)
+                    val orientation = FloatArray(3)
+                    SensorManager.getOrientation(rotMatrix, orientation)
+                    realYaw = Math.toDegrees(orientation[0].toDouble()).toFloat()
+                    realPitch = Math.toDegrees(orientation[1].toDouble()).toFloat()
+                }
+            }
+            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+        }
+    }
+    DisposableEffect(Unit) {
+        val rotSensor = sensorManager?.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
+        rotSensor?.let {
+            sensorManager.registerListener(gyroListener, it, SensorManager.SENSOR_DELAY_UI)
+        }
+        onDispose {
+            sensorManager?.unregisterListener(gyroListener)
+        }
+    }
 
     // Live Metrics
     var pointCloudPoints by remember { mutableIntStateOf(0) }
@@ -665,6 +697,23 @@ fun RoomScannerScreen(
                                 tint = DorjaColors.Jol600,
                                 modifier = Modifier.size(48.dp)
                             )
+                            // Checkmark badge overlay
+                            Box(
+                                modifier = Modifier
+                                    .align(Alignment.BottomEnd)
+                                    .size(24.dp)
+                                    .clip(CircleShape)
+                                    .background(DorjaColors.Success)
+                                    .border(2.dp, DorjaColors.Ink950, CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = "Ready",
+                                    tint = DorjaColors.White,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                            }
                         }
 
                         Spacer(modifier = Modifier.height(20.dp))
@@ -688,37 +737,50 @@ fun RoomScannerScreen(
 
                         Spacer(modifier = Modifier.height(24.dp))
 
-                        // Green Pill Action Button: PRESS TO START
-                        Surface(
-                            shape = RoundedCornerShape(24.dp),
-                            color = DorjaColors.Jol600,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(24.dp))
-                                .clickable {
-                                    currentTargetIndex = 0
-                                    capturedSlices.clear()
-                                    scanPhase = PanoramaScanPhase.ACTIVE_PANORAMA
-                                }
-                                .testTag("press_to_start_panorama_button")
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                        // Green Pill Action Button: PRESS TO START with down-caret
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(
+                                text = "PRESS TO START",
+                                color = DorjaColors.White,
+                                fontWeight = FontWeight.Bold,
+                                style = MaterialTheme.typography.labelLarge,
+                                fontFamily = FontFamily.Monospace
+                            )
+                            Icon(
+                                imageVector = Icons.Default.KeyboardArrowDown,
+                                contentDescription = null,
+                                tint = DorjaColors.Jol600,
+                                modifier = Modifier.size(22.dp)
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Surface(
+                                shape = RoundedCornerShape(24.dp),
+                                color = DorjaColors.Jol600,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(24.dp))
+                                    .clickable {
+                                        currentTargetIndex = 0
+                                        capturedSlices.clear()
+                                        scanPhase = PanoramaScanPhase.ACTIVE_PANORAMA
+                                    }
+                                    .testTag("press_to_start_panorama_button")
                             ) {
-                                Text(
-                                    text = "PRESS TO START",
-                                    color = DorjaColors.White,
-                                    fontWeight = FontWeight.Bold,
-                                    style = MaterialTheme.typography.labelLarge,
-                                    fontFamily = FontFamily.Monospace
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null, tint = DorjaColors.White, modifier = Modifier.size(18.dp))
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 24.dp, vertical = 14.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(36.dp)
+                                            .clip(CircleShape)
+                                            .background(DorjaColors.White)
+                                    )
+                                }
                             }
                         }
                     }
 
-                    // Bottom Bar (Gallery, Center Shutter, Gyro Status)
+                    // Bottom Bar (Layers, Center Shutter, Gyro Toggle)
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -727,6 +789,7 @@ fun RoomScannerScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
+                        // Left: Layers / Gallery icon
                         IconButton(
                             onClick = { },
                             modifier = Modifier
@@ -734,7 +797,7 @@ fun RoomScannerScreen(
                                 .clip(CircleShape)
                                 .background(DorjaColors.Gray700)
                         ) {
-                            Icon(Icons.Default.CameraAlt, contentDescription = "Camera", tint = DorjaColors.Sand300)
+                            Icon(Icons.Default.Settings, contentDescription = "Layers", tint = DorjaColors.Sand300)
                         }
 
                         // Center Shutter Button
@@ -759,19 +822,20 @@ fun RoomScannerScreen(
                             )
                         }
 
-                        // Sensor Status
+                        // Right: Gyro Toggle
                         Surface(
                             shape = RoundedCornerShape(12.dp),
                             color = DorjaColors.Ink950.copy(alpha = 0.7f),
-                            border = BorderStroke(1.dp, DorjaColors.Sand300.copy(alpha = 0.3f))
+                            border = BorderStroke(1.dp, DorjaColors.Sand300.copy(alpha = 0.3f)),
+                            modifier = Modifier.clickable { hdModeEnabled = !hdModeEnabled }
                         ) {
                             Row(
                                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Icon(Icons.Default.Explore, contentDescription = null, tint = DorjaColors.Success, modifier = Modifier.size(16.dp))
+                                Icon(Icons.Default.Explore, contentDescription = null, tint = if (hdModeEnabled) DorjaColors.Success else DorjaColors.Sand300, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(4.dp))
-                                Text("GYRO ON", color = DorjaColors.White, fontSize = 10.sp, fontFamily = FontFamily.Monospace)
+                                Text("GYRO ${if (hdModeEnabled) "ON" else "OFF"}", color = DorjaColors.White, fontSize = 10.sp, fontFamily = FontFamily.Monospace)
                             }
                         }
                     }
@@ -782,38 +846,46 @@ fun RoomScannerScreen(
                 // Screen 3: Full-Screen Multi-Axis Panorama Construction Scanner
                 val currentTarget = panoramaTargets.getOrElse(currentTargetIndex) { panoramaTargets.last() }
 
-                // Simulation loop to guide alignment
+                // Gyroscope-driven alignment: auto-capture when device is near target angle
                 LaunchedEffect(currentTargetIndex) {
                     isReticleAligned = false
-                    // Simulate phone turning to target
-                    val startYaw = simulatedYaw
-                    val startPitch = simulatedPitch
-                    val endYaw = currentTarget.angleYaw
-                    val endPitch = currentTarget.anglePitch
+                    val target = panoramaTargets.getOrElse(currentTargetIndex) { panoramaTargets.last() }
 
-                    val steps = 15
-                    for (i in 1..steps) {
-                        delay(50)
-                        simulatedYaw = startYaw + (endYaw - startYaw) * (i.toFloat() / steps)
-                        simulatedPitch = startPitch + (endPitch - startPitch) * (i.toFloat() / steps)
-                        pointCloudPoints += 12
-                        planesDetected = (capturedSlices.size / 2) + 1
+                    // Wait until device is aligned with target (within ±15° tolerance)
+                    val yawTolerance = 15f
+                    val pitchTolerance = 15f
+                    var alignedSince = 0L
+
+                    while (true) {
+                        delay(100)
+                        val yawDiff = kotlin.math.abs(normalizeAngle(realYaw) - normalizeAngle(target.angleYaw))
+                        val pitchDiff = kotlin.math.abs(realPitch - target.anglePitch)
+                        val yawAligned = yawDiff < yawTolerance || yawDiff > (360f - yawTolerance)
+                        val pitchAligned = pitchDiff < pitchTolerance
+
+                        if (yawAligned && pitchAligned) {
+                            if (alignedSince == 0L) alignedSince = System.currentTimeMillis()
+                            isReticleAligned = true
+                            pointCloudPoints += 8
+                            planesDetected = (capturedSlices.size / 2) + 1
+
+                            // Hold alignment for 300ms before capturing
+                            if (System.currentTimeMillis() - alignedSince > 300) {
+                                if (!capturedSlices.contains(currentTargetIndex)) {
+                                    capturedSlices.add(currentTargetIndex)
+                                }
+                                break
+                            }
+                        } else {
+                            alignedSince = 0L
+                            isReticleAligned = false
+                        }
                     }
 
-                    // Auto-align lock
-                    isReticleAligned = true
-                    delay(400) // Lock confirmation delay
-
-                    // Auto-capture slice
-                    if (!capturedSlices.contains(currentTargetIndex)) {
-                        capturedSlices.add(currentTargetIndex)
-                    }
-
+                    delay(250)
                     if (currentTargetIndex < panoramaTargets.size - 1) {
-                        delay(250)
                         currentTargetIndex++
                     } else {
-                        // All 12 slices captured! Advance to stitching
                         delay(500)
                         scanPhase = PanoramaScanPhase.STITCHING_PROCESSING
                     }
@@ -1262,27 +1334,64 @@ private fun ViewfinderFramingOverlay() {
     Canvas(modifier = Modifier.fillMaxSize()) {
         val w = size.width
         val h = size.height
-        val margin = 24.dp.toPx()
-        val cornerLen = 32.dp.toPx()
-        val strokeW = 2.dp.toPx()
-        val color = Color(0xFF007C78).copy(alpha = 0.7f)
+        val dotColor = Color(0xFF00BCD4).copy(alpha = 0.55f)
+        val dotRadius = 2.dp.toPx()
 
-        // Top-Left Corner
-        drawLine(color, Offset(margin, margin), Offset(margin + cornerLen, margin), strokeW)
-        drawLine(color, Offset(margin, margin), Offset(margin, margin + cornerLen), strokeW)
+        // Top border: cyan dot-grid curving inward (cylindrical effect)
+        for (i in 0..24) {
+            val frac = i / 24f
+            val x = w * frac
+            // Curve: dots dip inward toward center
+            val curveDepth = 18f * (1f - 4f * (frac - 0.5f) * (frac - 0.5f))
+            drawCircle(
+                color = dotColor,
+                radius = dotRadius,
+                center = Offset(x, 8.dp.toPx() + curveDepth.coerceAtLeast(0f))
+            )
+        }
 
-        // Top-Right Corner
-        drawLine(color, Offset(w - margin, margin), Offset(w - margin - cornerLen, margin), strokeW)
-        drawLine(color, Offset(w - margin, margin), Offset(w - margin, margin + cornerLen), strokeW)
+        // Bottom border: same cylindrical curve
+        for (i in 0..24) {
+            val frac = i / 24f
+            val x = w * frac
+            val curveDepth = 18f * (1f - 4f * (frac - 0.5f) * (frac - 0.5f))
+            drawCircle(
+                color = dotColor,
+                radius = dotRadius,
+                center = Offset(x, h - 8.dp.toPx() - curveDepth.coerceAtLeast(0f))
+            )
+        }
 
-        // Bottom-Left Corner
-        drawLine(color, Offset(margin, h - margin), Offset(margin + cornerLen, h - margin), strokeW)
-        drawLine(color, Offset(margin, h - margin), Offset(margin, h - margin - cornerLen), strokeW)
+        // Left edge dots
+        for (i in 0..14) {
+            val frac = i / 14f
+            val y = h * frac
+            val curveDepth = 12f * (1f - 4f * (frac - 0.5f) * (frac - 0.5f))
+            drawCircle(
+                color = dotColor,
+                radius = dotRadius,
+                center = Offset(8.dp.toPx() + curveDepth.coerceAtLeast(0f), y)
+            )
+        }
 
-        // Bottom-Right Corner
-        drawLine(color, Offset(w - margin, h - margin), Offset(w - margin - cornerLen, h - margin), strokeW)
-        drawLine(color, Offset(w - margin, h - margin), Offset(w - margin, h - margin - cornerLen), strokeW)
+        // Right edge dots
+        for (i in 0..14) {
+            val frac = i / 14f
+            val y = h * frac
+            val curveDepth = 12f * (1f - 4f * (frac - 0.5f) * (frac - 0.5f))
+            drawCircle(
+                color = dotColor,
+                radius = dotRadius,
+                center = Offset(w - 8.dp.toPx() - curveDepth.coerceAtLeast(0f), y)
+            )
+        }
     }
+}
+
+private fun normalizeAngle(angle: Float): Float {
+    var a = angle % 360f
+    if (a < 0f) a += 360f
+    return a
 }
 
 @Composable
