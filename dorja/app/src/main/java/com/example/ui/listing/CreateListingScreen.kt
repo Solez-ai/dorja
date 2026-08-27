@@ -99,6 +99,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -2321,6 +2322,35 @@ fun Guided3DPanoramaScannerDialog(
     var previewPan by remember { mutableFloatStateOf(0f) }
     var previewTilt by remember { mutableFloatStateOf(0f) }
 
+    // Gyroscope-driven crosshair offset
+    var gyroYaw by remember { mutableFloatStateOf(0f) }
+    var gyroPitch by remember { mutableFloatStateOf(0f) }
+    val sensorManager = context.getSystemService(android.content.Context.SENSOR_SERVICE) as? android.hardware.SensorManager
+    val gyroscopeListener = remember {
+        object : android.hardware.SensorEventListener {
+            override fun onSensorChanged(event: android.hardware.SensorEvent?) {
+                if (event?.sensor?.type == android.hardware.Sensor.TYPE_ROTATION_VECTOR) {
+                    val rotationMatrix = FloatArray(9)
+                    android.hardware.SensorManager.getRotationMatrixFromVector(rotationMatrix, event.values)
+                    val orientation = FloatArray(3)
+                    android.hardware.SensorManager.getOrientation(rotationMatrix, orientation)
+                    gyroYaw = Math.toDegrees(orientation[0].toDouble()).toFloat()
+                    gyroPitch = Math.toDegrees(orientation[1].toDouble()).toFloat()
+                }
+            }
+            override fun onAccuracyChanged(sensor: android.hardware.Sensor?, accuracy: Int) {}
+        }
+    }
+    DisposableEffect(Unit) {
+        val rotationVectorSensor = sensorManager?.getDefaultSensor(android.hardware.Sensor.TYPE_ROTATION_VECTOR)
+        rotationVectorSensor?.let {
+            sensorManager.registerListener(gyroscopeListener, it, android.hardware.SensorManager.SENSOR_DELAY_UI)
+        }
+        onDispose {
+            sensorManager?.unregisterListener(gyroscopeListener)
+        }
+    }
+
     val currentTarget = targets.getOrElse(currentTargetIndex) { targets.first() }
 
     LaunchedEffect(shutterFlash) {
@@ -2707,7 +2737,7 @@ fun Guided3DPanoramaScannerDialog(
 
                         Spacer(modifier = Modifier.height(16.dp))
 
-                        // GUIDED DOT MATRIX & ARROW CANVAS
+                        // GUIDED DOT MATRIX & ARROW CANVAS with Cyan Overlay Borders
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth(0.92f)
@@ -2716,6 +2746,69 @@ fun Guided3DPanoramaScannerDialog(
                                 .background(Color.Black.copy(alpha = 0.2f)),
                             contentAlignment = Alignment.Center
                         ) {
+                            // Cyan dot-grid overlay borders (top + bottom)
+                            Canvas(modifier = Modifier.fillMaxSize()) {
+                                val w = size.width
+                                val h = size.height
+                                // Top border dots
+                                for (i in 0..20) {
+                                    val x = w * (i / 20f)
+                                    val curveOffset = 12f * (1f - kotlin.math.abs(i - 10f) / 10f)
+                                    drawCircle(
+                                        color = Color(0xFF00BCD4).copy(alpha = 0.4f),
+                                        radius = 2.dp.toPx(),
+                                        center = Offset(x, 4.dp.toPx() + curveOffset)
+                                    )
+                                }
+                                // Bottom border dots
+                                for (i in 0..20) {
+                                    val x = w * (i / 20f)
+                                    val curveOffset = 12f * (1f - kotlin.math.abs(i - 10f) / 10f)
+                                    drawCircle(
+                                        color = Color(0xFF00BCD4).copy(alpha = 0.4f),
+                                        radius = 2.dp.toPx(),
+                                        center = Offset(x, h - 4.dp.toPx() - curveOffset)
+                                    )
+                                }
+                                // Left/right side dots
+                                for (i in 0..12) {
+                                    val y = h * (i / 12f)
+                                    val curveOffset = 12f * (1f - kotlin.math.abs(i - 6f) / 6f)
+                                    drawCircle(color = Color(0xFF00BCD4).copy(alpha = 0.4f), radius = 2.dp.toPx(), center = Offset(4.dp.toPx() + curveOffset, y))
+                                    drawCircle(color = Color(0xFF00BCD4).copy(alpha = 0.4f), radius = 2.dp.toPx(), center = Offset(w - 4.dp.toPx() - curveOffset, y))
+                                }
+                            }
+
+                            // Gyroscope-driven crosshair overlay
+                            val crosshairOffsetX = (gyroYaw / 90f * 120f).dp
+                            val crosshairOffsetY = (gyroPitch / 45f * 80f).dp
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                // Moving crosshair reticle
+                                Box(
+                                    modifier = Modifier
+                                        .offset(x = crosshairOffsetX, y = crosshairOffsetY)
+                                        .size(48.dp)
+                                        .border(2.dp, Color(0xFF00BCD4), CircleShape)
+                                )
+                                // Center dot
+                                Box(
+                                    modifier = Modifier
+                                        .offset(x = crosshairOffsetX, y = crosshairOffsetY)
+                                        .size(8.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(0xFF00BCD4))
+                                )
+                                // Target ring
+                                Box(
+                                    modifier = Modifier
+                                        .size(100.dp)
+                                        .border(1.dp, Color(0xFF00BCD4).copy(alpha = 0.3f), CircleShape)
+                                )
+                            }
+
                             GuidedAngleDotsCanvas(
                                 currentTargetIndex = currentTargetIndex,
                                 capturedSlices = capturedSlices,
