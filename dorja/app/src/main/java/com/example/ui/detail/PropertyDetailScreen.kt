@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -160,7 +161,7 @@ fun PropertyDetailScreen(
             shape = RoundedCornerShape(16.dp),
             containerColor = DorjaColors.Ink950,
             text = {
-                Box(modifier = Modifier.fillMaxWidth().height(320.dp)) {
+                Box(modifier = Modifier.fillMaxWidth().aspectRatio(4f / 5f)) {
                     AsyncImage(
                         model = fullScreenPhotoUrl,
                         contentDescription = "Full Screen Photo",
@@ -464,7 +465,7 @@ fun PropertyDetailScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(240.dp)
+                        .aspectRatio(4f / 5f)
                         .clip(RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp))
                         .background(DorjaColors.Ink950)
                 ) {

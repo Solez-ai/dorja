@@ -130,6 +130,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.foundation.Image
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import coil.compose.AsyncImage
@@ -149,6 +151,11 @@ import kotlinx.coroutines.launch
 import java.util.UUID
 import kotlin.math.cos
 import kotlin.math.sin
+import android.graphics.BitmapFactory
+import android.graphics.Bitmap
+import android.net.Uri
+import kotlin.math.min
+import kotlin.math.max
 
 data class PhotoAssignmentItem(
     val id: String = UUID.randomUUID().toString(),
@@ -202,6 +209,12 @@ fun CreateListingScreen(
 
     var coverPhotoIndex by remember { mutableIntStateOf(0) }
     var showMultiPhotoSelectorDialog by remember { mutableStateOf(false) }
+
+    // Crop state
+    var showCropDialog by remember { mutableStateOf(false) }
+    var cropBitmap by remember { mutableStateOf<Bitmap?>(null) }
+    var cropAssignedRoomId by remember { mutableStateOf<String?>(null) }
+    var cropCaption by remember { mutableStateOf("") }
 
     // 4. 3D Scan Section States
     var showMarkScannedDialog by remember { mutableStateOf<RoomItem?>(null) }
@@ -278,6 +291,162 @@ fun CreateListingScreen(
         )
     }
 
+    // CROP DIALOG (4:5 aspect ratio enforcement)
+    if (showCropDialog && cropBitmap != null) {
+        val bitmap = cropBitmap!!
+        var offsetX by remember { mutableFloatStateOf(0f) }
+        var offsetY by remember { mutableFloatStateOf(0f) }
+        val coroutineScope = rememberCoroutineScope()
+
+        // 4:5 crop overlay dimensions
+        val cropRatio = 4f / 5f
+
+        Dialog(
+            onDismissRequest = { showCropDialog = false; cropBitmap = null },
+            properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(DorjaColors.Ink950)
+            ) {
+                // Image with drag-to-position
+                val imageWidth = 360f
+                val imageHeight = imageWidth * (bitmap.height.toFloat() / bitmap.width.toFloat())
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .pointerInput(Unit) {
+                            detectDragGestures { _, dragAmount ->
+                                offsetX += dragAmount.x
+                                offsetY += dragAmount.y
+                            }
+                        }
+                ) {
+                    Image(
+                        bitmap = bitmap.asImageBitmap(),
+                        contentDescription = "Photo to crop",
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+
+                // 4:5 Crop Overlay (darken outside, clear inside)
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    val w = size.width
+                    val h = size.height
+                    val cropW = w * 0.85f
+                    val cropH = cropW / cropRatio
+                    val left = (w - cropW) / 2f
+                    val top = (h - cropH) / 2f
+
+                    // Darken outside
+                    drawRect(Color.Black.copy(alpha = 0.6f))
+                    // Clear inside
+                    drawRect(Color.Transparent, topLeft = Offset(left, top), size = androidx.compose.ui.geometry.Size(cropW, cropH))
+                    // Border
+                    drawRect(
+                        color = Color.White,
+                        topLeft = Offset(left, top),
+                        size = androidx.compose.ui.geometry.Size(cropW, cropH),
+                        style = Stroke(2.dp.toPx())
+                    )
+                    // Corner accents
+                    val cornerLen = 20.dp.toPx()
+                    val corners = listOf(
+                        Offset(left, top) to Offset(left + cornerLen, top),
+                        Offset(left, top) to Offset(left, top + cornerLen),
+                        Offset(left + cropW, top) to Offset(left + cropW - cornerLen, top),
+                        Offset(left + cropW, top) to Offset(left + cropW, top + cornerLen),
+                        Offset(left, top + cropH) to Offset(left + cornerLen, top + cropH),
+                        Offset(left, top + cropH) to Offset(left, top + cropH - cornerLen),
+                        Offset(left + cropW, top + cropH) to Offset(left + cropW - cornerLen, top + cropH),
+                        Offset(left + cropW, top + cropH) to Offset(left + cropW, top + cropH - cornerLen)
+                    )
+                    corners.forEach { (from, to) -> drawLine(Color(0xFF00BCD4), from, to, 3.dp.toPx()) }
+                }
+
+                // Header
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 40.dp, start = 20.dp, end = 20.dp)
+                        .align(Alignment.TopCenter)
+                ) {
+                    Text(
+                        text = "Crop to 4:5 Ratio",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = DorjaColors.White,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Drag image to position within the frame",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = DorjaColors.Sand300,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+
+                // Bottom buttons
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 40.dp, start = 24.dp, end = 24.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    DorjaOutlinedButton(
+                        text = "Cancel",
+                        onClick = { showCropDialog = false; cropBitmap = null },
+                        modifier = Modifier.weight(1f)
+                    )
+                    DorjaButton(
+                        text = "Crop & Save",
+                        onClick = {
+                            // Auto-crop to center 4:5 region
+                            val ratio = 4f / 5f
+                            val cropW: Int
+                            val cropH: Int
+                            if (bitmap.width.toFloat() / bitmap.height.toFloat() > ratio) {
+                                cropH = bitmap.height
+                                cropW = (bitmap.height * ratio).toInt()
+                            } else {
+                                cropW = bitmap.width
+                                cropH = (bitmap.width / ratio).toInt()
+                            }
+                            val x = (bitmap.width - cropW) / 2
+                            val y = (bitmap.height - cropH) / 2
+                            val cropped = Bitmap.createBitmap(bitmap, max(0, x), max(0, y), min(cropW, bitmap.width), min(cropH, bitmap.height))
+
+                            val ctx = context
+                            val file = java.io.File(ctx.cacheDir, "cropped_${System.currentTimeMillis()}.jpg")
+                            java.io.FileOutputStream(file).use { out ->
+                                cropped.compress(Bitmap.CompressFormat.JPEG, 92, out)
+                            }
+
+                            photoAssignments.add(
+                                PhotoAssignmentItem(
+                                    url = "file://${file.absolutePath}",
+                                    caption = cropCaption.ifBlank { "Photo ${photoAssignments.size + 1}" },
+                                    assignedRoomId = cropAssignedRoomId
+                                )
+                            )
+
+                            showCropDialog = false
+                            cropBitmap = null
+                        },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+        }
+    }
+
     // MULTI-PHOTO SELECTION MODAL
     if (showMultiPhotoSelectorDialog) {
         var customCaptionInput by remember { mutableStateOf("") }
@@ -352,38 +521,35 @@ fun CreateListingScreen(
 
                     Spacer(modifier = Modifier.height(4.dp))
 
-                    // Pick buttons
+                    // Pick buttons (both go through 4:5 crop)
+                    val ctx = LocalContext.current
                     val galleryLauncher = rememberLauncherForActivityResult(
                         contract = ActivityResultContracts.GetContent()
                     ) { uri ->
                         if (uri != null) {
-                            photoAssignments.add(
-                                PhotoAssignmentItem(
-                                    url = uri.toString(),
-                                    caption = customCaptionInput.ifBlank { "Property Photo ${photoAssignments.size + 1}" },
-                                    assignedRoomId = selectedRoomForNewPhoto
-                                )
-                            )
+                            try {
+                                val inputStream = ctx.contentResolver.openInputStream(uri)
+                                val bmp = BitmapFactory.decodeStream(inputStream)
+                                inputStream?.close()
+                                if (bmp != null) {
+                                    cropBitmap = bmp
+                                    cropAssignedRoomId = selectedRoomForNewPhoto
+                                    cropCaption = customCaptionInput
+                                    showCropDialog = true
+                                }
+                            } catch (_: Exception) {}
                             customCaptionInput = ""
                         }
                     }
 
-                    val ctx = LocalContext.current
                     val cameraLauncher = rememberLauncherForActivityResult(
                         contract = ActivityResultContracts.TakePicturePreview()
                     ) { bitmap ->
                         if (bitmap != null) {
-                            val file = java.io.File(ctx.cacheDir, "camera_photo_${System.currentTimeMillis()}.jpg")
-                            java.io.FileOutputStream(file).use { out ->
-                                bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, out)
-                            }
-                            photoAssignments.add(
-                                PhotoAssignmentItem(
-                                    url = "file://${file.absolutePath}",
-                                    caption = customCaptionInput.ifBlank { "Camera Photo ${photoAssignments.size + 1}" },
-                                    assignedRoomId = selectedRoomForNewPhoto
-                                )
-                            )
+                            cropBitmap = bitmap
+                            cropAssignedRoomId = selectedRoomForNewPhoto
+                            cropCaption = customCaptionInput
+                            showCropDialog = true
                             customCaptionInput = ""
                         }
                     }
