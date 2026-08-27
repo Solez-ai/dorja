@@ -3,12 +3,12 @@ name: Build APK
 on:
   push:
     branches: [main]
-  workflow_dispatch: # Allows manual trigger from GitHub UI
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
 
     steps:
       - name: Checkout code
@@ -25,15 +25,14 @@ jobs:
         with:
           gradle-version: '9.3.1'
 
-      - name: Generate dummy .env (secrets plugin requires it)
+      - name: Generate dummy .env
         working-directory: dorja
         run: echo "# CI build" > .env
 
       - name: Generate dummy google-services.json
         working-directory: dorja/app
         run: |
-          cat > google-services.json << 'ENDJSON'
-          {
+          printf '%s\n' '{
             "project_info": {
               "project_number": "000000000000",
               "project_id": "dorja-placeholder",
@@ -60,22 +59,19 @@ jobs:
               }
             ],
             "configuration_version": "1"
-          }
-          ENDJSON
+          }' > google-services.json
 
       - name: Decode keystore from GitHub secret
         run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > dorja/release.keystore
 
       - name: Build signed release APK
         working-directory: dorja
-        run: |
-          gradle assembleRelease \
-            --no-daemon \
-            --stacktrace \
-            -Pandroid.injected.signing.store.file=${{ github.workspace }}/dorja/release.keystore \
-            -Pandroid.injected.signing.store.password=${{ secrets.STORE_PASSWORD }} \
-            -Pandroid.injected.signing.key.alias=dorja \
-            -Pandroid.injected.signing.key.password=${{ secrets.KEY_PASSWORD }}
+        env:
+          KEYSTORE_PATH: ${{ github.workspace }}/dorja/release.keystore
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_ALIAS: dorja
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: gradle assembleRelease --no-daemon --stacktrace
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
