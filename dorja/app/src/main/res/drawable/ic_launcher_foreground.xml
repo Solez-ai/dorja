@@ -1,0 +1,38 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <group
+        android:scaleX="0.55"
+        android:scaleY="0.55"
+        android:translateX="24.3"
+        android:translateY="24.3">
+        <!-- Left Wing (Teal) -->
+        <path
+            android:fillColor="#007C78"
+            android:pathData="M18,24 L36,36 C40,38 42,43 42,49 L42,80 L24,80 L18,24 Z" />
+
+        <!-- Right Wing (Teal) -->
+        <path
+            android:fillColor="#007C78"
+            android:pathData="M90,24 L72,36 C68,38 66,43 66,49 L66,80 L84,80 L90,24 Z" />
+
+        <!-- Arch Outline (White) -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M54,39 C49,43 45,50 45,58 L45,71 L48,71 L48,58 C48,52 51,48 54,45 C57,48 60,52 60,58 L60,71 L63,71 L63,58 C63,50 59,43 54,39 Z" />
+
+        <!-- River Path (Teal Light) -->
+        <path
+            android:fillColor="#D7F1EE"
+            android:pathData="M41,83 L67,83 C65,77 59,73 56,71 C53,68 57,65 55,62 C53,59 56,58 54,56 C52,58 52,60 50,63 C48,66 53,69 51,73 C49,76 45,80 41,83 Z" />
+
+        <!-- Sun / Sphere -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M54,51 A3,3 0 1 0 54,57 A3,3 0 1 0 54,51 Z" />
+    </group>
+
+</vector>

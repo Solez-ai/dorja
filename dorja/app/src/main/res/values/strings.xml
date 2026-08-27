@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">DORJA</string>
+    <string name="app_tagline">Property Trust Platform</string>
+    <string name="scam_prevention_desc">Addresses unlocked only with verified SafeView passes.</string>
+</resources>

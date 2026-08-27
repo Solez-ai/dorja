@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="200dp"
+    android:height="200dp"
+    android:viewportWidth="200"
+    android:viewportHeight="200">
+
+    <!-- Left Wing (Teal) -->
+    <path
+        android:fillColor="#007C78"
+        android:pathData="M35,46 L68,68 C74,72 78,80 78,92 L78,148 L46,148 L35,46 Z" />
+
+    <!-- Right Wing (Teal) -->
+    <path
+        android:fillColor="#007C78"
+        android:pathData="M165,46 L132,68 C126,72 122,80 122,92 L122,148 L154,148 L165,46 Z" />
+
+    <!-- Arch Outline / Gate (Teal) -->
+    <path
+        android:fillColor="#007C78"
+        android:pathData="M100,72 C92,80 84,92 84,106 L84,130 L90,130 L90,106 C90,95 96,87 100,83 C104,87 110,95 110,106 L110,130 L116,130 L116,106 C116,92 108,80 100,72 Z" />
+
+    <!-- River / Winding Path (Dark Ink Blue #0B1F33) -->
+    <path
+        android:fillColor="#0B1F33"
+        android:pathData="M76,152 L124,152 C120,142 108,134 104,130 C98,124 106,120 102,114 C98,109 104,106 100,103 C96,106 97,110 93,115 C88,122 98,126 94,134 C90,140 82,146 76,152 Z" />
+
+    <!-- Sun / Goal Sphere (Dark Ink Blue #0B1F33) -->
+    <path
+        android:fillColor="#0B1F33"
+        android:pathData="M100,94 A5,5 0 1 0 100,104 A5,5 0 1 0 100,94 Z" />
+
+</vector>

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="dorja_ink950">#FF0B1F33</color>
+    <color name="dorja_jol600">#FF007C78</color>
+    <color name="dorja_paper50">#FFFBF8F2</color>
+    <color name="dorja_sand300">#FFD9CCB9</color>
+    <color name="dorja_teal100">#FFD7F1EE</color>
+    <color name="dorja_gray700">#FF17324D</color>
+    <color name="dorja_error">#FFB91C1C</color>
+    <color name="dorja_warning">#FFC2710B</color>
+    <color name="dorja_success">#FF007C78</color>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+</resources>
