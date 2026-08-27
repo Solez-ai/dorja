@@ -64,6 +64,9 @@ import com.example.ui.components.DorjaButton
 import com.example.ui.components.DorjaOutlinedButton
 import com.example.ui.theme.DorjaColors
 import com.example.ui.util.Formatters
+import com.example.R
+import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
 import kotlinx.coroutines.launch
 
 @Composable
@@ -123,18 +126,26 @@ fun HostListingsScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
-                    Text(
-                        text = "My Properties",
-                        style = MaterialTheme.typography.titleLarge,
-                        color = DorjaColors.Ink950,
-                        fontWeight = FontWeight.Bold
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Image(
+                        painter = painterResource(id = R.drawable.ic_dorja_logo),
+                        contentDescription = "Dorja Logo",
+                        modifier = Modifier.size(36.dp)
                     )
-                    Text(
-                        text = "Host Management Suite • Dorja BD",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = DorjaColors.Gray700
-                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column {
+                        Text(
+                            text = "My Properties",
+                            style = MaterialTheme.typography.titleLarge,
+                            color = DorjaColors.Ink950,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Host Management Suite • Dorja BD",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = DorjaColors.Gray700
+                        )
+                    }
                 }
 
                 DorjaButton(

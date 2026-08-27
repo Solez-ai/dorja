@@ -69,6 +69,7 @@ import com.example.ui.components.DorjaChip
 import com.example.ui.components.DorjaOutlinedButton
 import com.example.ui.theme.DorjaColors
 import kotlinx.coroutines.launch
+import androidx.compose.material3.CircularProgressIndicator
 
 @Composable
 fun AccountScreen(
@@ -229,7 +230,23 @@ fun AccountScreen(
         )
     }
 
-    val user = currentUser ?: return
+    if (currentUser == null) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(DorjaColors.CanvasBg),
+            contentAlignment = Alignment.Center
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                CircularProgressIndicator(color = DorjaColors.BentoBlueIcon)
+                Spacer(modifier = Modifier.height(12.dp))
+                Text("Loading account...", style = MaterialTheme.typography.bodySmall, color = DorjaColors.Gray700)
+            }
+        }
+        return
+    }
+
+    val user = currentUser!!
 
     Column(
         modifier = Modifier

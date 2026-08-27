@@ -69,6 +69,8 @@ import com.example.ui.components.DorjaChip
 import com.example.ui.components.DorjaOutlinedButton
 import com.example.ui.theme.DorjaColors
 import com.example.ui.util.Formatters
+import com.example.R
+import androidx.compose.ui.res.painterResource
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -114,37 +116,47 @@ fun ExploreScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
-                    Text(
-                        text = "Dorja Properties",
-                        style = MaterialTheme.typography.titleLarge,
-                        color = DorjaColors.Ink950,
-                        fontWeight = FontWeight.Bold
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Image(
+                        painter = painterResource(id = R.drawable.ic_dorja_logo),
+                        contentDescription = "Dorja Logo",
+                        modifier = Modifier.size(40.dp)
                     )
-                    Text(
-                        text = "Verified Bangladeshi Homes • SafeView Access",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = DorjaColors.Gray700
-                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column {
+                        Text(
+                            text = "Dorja Properties",
+                            style = MaterialTheme.typography.titleLarge,
+                            color = DorjaColors.Ink950,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Verified Bangladeshi Homes • SafeView Access",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = DorjaColors.Gray700
+                        )
+                    }
                 }
 
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(DorjaColors.BentoGreenBg)
-                        .padding(horizontal = 10.dp, vertical = 5.dp)
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = DorjaColors.BentoGreenBg,
+                    border = BorderStroke(1.dp, DorjaColors.BentoGreenIcon.copy(alpha = 0.3f))
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                    ) {
                         Icon(
                             imageVector = Icons.Default.Shield,
                             contentDescription = null,
                             tint = DorjaColors.BentoGreenIcon,
                             modifier = Modifier.size(14.dp)
                         )
-                        Spacer(modifier = Modifier.width(4.dp))
+                        Spacer(modifier = Modifier.width(5.dp))
                         Text(
                             text = "ANTI-SCAM",
-                            style = MaterialTheme.typography.labelSmall,
+                            style = MaterialTheme.typography.labelMedium,
                             color = DorjaColors.BentoGreenText,
                             fontWeight = FontWeight.Bold
                         )
