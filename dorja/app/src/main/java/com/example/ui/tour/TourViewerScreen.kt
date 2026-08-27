@@ -29,9 +29,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CompassCalibration
 import androidx.compose.material.icons.filled.MeetingRoom
 import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.Smartphone
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -150,6 +152,9 @@ fun TourViewerScreen(
     val transitionScale = remember { Animatable(1f) }
     val scope = rememberCoroutineScope()
     var isTransitioning by remember { mutableStateOf(false) }
+
+    // Orientation recommendation banner
+    var showOrientationBanner by remember { mutableStateOf(true) }
 
     // Renderer reference
     var rendererRef by remember { mutableStateOf<Room3DRenderer?>(null) }
@@ -272,14 +277,70 @@ fun TourViewerScreen(
             )
         }
 
-        // 3. Compass / Orientation Indicator (Top Right Below Bar)
+        // 3. Orientation Recommendation Banner
+        AnimatedVisibility(
+            visible = showOrientationBanner,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 104.dp, start = 16.dp, end = 16.dp)
+        ) {
+            Surface(
+                shape = RoundedCornerShape(14.dp),
+                color = DorjaColors.Ink950.copy(alpha = 0.92f),
+                border = androidx.compose.foundation.BorderStroke(1.5.dp, DorjaColors.Jol600),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Smartphone,
+                            contentDescription = null,
+                            tint = DorjaColors.Jol600,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Column {
+                            Text(
+                                text = "Rotate to Landscape",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = DorjaColors.White,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "For the best 3D viewing experience",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = DorjaColors.Sand300,
+                                fontSize = 11.sp
+                            )
+                        }
+                    }
+                    IconButton(
+                        onClick = { showOrientationBanner = false },
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(Icons.Default.Close, contentDescription = "Dismiss", tint = DorjaColors.Sand300, modifier = Modifier.size(16.dp))
+                    }
+                }
+            }
+        }
+
+        // 4. Compass / Orientation Indicator (Top Right Below Bar)
         Surface(
             shape = RoundedCornerShape(8.dp),
             color = DorjaColors.Ink950.copy(alpha = 0.75f),
             border = androidx.compose.foundation.BorderStroke(1.dp, DorjaColors.Sand300.copy(alpha = 0.3f)),
             modifier = Modifier
                 .align(Alignment.TopEnd)
-                .padding(top = 104.dp, end = 16.dp)
+                .padding(top = 156.dp, end = 16.dp)
         ) {
             Row(
                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),

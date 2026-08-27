@@ -16,3 +16,6 @@
 local.properties
 .env
 debug.keystore
+dorja-release.keystore
+dorja-release.keystore.base64
+release.keystore

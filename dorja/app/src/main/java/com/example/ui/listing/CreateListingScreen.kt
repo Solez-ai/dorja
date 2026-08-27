@@ -78,6 +78,7 @@ import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.SquareFoot
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Smartphone
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Undo
@@ -877,13 +878,12 @@ fun CreateListingScreen(
             }
         }
     ) { innerPadding ->
-        // Form Fields
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 14.dp, vertical = 6.dp)
+                .padding(horizontal = 14.dp, vertical = 8.dp)
         ) {
             // Intent & Type
             BentoCard(modifier = Modifier.fillMaxWidth()) {
@@ -1761,9 +1761,9 @@ fun CreateListingScreen(
                         placeholder = { Text("Describe neighborhood advantages, natural ventilation, handover condition...") },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(100.dp)
                             .testTag("input_listing_description"),
-                        maxLines = 4,
+                        minLines = 3,
+                        maxLines = 6,
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedContainerColor = DorjaColors.White,
                             unfocusedContainerColor = DorjaColors.White,
@@ -1776,16 +1776,30 @@ fun CreateListingScreen(
             }
 
             if (errorMessage != null) {
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    text = errorMessage!!,
-                    color = DorjaColors.Error,
-                    style = MaterialTheme.typography.bodySmall,
-                    fontWeight = FontWeight.Bold
-                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = DorjaColors.Error.copy(alpha = 0.1f),
+                    border = BorderStroke(1.dp, DorjaColors.Error.copy(alpha = 0.3f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.Warning, contentDescription = null, tint = DorjaColors.Error, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = errorMessage!!,
+                            color = DorjaColors.Error,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
             // Submit Button
             DorjaButton(
@@ -1837,11 +1851,11 @@ fun CreateListingScreen(
                 },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(48.dp),
+                    .height(52.dp),
                 testTag = "publish_listing_button"
             )
 
-            Spacer(modifier = Modifier.height(36.dp))
+            Spacer(modifier = Modifier.height(48.dp))
         }
     }
 }
@@ -1977,6 +1991,7 @@ fun Guided3DPanoramaScannerDialog(
     var currentTargetIndex by remember(selectedRoomId) { mutableIntStateOf(0) }
     val capturedSlices = remember(selectedRoomId) { mutableStateListOf<Int>() }
     var isPreviewMode by remember(selectedRoomId) { mutableStateOf(false) }
+    var showOrientationPrompt by remember(selectedRoomId) { mutableStateOf(true) }
     var shutterFlash by remember { mutableStateOf(false) }
 
     var previewPan by remember { mutableFloatStateOf(0f) }
@@ -2037,8 +2052,77 @@ fun Guided3DPanoramaScannerDialog(
                 )
             }
 
-            // Scanner HUD Layout
-            Column(
+            // Orientation Prompt (shown before scanning starts)
+            if (showOrientationPrompt) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(DorjaColors.Ink950.copy(alpha = 0.95f))
+                        .padding(32.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(88.dp)
+                            .clip(CircleShape)
+                            .background(DorjaColors.Jol600.copy(alpha = 0.15f))
+                            .border(2.dp, DorjaColors.Jol600, CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Smartphone,
+                            contentDescription = null,
+                            tint = DorjaColors.Jol600,
+                            modifier = Modifier.size(48.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    Text(
+                        text = "Hold your phone upright",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = DorjaColors.White,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Text(
+                        text = "Stand in the center of ${activeRoom?.displayName ?: "the room"} and keep the phone at chest height in portrait mode.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = DorjaColors.Sand300,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Text(
+                        text = "You will capture 12 angles: 8 around you, 2 ceiling, and 2 floor.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = DorjaColors.Jol600,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        fontWeight = FontWeight.SemiBold
+                    )
+
+                    Spacer(modifier = Modifier.height(32.dp))
+
+                    DorjaButton(
+                        text = "Start 3D Scan",
+                        onClick = { showOrientationPrompt = false },
+                        icon = Icons.Default.ViewInAr,
+                        modifier = Modifier
+                            .fillMaxWidth(0.7f)
+                            .height(52.dp),
+                        testTag = "start_scan_from_prompt"
+                    )
+                }
+            }
+
+            // Scanner HUD Layout (only when orientation prompt is dismissed)
+            if (!showOrientationPrompt) Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(top = 40.dp, start = 16.dp, end = 16.dp, bottom = 24.dp),
@@ -2276,6 +2360,10 @@ fun Guided3DPanoramaScannerDialog(
                                         "DOWN" -> Icons.Default.KeyboardArrowDown
                                         "LEFT" -> Icons.AutoMirrored.Filled.ArrowBack
                                         "RIGHT" -> Icons.AutoMirrored.Filled.ArrowForward
+                                        "UP_RIGHT" -> Icons.Default.KeyboardArrowUp
+                                        "UP_LEFT" -> Icons.Default.KeyboardArrowUp
+                                        "DOWN_RIGHT" -> Icons.Default.KeyboardArrowDown
+                                        "DOWN_LEFT" -> Icons.Default.KeyboardArrowDown
                                         else -> Icons.Default.Navigation
                                     },
                                     contentDescription = null,
@@ -2301,7 +2389,7 @@ fun Guided3DPanoramaScannerDialog(
                                 .fillMaxWidth(0.92f)
                                 .height(300.dp)
                                 .clip(RoundedCornerShape(20.dp))
-                                .background(Color.Black.copy(alpha = 0.4f)),
+                                .background(Color.Black.copy(alpha = 0.2f)),
                             contentAlignment = Alignment.Center
                         ) {
                             GuidedAngleDotsCanvas(
@@ -2334,26 +2422,83 @@ fun Guided3DPanoramaScannerDialog(
                     }
                 }
 
-                // Bottom Action Bar: Finish or Scan Next Room
+                // Bottom Action Bar: Preview verification or continue scanning
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (isPreviewMode || capturedSlices.size >= targets.size) {
+                        // SCAN PREVIEW: Verify the 3D scan looks correct
+                        Surface(
+                            shape = RoundedCornerShape(14.dp),
+                            color = DorjaColors.Ink950.copy(alpha = 0.9f),
+                            border = BorderStroke(1.5.dp, DorjaColors.Success),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.CheckCircle, contentDescription = null, tint = DorjaColors.Success, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = "SCAN COMPLETE — PREVIEW",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = DorjaColors.Success,
+                                        fontFamily = FontFamily.Monospace,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "Drag the preview above to verify the 3D scan looks correct before saving.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = DorjaColors.Sand300,
+                                    fontSize = 11.sp
+                                )
+                            }
+                        }
+
+                        // Save scan
                         DorjaButton(
-                            text = "Finish & Save 3D Scan (${activeRoom?.displayName ?: "Room"})",
+                            text = "✓ Save Scan (${activeRoom?.displayName ?: "Room"})",
                             onClick = {
                                 if (activeRoom != null) {
                                     onRoomScanSaved(activeRoom.id)
                                 }
                                 onDismiss()
                             },
-                            icon = Icons.Default.Shield,
+                            icon = Icons.Default.CheckCircle,
                             modifier = Modifier.fillMaxWidth(),
                             testTag = "finish_scan_button"
                         )
 
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            // Re-scan this room
+                            DorjaOutlinedButton(
+                                text = "Re-Scan",
+                                onClick = {
+                                    capturedSlices.clear()
+                                    currentTargetIndex = 0
+                                    isPreviewMode = false
+                                },
+                                icon = Icons.Default.Refresh,
+                                modifier = Modifier.weight(1f),
+                                testTag = "rescan_button"
+                            )
+
+                            // Skip — don't save
+                            DorjaOutlinedButton(
+                                text = "Skip",
+                                onClick = onDismiss,
+                                modifier = Modifier.weight(1f),
+                                testTag = "skip_scan_button"
+                            )
+                        }
+
+                        // Scan another room (if available)
                         val nextRoom = rooms.find { !it.has3DScan && it.id != activeRoom?.id }
                         if (nextRoom != null) {
                             DorjaOutlinedButton(
-                                text = "Scan Another Room: ${nextRoom.displayName}",
+                                text = "Scan Next: ${nextRoom.displayName}",
                                 onClick = {
                                     if (activeRoom != null) {
                                         onRoomScanSaved(activeRoom.id)
@@ -2368,27 +2513,11 @@ fun Guided3DPanoramaScannerDialog(
                             )
                         }
                     } else {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            DorjaOutlinedButton(
-                                text = "Auto-Capture",
-                                onClick = {
-                                    capturedSlices.clear()
-                                    capturedSlices.addAll(targets.indices)
-                                    isPreviewMode = true
-                                },
-                                icon = Icons.Default.Autorenew,
-                                modifier = Modifier.weight(1f),
-                                testTag = "auto_capture_button"
-                            )
-                            DorjaButton(
-                                text = "Done / Close",
-                                onClick = onDismiss,
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
+                        DorjaOutlinedButton(
+                            text = "Cancel Scan",
+                            onClick = onDismiss,
+                            modifier = Modifier.fillMaxWidth()
+                        )
                     }
                 }
             }
@@ -2448,11 +2577,14 @@ private fun GuidedAngleDotsCanvas(
             style = Stroke(width = 2.dp.toPx())
         )
 
-        // 3. Draw Constellation of Dots for 8 compass directions + 4 elevation nodes
+        // 3. Draw Constellation of Dots for 8 compass + 4 elevation nodes
         val horizontalTargets = targets.filter { it.elevationPitch == 0f }
+        val ceilingTargets = targets.filter { it.elevationPitch < 0f }
+        val floorTargets = targets.filter { it.elevationPitch > 0f }
         val dotPositions = mutableListOf<Offset>()
 
-        horizontalTargets.forEachIndexed { idx, target ->
+        // Draw horizontal ring dots
+        horizontalTargets.forEach { target ->
             val rad = Math.toRadians(target.angleDegree.toDouble() - 90.0)
             val dx = cx + (radius * cos(rad)).toFloat()
             val dy = cy + (radius * sin(rad)).toFloat()
@@ -2462,7 +2594,6 @@ private fun GuidedAngleDotsCanvas(
             val isCaptured = capturedSlices.contains(target.index)
             val isCurrent = currentTargetIndex == target.index
 
-            // Dot node
             drawCircle(
                 color = when {
                     isCaptured -> Color(0xFF2E7D32)
@@ -2472,8 +2603,6 @@ private fun GuidedAngleDotsCanvas(
                 radius = if (isCurrent) 10.dp.toPx() * pulseAnim else 6.dp.toPx(),
                 center = pt
             )
-
-            // Inner white dot
             drawCircle(
                 color = Color.White,
                 radius = if (isCurrent) 4.dp.toPx() else 2.5.dp.toPx(),
@@ -2481,15 +2610,105 @@ private fun GuidedAngleDotsCanvas(
             )
         }
 
+        // Draw ceiling dots (above center)
+        ceilingTargets.forEach { target ->
+            val rad = Math.toRadians(target.angleDegree.toDouble() - 90.0)
+            val dx = cx + (radius * 0.55f * cos(rad)).toFloat()
+            val dy = cy - (radius * 0.6f) + (radius * 0.15f * sin(rad)).toFloat()
+            val pt = Offset(dx, dy)
+
+            val isCaptured = capturedSlices.contains(target.index)
+            val isCurrent = currentTargetIndex == target.index
+
+            drawCircle(
+                color = when {
+                    isCaptured -> Color(0xFF2E7D32)
+                    isCurrent -> Color(0xFFFFA000)
+                    else -> Color.White.copy(alpha = 0.3f)
+                },
+                radius = if (isCurrent) 9.dp.toPx() * pulseAnim else 5.dp.toPx(),
+                center = pt
+            )
+            drawCircle(
+                color = Color.White,
+                radius = if (isCurrent) 3.5.dp.toPx() else 2.dp.toPx(),
+                center = pt
+            )
+        }
+
+        // Draw floor dots (below center)
+        floorTargets.forEach { target ->
+            val rad = Math.toRadians(target.angleDegree.toDouble() - 90.0)
+            val dx = cx + (radius * 0.55f * cos(rad)).toFloat()
+            val dy = cy + (radius * 0.6f) + (radius * 0.15f * sin(rad)).toFloat()
+            val pt = Offset(dx, dy)
+
+            val isCaptured = capturedSlices.contains(target.index)
+            val isCurrent = currentTargetIndex == target.index
+
+            drawCircle(
+                color = when {
+                    isCaptured -> Color(0xFF2E7D32)
+                    isCurrent -> Color(0xFFFFA000)
+                    else -> Color.White.copy(alpha = 0.3f)
+                },
+                radius = if (isCurrent) 9.dp.toPx() * pulseAnim else 5.dp.toPx(),
+                center = pt
+            )
+            drawCircle(
+                color = Color.White,
+                radius = if (isCurrent) 3.5.dp.toPx() else 2.dp.toPx(),
+                center = pt
+            )
+        }
+
         // Connecting lines between horizontal dots
         for (i in 0 until dotPositions.size) {
             val nextIdx = (i + 1) % dotPositions.size
-            val isLineActive = capturedSlices.contains(i) && capturedSlices.contains(nextIdx)
+            val isLineActive = capturedSlices.contains(horizontalTargets[i].index) && capturedSlices.contains(horizontalTargets[nextIdx].index)
             drawLine(
                 color = if (isLineActive) Color(0xFF2E7D32).copy(alpha = 0.7f) else Color(0xFF007C78).copy(alpha = 0.25f),
                 start = dotPositions[i],
                 end = dotPositions[nextIdx],
                 strokeWidth = if (isLineActive) 2.dp.toPx() else 1.dp.toPx()
+            )
+        }
+
+        // Connect ceiling dots to each other
+        val ceilingPositions = ceilingTargets.map { target ->
+            val rad = Math.toRadians(target.angleDegree.toDouble() - 90.0)
+            Offset(
+                cx + (radius * 0.55f * cos(rad)).toFloat(),
+                cy - (radius * 0.6f) + (radius * 0.15f * sin(rad)).toFloat()
+            )
+        }
+        for (i in 0 until ceilingPositions.size) {
+            val nextIdx = (i + 1) % ceilingPositions.size
+            val isLineActive = capturedSlices.contains(ceilingTargets[i].index) && capturedSlices.contains(ceilingTargets[nextIdx].index)
+            drawLine(
+                color = if (isLineActive) Color(0xFF2E7D32).copy(alpha = 0.5f) else Color(0xFFFFA000).copy(alpha = 0.2f),
+                start = ceilingPositions[i],
+                end = ceilingPositions[nextIdx],
+                strokeWidth = if (isLineActive) 1.5.dp.toPx() else 1.dp.toPx()
+            )
+        }
+
+        // Connect floor dots to each other
+        val floorPositions = floorTargets.map { target ->
+            val rad = Math.toRadians(target.angleDegree.toDouble() - 90.0)
+            Offset(
+                cx + (radius * 0.55f * cos(rad)).toFloat(),
+                cy + (radius * 0.6f) + (radius * 0.15f * sin(rad)).toFloat()
+            )
+        }
+        for (i in 0 until floorPositions.size) {
+            val nextIdx = (i + 1) % floorPositions.size
+            val isLineActive = capturedSlices.contains(floorTargets[i].index) && capturedSlices.contains(floorTargets[nextIdx].index)
+            drawLine(
+                color = if (isLineActive) Color(0xFF2E7D32).copy(alpha = 0.5f) else Color(0xFFFFA000).copy(alpha = 0.2f),
+                start = floorPositions[i],
+                end = floorPositions[nextIdx],
+                strokeWidth = if (isLineActive) 1.5.dp.toPx() else 1.dp.toPx()
             )
         }
 

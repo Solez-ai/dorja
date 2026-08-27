@@ -16,7 +16,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.util.UUID
 
@@ -36,20 +35,7 @@ class DorjaRepository(private val database: DorjaDatabase) {
 
     init {
         CoroutineScope(Dispatchers.IO).launch {
-            val existingUsers = userDao.getAllUsers().first()
-            if (existingUsers.isEmpty()) {
-                DorjaDatabase.populateInitialData(database)
-            }
-            val defaultUser = userDao.getUserById("u1") ?: User(
-                id = "u1",
-                username = "host",
-                displayName = "Rahim Ahmed (Host)",
-                role = "SELLER",
-                phone = "+880 1712-345678",
-                email = "rahim.ahmed@dorja.bd",
-                bio = "Verified property host in Dhaka.",
-                location = "Gulshan, Dhaka"
-            )
+            val defaultUser = userDao.getUserById("u1")
             _currentUser.value = defaultUser
         }
     }
