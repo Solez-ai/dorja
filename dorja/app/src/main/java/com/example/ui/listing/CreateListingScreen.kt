@@ -134,6 +134,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import coil.compose.AsyncImage
 import com.example.DorjaApp
 import com.example.data.model.LegalDocument
+import com.example.data.model.Promise
 import com.example.data.model.RoomItem
 import com.example.ui.components.BentoCard
 import com.example.ui.components.DorjaBadge
@@ -210,6 +211,11 @@ fun CreateListingScreen(
     // 5. Legal Documents (Empty by default - no fake documents)
     val customLegalDocs = remember {
         mutableStateListOf<LegalDocument>()
+    }
+
+    // 6. Promises
+    val customPromises = remember {
+        mutableStateListOf<Promise>()
     }
 
     var showAddDocDialog by remember { mutableStateOf(false) }
@@ -987,6 +993,92 @@ fun CreateListingScreen(
                         ),
                         shape = RoundedCornerShape(12.dp)
                     )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // Use My Location Button
+                    val context = androidx.compose.ui.platform.LocalContext.current
+                    var locationLoading by remember { mutableStateOf(false) }
+                    var lastFetchedLocation by remember { mutableStateOf("") }
+                    var hasLocationPermission by remember {
+                        mutableStateOf(
+                            androidx.core.content.ContextCompat.checkSelfPermission(
+                                context, android.Manifest.permission.ACCESS_FINE_LOCATION
+                            ) == PackageManager.PERMISSION_GRANTED
+                        )
+                    }
+                    val locationPermissionLauncher = rememberLauncherForActivityResult(
+                        ActivityResultContracts.RequestMultiplePermissions()
+                    ) { permissions ->
+                        val granted = permissions.values.any { it }
+                        hasLocationPermission = granted
+                        if (granted) {
+                            locationLoading = true
+                            try {
+                                val fusedLocationClient = com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(context)
+                                @Suppress("MissingPermission")
+                                fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+                                    locationLoading = false
+                                    if (location != null) {
+                                        val lat = String.format("%.4f", location.latitude)
+                                        val lng = String.format("%.4f", location.longitude)
+                                        lastFetchedLocation = "$lat, $lng"
+                                        if (exactAddress.isBlank()) exactAddress = "GPS: $lat, $lng"
+                                        if (publicArea.isBlank()) publicArea = "Nearby Location"
+                                    } else {
+                                        lastFetchedLocation = "Location unavailable"
+                                    }
+                                }.addOnFailureListener {
+                                    locationLoading = false
+                                    lastFetchedLocation = "Error getting location"
+                                }
+                            } catch (e: Exception) {
+                                locationLoading = false
+                                lastFetchedLocation = "Error: ${e.message}"
+                            }
+                        }
+                    }
+
+                    DorjaOutlinedButton(
+                        text = if (locationLoading) "Getting Location..." else if (lastFetchedLocation.isNotBlank()) "📍 $lastFetchedLocation" else "Use My Current Location",
+                        onClick = {
+                            if (hasLocationPermission) {
+                                locationLoading = true
+                                try {
+                                    val fusedLocationClient = com.google.android.gms.location.LocationServices.getFusedLocationProviderClient(context)
+                                    @Suppress("MissingPermission")
+                                    fusedLocationClient.lastLocation.addOnSuccessListener { location ->
+                                        locationLoading = false
+                                        if (location != null) {
+                                            val lat = String.format("%.4f", location.latitude)
+                                            val lng = String.format("%.4f", location.longitude)
+                                            lastFetchedLocation = "$lat, $lng"
+                                            if (exactAddress.isBlank()) exactAddress = "GPS: $lat, $lng"
+                                            if (publicArea.isBlank()) publicArea = "Nearby Location"
+                                        } else {
+                                            lastFetchedLocation = "Location unavailable"
+                                        }
+                                    }.addOnFailureListener {
+                                        locationLoading = false
+                                        lastFetchedLocation = "Error getting location"
+                                    }
+                                } catch (e: Exception) {
+                                    locationLoading = false
+                                    lastFetchedLocation = "Error: ${e.message}"
+                                }
+                            } else {
+                                locationPermissionLauncher.launch(
+                                    arrayOf(
+                                        android.Manifest.permission.ACCESS_FINE_LOCATION,
+                                        android.Manifest.permission.ACCESS_COARSE_LOCATION
+                                    )
+                                )
+                            }
+                        },
+                        icon = Icons.Default.LocationOn,
+                        modifier = Modifier.fillMaxWidth(),
+                        testTag = "use_my_location_button"
+                    )
                 }
             }
 
@@ -1262,21 +1354,32 @@ fun CreateListingScreen(
 
                     if (photoAssignments.isEmpty()) {
                         Surface(
-                            shape = RoundedCornerShape(10.dp),
+                            shape = RoundedCornerShape(12.dp),
                             color = DorjaColors.Sand100,
-                            border = BorderStroke(1.dp, DorjaColors.BentoCardBorder),
+                            border = BorderStroke(1.5.dp, DorjaColors.BentoCardBorder),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable { showMultiPhotoSelectorDialog = true }
                         ) {
                             Column(
-                                modifier = Modifier.padding(12.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(20.dp),
                                 horizontalAlignment = Alignment.CenterHorizontally
                             ) {
-                                Icon(Icons.Default.AddPhotoAlternate, contentDescription = null, tint = DorjaColors.Jol600, modifier = Modifier.size(24.dp))
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text("No photos selected yet", fontWeight = FontWeight.Bold, color = DorjaColors.Ink950, style = MaterialTheme.typography.bodyMedium)
-                                Text("Tap to select multiple images and assign them to your rooms", style = MaterialTheme.typography.bodySmall, color = DorjaColors.Gray700)
+                                Box(
+                                    modifier = Modifier
+                                        .size(48.dp)
+                                        .clip(CircleShape)
+                                        .background(DorjaColors.BentoBlueBg),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(Icons.Default.AddPhotoAlternate, contentDescription = null, tint = DorjaColors.BentoBlueIcon, modifier = Modifier.size(24.dp))
+                                }
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Text("No photos added yet", fontWeight = FontWeight.Bold, color = DorjaColors.Ink950, style = MaterialTheme.typography.bodyMedium)
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text("Tap here to add photos and assign them to rooms", style = MaterialTheme.typography.bodySmall, color = DorjaColors.Gray700)
                             }
                         }
                     } else {
@@ -1776,6 +1879,201 @@ fun CreateListingScreen(
                 }
             }
 
+            // Promises Section
+            var showAddPromiseDialog by remember { mutableStateOf(false) }
+            var newPromiseCategory by remember { mutableStateOf("HANDOVER_DATE") }
+            var newPromiseTitle by remember { mutableStateOf("") }
+            var newPromiseText by remember { mutableStateOf("") }
+
+            val promiseCategoryOptions = listOf(
+                Pair("HANDOVER_DATE", "Handover Date"),
+                Pair("UNIT_SIZE_OR_LAYOUT", "Unit Size / Layout"),
+                Pair("PARKING", "Parking"),
+                Pair("FIXTURES", "Fixtures & Fittings"),
+                Pair("AMENITIES", "Amenities")
+            )
+
+            if (showAddPromiseDialog) {
+                AlertDialog(
+                    onDismissRequest = { showAddPromiseDialog = false },
+                    title = { Text("Add Seller Promise", fontWeight = FontWeight.Bold) },
+                    text = {
+                        Column {
+                            Text("Category", style = MaterialTheme.typography.labelSmall, color = DorjaColors.Gray500)
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                promiseCategoryOptions.take(3).forEach { (value, label) ->
+                                    DorjaChip(
+                                        selected = newPromiseCategory == value,
+                                        label = label,
+                                        onClick = { newPromiseCategory = value }
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                promiseCategoryOptions.drop(3).forEach { (value, label) ->
+                                    DorjaChip(
+                                        selected = newPromiseCategory == value,
+                                        label = label,
+                                        onClick = { newPromiseCategory = value }
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(12.dp))
+                            OutlinedTextField(
+                                value = newPromiseTitle,
+                                onValueChange = { newPromiseTitle = it },
+                                label = { Text("Promise Title") },
+                                placeholder = { Text("e.g. Handover by Q4 2026") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedContainerColor = DorjaColors.White,
+                                    unfocusedContainerColor = DorjaColors.White,
+                                    focusedBorderColor = DorjaColors.Jol600,
+                                    unfocusedBorderColor = DorjaColors.BentoCardBorder
+                                )
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            OutlinedTextField(
+                                value = newPromiseText,
+                                onValueChange = { newPromiseText = it },
+                                label = { Text("Commitment Description") },
+                                placeholder = { Text("Formal contract clause or guarantee...") },
+                                maxLines = 3,
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedContainerColor = DorjaColors.White,
+                                    unfocusedContainerColor = DorjaColors.White,
+                                    focusedBorderColor = DorjaColors.Jol600,
+                                    unfocusedBorderColor = DorjaColors.BentoCardBorder
+                                )
+                            )
+                        }
+                    },
+                    confirmButton = {
+                        DorjaButton(
+                            text = "Add Promise",
+                            onClick = {
+                                if (newPromiseTitle.isNotBlank()) {
+                                    customPromises.add(
+                                        Promise(
+                                            listingId = "pending",
+                                            category = newPromiseCategory,
+                                            title = newPromiseTitle,
+                                            originalText = newPromiseText.ifBlank { newPromiseTitle }
+                                        )
+                                    )
+                                    newPromiseTitle = ""
+                                    newPromiseText = ""
+                                    showAddPromiseDialog = false
+                                }
+                            },
+                            modifier = Modifier.width(130.dp)
+                        )
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showAddPromiseDialog = false }) {
+                            Text("Cancel", color = DorjaColors.Gray700)
+                        }
+                    }
+                )
+            }
+
+            BentoCard(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Shield,
+                                contentDescription = null,
+                                tint = DorjaColors.BentoGreenIcon,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Column {
+                                Text(
+                                    text = "5. SELLER PROMISES (${customPromises.size})",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = DorjaColors.Ink950,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "Binding commitments for the Handover Passport",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = DorjaColors.Gray700,
+                                    fontSize = 11.sp
+                                )
+                            }
+                        }
+                        DorjaOutlinedButton(
+                            text = "+ Promise",
+                            onClick = { showAddPromiseDialog = true },
+                            modifier = Modifier.height(32.dp),
+                            testTag = "add_promise_button"
+                        )
+                    }
+
+                    if (customPromises.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            customPromises.forEachIndexed { index, promise ->
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = DorjaColors.Sand100,
+                                    border = BorderStroke(1.dp, DorjaColors.BentoCardBorder),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(10.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Check,
+                                            contentDescription = null,
+                                            tint = DorjaColors.BentoGreenIcon,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = promise.title,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = DorjaColors.Ink950,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                            Text(
+                                                text = promise.category.replace("_", " "),
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = DorjaColors.Gray500,
+                                                fontFamily = FontFamily.Monospace,
+                                                fontSize = 10.sp
+                                            )
+                                        }
+                                        IconButton(
+                                            onClick = { customPromises.removeAt(index) },
+                                            modifier = Modifier.size(28.dp)
+                                        ) {
+                                            Icon(
+                                                Icons.Default.Delete,
+                                                contentDescription = "Remove",
+                                                tint = DorjaColors.Error,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             if (errorMessage != null) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Surface(
@@ -1847,6 +2145,16 @@ fun CreateListingScreen(
                             customRooms = finalRooms,
                             legalDocs = customLegalDocs
                         )
+                        // Save promises for this listing
+                        customPromises.forEach { promise ->
+                            repository.addPromise(
+                                listingId = newId,
+                                category = promise.category,
+                                title = promise.title,
+                                originalText = promise.originalText,
+                                evidenceNote = promise.evidenceNote
+                            )
+                        }
                         onListingCreated(newId)
                     }
                 },
