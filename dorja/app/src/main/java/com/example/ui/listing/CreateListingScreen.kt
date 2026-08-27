@@ -488,8 +488,25 @@ fun CreateListingScreen(
                     }
 
                     Spacer(modifier = Modifier.height(4.dp))
+
+                    // Native Image Picker Buttons
+                    val galleryLauncher = rememberLauncherForActivityResult(
+                        contract = ActivityResultContracts.GetContent()
+                    ) { uri ->
+                        if (uri != null) {
+                            photoAssignments.add(
+                                PhotoAssignmentItem(
+                                    url = uri.toString(),
+                                    caption = customCaptionInput.ifBlank { "Property Photo ${photoAssignments.size + 1}" },
+                                    assignedRoomId = selectedRoomForNewPhoto
+                                )
+                            )
+                            customCaptionInput = ""
+                        }
+                    }
+
                     Text(
-                        text = "ADD CUSTOM PHOTO URL OR PATH",
+                        text = "ADD FROM DEVICE",
                         style = MaterialTheme.typography.labelSmall,
                         color = DorjaColors.Gray500,
                         fontFamily = FontFamily.Monospace,
@@ -499,7 +516,7 @@ fun CreateListingScreen(
                     OutlinedTextField(
                         value = customCaptionInput,
                         onValueChange = { customCaptionInput = it },
-                        label = { Text("Photo Caption / Label") },
+                        label = { Text("Photo Caption (optional)") },
                         placeholder = { Text("e.g. Master Bedroom Balcony") },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
@@ -511,36 +528,33 @@ fun CreateListingScreen(
                         )
                     )
 
-                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        OutlinedTextField(
-                            value = customUrlInput,
-                            onValueChange = { customUrlInput = it },
-                            placeholder = { Text("https://example.com/photo.jpg", fontSize = 12.sp) },
-                            modifier = Modifier.weight(1f),
-                            singleLine = true,
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedContainerColor = DorjaColors.White,
-                                unfocusedContainerColor = DorjaColors.White,
-                                focusedBorderColor = DorjaColors.Jol600,
-                                unfocusedBorderColor = DorjaColors.BentoCardBorder
-                            )
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        DorjaOutlinedButton(
+                            text = "Gallery",
+                            onClick = { galleryLauncher.launch("image/*") },
+                            icon = Icons.Default.Image,
+                            modifier = Modifier.weight(1f)
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        DorjaButton(
-                            text = "+ Add",
+                        DorjaOutlinedButton(
+                            text = "Camera",
                             onClick = {
-                                if (customUrlInput.isNotBlank()) {
-                                    photoAssignments.add(
-                                        PhotoAssignmentItem(
-                                            url = customUrlInput.trim(),
-                                            caption = customCaptionInput.ifBlank { "Property Photo ${photoAssignments.size + 1}" },
-                                            assignedRoomId = selectedRoomForNewPhoto
-                                        )
+                                // Add a placeholder for camera capture
+                                photoAssignments.add(
+                                    PhotoAssignmentItem(
+                                        url = "camera://${System.currentTimeMillis()}",
+                                        caption = customCaptionInput.ifBlank { "Camera Photo ${photoAssignments.size + 1}" },
+                                        assignedRoomId = selectedRoomForNewPhoto
                                     )
-                                    customUrlInput = ""
-                                    customCaptionInput = ""
-                                }
-                            }
+                                )
+                                customCaptionInput = ""
+                            },
+                            icon = Icons.Default.CameraAlt,
+                            modifier = Modifier.weight(1f)
                         )
                     }
                 }

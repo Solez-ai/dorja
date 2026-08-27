@@ -133,7 +133,7 @@ fun PropertyDetailScreen(
     }
 
     val safeListing = listing!!
-    val isOwner = currentUser?.id == safeListing.ownerId
+    val isOwner = currentUser?.id == safeListing.ownerId && currentUser?.role == "SELLER"
 
     // Assemble high-quality photo list for buyer view
     val galleryPhotos = remember(safeListing, rooms) {
