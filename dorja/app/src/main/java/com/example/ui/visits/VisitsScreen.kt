@@ -60,7 +60,6 @@ import com.example.ui.theme.DorjaColors
 import com.example.ui.util.Formatters
 import com.example.R
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.ui.res.painterResource
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers

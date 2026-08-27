@@ -47,6 +47,15 @@ import com.example.ui.util.Formatters
 import com.example.R
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.size
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.res.painterResource
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import com.example.R
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.size
 import androidx.compose.ui.res.painterResource
 
 @Composable
@@ -156,9 +165,8 @@ fun InboxScreen(
                     val otherId = if (userId == conv.hostUserId) conv.seekerUserId else conv.hostUserId
                     var otherName by remember(conv.id) { mutableStateOf("") }
                     var otherRole by remember(conv.id) { mutableStateOf("") }
-                    val scope = rememberCoroutineScope()
-                    remember(conv.id) {
-                        scope.launch(Dispatchers.IO) {
+                    LaunchedEffect(conv.id) {
+                        withContext(Dispatchers.IO) {
                             val otherUser = DorjaApp.instance.repository.getUserById(otherId)
                             withContext(Dispatchers.Main) {
                                 otherName = otherUser?.displayName?.ifBlank { otherUser.username } ?: otherId

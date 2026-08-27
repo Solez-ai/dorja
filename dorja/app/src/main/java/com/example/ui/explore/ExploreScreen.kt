@@ -70,6 +70,8 @@ import com.example.ui.components.DorjaOutlinedButton
 import com.example.ui.theme.DorjaColors
 import com.example.ui.util.Formatters
 import com.example.R
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.size
 import androidx.compose.ui.res.painterResource
 import kotlinx.coroutines.launch
 
