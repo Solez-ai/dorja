@@ -99,6 +99,7 @@ import com.example.ui.components.DorjaOutlinedButton
 import com.example.ui.theme.DorjaColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import androidx.compose.runtime.mutableStateListOf
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.abs
@@ -154,6 +155,10 @@ fun RoomScannerScreen(
     var showAddRoomDialog by remember { mutableStateOf(false) }
     var newRoomName by remember { mutableStateOf("") }
     var newRoomDimensions by remember { mutableStateOf("14 x 12 ft") }
+
+    // Real camera capture
+    var imageCapture by remember { mutableStateOf<androidx.camera.core.ImageCapture?>(null) }
+    val capturedFramePaths = remember { mutableStateListOf<String>() }
 
     // Real gyroscope
     var realYaw by remember { mutableFloatStateOf(0f) }
@@ -276,7 +281,7 @@ fun RoomScannerScreen(
         onDispose { sensorManager?.unregisterListener(gyroListener) }
     }
 
-    // Auto-capture logic during scanning
+    // Auto-capture logic during scanning — takes real camera photos
     LaunchedEffect(phase, scanProgress) {
         if (phase != ScannerPhase.SCANNING || scanProgress >= totalTargets) return@LaunchedEffect
 
@@ -293,10 +298,26 @@ fun RoomScannerScreen(
                 if (alignedSince == 0L) alignedSince = System.currentTimeMillis()
                 isAligned = true
                 if (System.currentTimeMillis() - alignedSince > 350) {
+                    // CAPTURE REAL CAMERA FRAME
+                    val ic = imageCapture
+                    if (ic != null) {
+                        val file = java.io.File(context.cacheDir, "pano_${scanProgress}_${System.currentTimeMillis()}.jpg")
+                        val outputOptions = androidx.camera.core.ImageCapture.OutputFileOptions.Builder(file).build()
+                        ic.takePicture(outputOptions, ContextCompat.getMainExecutor(context),
+                            object : androidx.camera.core.ImageCapture.OnImageSavedCallback {
+                                override fun onImageSaved(output: androidx.camera.core.ImageCapture.OutputFileResults) {
+                                    capturedFramePaths.add(file.absolutePath)
+                                }
+                                override fun onError(exc: androidx.camera.core.ImageCaptureException) {
+                                    // Still count the angle even if capture fails
+                                }
+                            }
+                        )
+                    }
                     scanProgress++
                     alignedSince = 0L
                     isAligned = false
-                    delay(200)
+                    delay(300)
                 }
             } else {
                 alignedSince = 0L
@@ -304,7 +325,7 @@ fun RoomScannerScreen(
             }
         }
         // All angles captured
-        delay(300)
+        delay(500)
         phase = ScannerPhase.RESULT
     }
 
@@ -472,7 +493,7 @@ fun RoomScannerScreen(
             ScannerPhase.PRE_CAPTURE -> {
                 // Full-screen camera + instruction overlay
                 Box(modifier = Modifier.fillMaxSize()) {
-                    // Camera preview
+                    // Camera preview with ImageCapture
                     if (hasCameraPermission) {
                         AndroidView(
                             factory = { ctx ->
@@ -482,8 +503,13 @@ fun RoomScannerScreen(
                                     try {
                                         val cp = future.get()
                                         val preview = Preview.Builder().build().also { it.setSurfaceProvider(pv.surfaceProvider) }
+                                        val ic = androidx.camera.core.ImageCapture.Builder()
+                                            .setCaptureMode(androidx.camera.core.ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
+                                            .setFlashMode(androidx.camera.core.ImageCapture.FLASH_MODE_OFF)
+                                            .build()
+                                        imageCapture = ic
                                         cp.unbindAll()
-                                        cp.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview)
+                                        cp.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, ic)
                                     } catch (e: Exception) { e.printStackTrace() }
                                 }, ContextCompat.getMainExecutor(ctx))
                                 pv
@@ -586,7 +612,7 @@ fun RoomScannerScreen(
             ScannerPhase.SCANNING -> {
                 // Full-screen active panorama scanner
                 Box(modifier = Modifier.fillMaxSize()) {
-                    // Camera preview
+                    // Camera preview with ImageCapture
                     if (hasCameraPermission) {
                         AndroidView(
                             factory = { ctx ->
@@ -596,8 +622,13 @@ fun RoomScannerScreen(
                                     try {
                                         val cp = future.get()
                                         val preview = Preview.Builder().build().also { it.setSurfaceProvider(pv.surfaceProvider) }
+                                        val ic = imageCapture ?: androidx.camera.core.ImageCapture.Builder()
+                                            .setCaptureMode(androidx.camera.core.ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
+                                            .setFlashMode(androidx.camera.core.ImageCapture.FLASH_MODE_OFF)
+                                            .build()
+                                        imageCapture = ic
                                         cp.unbindAll()
-                                        cp.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview)
+                                        cp.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, ic)
                                     } catch (e: Exception) { e.printStackTrace() }
                                 }, ContextCompat.getMainExecutor(ctx))
                                 pv
@@ -733,7 +764,14 @@ fun RoomScannerScreen(
                             onClick = {
                                 scope.launch {
                                     if (activeRoom != null) {
-                                        repository.updateRoom3DScan(activeRoom.id, "panorama_${System.currentTimeMillis()}")
+                                        // Build panorama JSON with real captured frame paths
+                                        val panoramaJson = org.json.JSONObject().apply {
+                                            put("frames", org.json.JSONArray(capturedFramePaths.toList()))
+                                            put("angleCount", capturedFramePaths.size)
+                                            put("roomId", activeRoom.id)
+                                            put("timestamp", System.currentTimeMillis())
+                                        }.toString()
+                                        repository.updateRoom3DScan(activeRoom.id, panoramaJson)
                                     }
                                     withContext(Dispatchers.Main) { onScanSaved(activeRoom?.id ?: "") }
                                 }

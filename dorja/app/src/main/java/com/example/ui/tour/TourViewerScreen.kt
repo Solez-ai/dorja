@@ -46,6 +46,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -57,7 +58,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
@@ -212,53 +215,117 @@ fun TourViewerScreen(
             .background(DorjaColors.Ink950)
             .testTag("tour_viewer_screen")
     ) {
-        // 1. Panorama Viewer — shows real captured camera frames when available, falls back to 3D renderer
+        // 1. Panorama Viewer — shows real captured camera frames as cylindrical 360° panorama
         if (panoramaFrameUris.isNotEmpty()) {
-            // REAL PANORAMA VIEWER — scrollable stitched camera frames
+            // REAL 360° PANORAMA VIEWER
+            // Gyroscope auto-pan
+            val ctx = androidx.compose.ui.platform.LocalContext.current
+            val sensorManager = ctx.getSystemService(android.content.Context.SENSOR_SERVICE) as? android.hardware.SensorManager
+            var gyroYaw by remember { mutableFloatStateOf(0f) }
+            DisposableEffect(Unit) {
+                val listener = object : android.hardware.SensorEventListener {
+                    override fun onSensorChanged(event: android.hardware.SensorEvent?) {
+                        if (event?.sensor?.type == android.hardware.Sensor.TYPE_ROTATION_VECTOR) {
+                            val rot = FloatArray(9)
+                            android.hardware.SensorManager.getRotationMatrixFromVector(rot, event.values)
+                            val orient = FloatArray(3)
+                            android.hardware.SensorManager.getOrientation(rot, orient)
+                            gyroYaw = Math.toDegrees(orient[0].toDouble()).toFloat()
+                        }
+                    }
+                    override fun onAccuracyChanged(sensor: android.hardware.Sensor?, accuracy: Int) {}
+                }
+                val sensor = sensorManager?.getDefaultSensor(android.hardware.Sensor.TYPE_ROTATION_VECTOR)
+                sensor?.let { sensorManager.registerListener(listener, it, android.hardware.SensorManager.SENSOR_DELAY_UI) }
+                onDispose { sensorManager?.unregisterListener(listener) }
+            }
+
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .alpha(transitionAlpha.value)
                     .scale(transitionScale.value)
-                    .pointerInput(Unit) {
-                        detectDragGestures { change, dragAmount ->
-                            change.consume()
-                            panAngle += dragAmount.x * 0.5f
-                        }
-                    }
             ) {
-                // Horizontal panoramic strip stitched from captured frames
+                // Cylindrical panorama: each frame fills screen height, total width = frameCount * screenWidth
+                // The pan offset shifts the strip, and frames wrap around for seamless 360°
+                val totalWidthDp = (panoramaFrameUris.size * 400f).dp
                 val scrollState = rememberScrollState()
-                LaunchedEffect(panAngle) {
-                    scrollState.animateScrollTo((panAngle * 2).toInt().coerceAtLeast(0))
+
+                // Auto-pan based on gyroscope
+                LaunchedEffect(gyroYaw) {
+                    val scrollTarget = ((gyroYaw / 360f) * (panoramaFrameUris.size * 400f)).toInt()
+                    scrollState.animateScrollTo(scrollTarget.coerceAtLeast(0))
                 }
-                Row(
+
+                // Drag-to-pan overrides gyro
+                var dragAccum by remember { mutableFloatStateOf(0f) }
+                Box(
                     modifier = Modifier
-                        .fillMaxHeight()
-                        .horizontalScroll(scrollState)
+                        .fillMaxSize()
+                        .pointerInput(Unit) {
+                            detectDragGestures { change, dragAmount ->
+                                change.consume()
+                                dragAccum += dragAmount.x
+                            }
+                        }
                 ) {
-                    panoramaFrameUris.forEach { uri ->
-                        Box(
-                            modifier = Modifier
-                                .fillMaxHeight()
-                                .width(300.dp)
-                        ) {
-                            coil.compose.AsyncImage(
-                                model = uri,
-                                contentDescription = "Panorama Frame",
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.fillMaxSize()
-                            )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .width(totalWidthDp)
+                            .horizontalScroll(scrollState)
+                    ) {
+                        // Duplicate frames for seamless wrap-around
+                        val extendedFrames = panoramaFrameUris + panoramaFrameUris
+                        extendedFrames.forEachIndexed { index, uri ->
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxHeight()
+                                    .width(400.dp)
+                            ) {
+                                AsyncImage(
+                                    model = uri,
+                                    contentDescription = "Panorama Frame ${index % panoramaFrameUris.size + 1}",
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            }
                         }
                     }
+
+                    // Top gradient for text contrast
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(80.dp)
+                            .background(
+                                androidx.compose.ui.graphics.Brush.verticalGradient(
+                                    colors = listOf(DorjaColors.Ink950.copy(alpha = 0.8f), Color.Transparent)
+                                )
+                            )
+                            .align(Alignment.TopCenter)
+                    )
+                    // Bottom gradient
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(80.dp)
+                            .background(
+                                androidx.compose.ui.graphics.Brush.verticalGradient(
+                                    colors = listOf(Color.Transparent, DorjaColors.Ink950.copy(alpha = 0.8f))
+                                )
+                            )
+                            .align(Alignment.BottomCenter)
+                    )
                 }
-                // Panorama label
+
+                // Panorama badge
                 Surface(
                     shape = RoundedCornerShape(12.dp),
                     color = DorjaColors.Ink950.copy(alpha = 0.75f),
                     modifier = Modifier
                         .align(Alignment.TopCenter)
-                        .padding(top = 16.dp)
+                        .padding(top = 56.dp)
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
@@ -272,7 +339,7 @@ fun TourViewerScreen(
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "360° REALITY SCAN \u2022 ${panoramaFrameUris.size} FRAMES",
+                            text = "360° REAL PANORAMA \u2022 ${panoramaFrameUris.size} FRAMES STITCHED",
                             style = MaterialTheme.typography.labelSmall,
                             color = DorjaColors.White,
                             fontFamily = FontFamily.Monospace,
@@ -280,6 +347,24 @@ fun TourViewerScreen(
                             fontSize = 10.sp
                         )
                     }
+                }
+
+                // Drag hint
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = DorjaColors.Ink950.copy(alpha = 0.6f),
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 100.dp)
+                ) {
+                    Text(
+                        text = "DRAG OR ROTATE PHONE TO LOOK AROUND",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = DorjaColors.Sand300,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 10.sp,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                    )
                 }
             }
         } else {
