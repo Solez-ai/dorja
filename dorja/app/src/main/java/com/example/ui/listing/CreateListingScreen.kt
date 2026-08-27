@@ -2319,6 +2319,10 @@ fun Guided3DPanoramaScannerDialog(
     var showOrientationPrompt by remember(selectedRoomId) { mutableStateOf(true) }
     var shutterFlash by remember { mutableStateOf(false) }
 
+    // Camera ImageCapture for saving panorama frames
+    var imageCapture by remember { mutableStateOf<androidx.camera.core.ImageCapture?>(null) }
+    val capturedFrameUris = remember(selectedRoomId) { mutableStateListOf<String>() }
+
     var previewPan by remember { mutableFloatStateOf(0f) }
     var previewTilt by remember { mutableFloatStateOf(0f) }
 
@@ -2384,9 +2388,14 @@ fun Guided3DPanoramaScannerDialog(
                                 val preview = Preview.Builder().build().also {
                                     it.setSurfaceProvider(previewView.surfaceProvider)
                                 }
+                                val ic = androidx.camera.core.ImageCapture.Builder()
+                                    .setCaptureMode(androidx.camera.core.ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
+                                    .setFlashMode(androidx.camera.core.ImageCapture.FLASH_MODE_OFF)
+                                    .build()
+                                imageCapture = ic
                                 val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
                                 cameraProvider.unbindAll()
-                                cameraProvider.bindToLifecycle(lifecycleOwner, cameraSelector, preview)
+                                cameraProvider.bindToLifecycle(lifecycleOwner, cameraSelector, preview, ic)
                             } catch (e: Exception) {
                                 e.printStackTrace()
                             }
@@ -2823,6 +2832,23 @@ fun Guided3DPanoramaScannerDialog(
                             text = "Connect & Snap Angle (${currentTargetIndex + 1}/${targets.size})",
                             onClick = {
                                 shutterFlash = true
+                                // Capture actual camera frame
+                                val ic = imageCapture
+                                if (ic != null) {
+                                    val outputFileOptions = androidx.camera.core.ImageCapture.OutputFileOptions.Builder(
+                                        java.io.File(context.cacheDir, "panorama_${currentTargetIndex}_${System.currentTimeMillis()}.jpg")
+                                    ).build()
+                                    ic.takePicture(outputFileOptions, ContextCompat.getMainExecutor(context),
+                                        object : androidx.camera.core.ImageCapture.OnImageSavedCallback {
+                                            override fun onImageSaved(output: androidx.camera.core.ImageCapture.OutputFileResults) {
+                                                output.savedUri?.toString()?.let { capturedFrameUris.add(it) }
+                                            }
+                                            override fun onError(exc: androidx.camera.core.ImageCaptureException) {
+                                                // Fallback: still record the angle
+                                            }
+                                        }
+                                    )
+                                }
                                 if (!capturedSlices.contains(currentTargetIndex)) {
                                     capturedSlices.add(currentTargetIndex)
                                 }
@@ -2876,6 +2902,18 @@ fun Guided3DPanoramaScannerDialog(
                             text = "✓ Save Scan (${activeRoom?.displayName ?: "Room"})",
                             onClick = {
                                 if (activeRoom != null) {
+                                    // Store captured frame URIs as panorama data in the room
+                                    val panoramaJson = org.json.JSONObject().apply {
+                                        put("frames", org.json.JSONArray(capturedFrameUris.toList()))
+                                        put("angleCount", capturedSlices.size)
+                                        put("roomId", activeRoom.id)
+                                        put("timestamp", System.currentTimeMillis())
+                                    }.toString()
+                                    // Update the room with panorama data via repository
+                                    kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                                        val repo = com.example.DorjaApp.instance.repository
+                                        repo.updateRoom3DScan(activeRoom.id, panoramaJson)
+                                    }
                                     onRoomScanSaved(activeRoom.id)
                                 }
                                 onDismiss()

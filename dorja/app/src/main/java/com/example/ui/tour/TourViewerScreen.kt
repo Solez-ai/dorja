@@ -12,6 +12,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import coil.compose.AsyncImage
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -156,7 +158,26 @@ fun TourViewerScreen(
     // Orientation recommendation banner
     var showOrientationBanner by remember { mutableStateOf(true) }
 
-    // Renderer reference
+    // Panorama frame data from scan
+    var panoramaFrameUris by remember { mutableStateOf<List<String>>(emptyList()) }
+    LaunchedEffect(currentRoom.id) {
+        val data = currentRoom.panoramaData
+        if (data.isNotBlank() && data != "{}") {
+            try {
+                val json = org.json.JSONObject(data)
+                val frames = json.getJSONArray("frames")
+                val uris = mutableListOf<String>()
+                for (i in 0 until frames.length()) {
+                    uris.add(frames.getString(i))
+                }
+                panoramaFrameUris = uris
+            } catch (e: Exception) {
+                panoramaFrameUris = emptyList()
+            }
+        } else {
+            panoramaFrameUris = emptyList()
+        }
+    }
     var rendererRef by remember { mutableStateOf<Room3DRenderer?>(null) }
     var glSurfaceViewRef by remember { mutableStateOf<GLSurfaceView?>(null) }
 
@@ -190,34 +211,106 @@ fun TourViewerScreen(
             .background(DorjaColors.Ink950)
             .testTag("tour_viewer_screen")
     ) {
-        // 1. OpenGL ES 2.0 3D View Canvas
-        AndroidView(
-            factory = { context ->
-                GLSurfaceView(context).apply {
-                    setEGLContextClientVersion(2)
-                    val renderer = Room3DRenderer(context).also {
-                        it.roomType = currentRoom.roomType
+        // 1. Panorama Viewer — shows real captured camera frames when available, falls back to 3D renderer
+        if (panoramaFrameUris.isNotEmpty()) {
+            // REAL PANORAMA VIEWER — scrollable stitched camera frames
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .alpha(transitionAlpha.value)
+                    .scale(transitionScale.value)
+                    .pointerInput(Unit) {
+                        detectDragGestures { change, dragAmount ->
+                            change.consume()
+                            panAngle += dragAmount.x * 0.5f
+                        }
                     }
-                    rendererRef = renderer
-                    setRenderer(renderer)
-                    renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
-                    glSurfaceViewRef = this
+            ) {
+                // Horizontal panoramic strip stitched from captured frames
+                val scrollState = rememberScrollState()
+                LaunchedEffect(panAngle) {
+                    scrollState.animateScrollTo((panAngle * 2).toInt().coerceAtLeast(0))
                 }
-            },
-            modifier = Modifier
-                .fillMaxSize()
-                .alpha(transitionAlpha.value)
-                .scale(transitionScale.value)
-                .pointerInput(Unit) {
-                    detectDragGestures { change, dragAmount ->
-                        change.consume()
-                        panAngle += dragAmount.x * 0.35f
-                        tiltAngle = (tiltAngle - dragAmount.y * 0.25f).coerceIn(-35f, 35f)
-                        rendererRef?.panAngle = panAngle
-                        rendererRef?.tiltAngle = tiltAngle
+                Row(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .horizontalScroll(scrollState)
+                ) {
+                    panoramaFrameUris.forEach { uri ->
+                        Box(
+                            modifier = Modifier
+                                .fillMaxHeight()
+                                .width(300.dp)
+                        ) {
+                            coil.compose.AsyncImage(
+                                model = uri,
+                                contentDescription = "Panorama Frame",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
                     }
                 }
-        )
+                // Panorama label
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = DorjaColors.Ink950.copy(alpha = 0.75f),
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = 16.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CompassCalibration,
+                            contentDescription = null,
+                            tint = DorjaColors.Jol600,
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "360° REALITY SCAN \u2022 ${panoramaFrameUris.size} FRAMES",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = DorjaColors.White,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 10.sp
+                        )
+                    }
+                }
+            }
+        } else {
+            // FALLBACK: OpenGL ES 3D renderer (no panorama data)
+            AndroidView(
+                factory = { context ->
+                    GLSurfaceView(context).apply {
+                        setEGLContextClientVersion(2)
+                        val renderer = Room3DRenderer(context).also {
+                            it.roomType = currentRoom.roomType
+                        }
+                        rendererRef = renderer
+                        setRenderer(renderer)
+                        renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
+                        glSurfaceViewRef = this
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxSize()
+                    .alpha(transitionAlpha.value)
+                    .scale(transitionScale.value)
+                    .pointerInput(Unit) {
+                        detectDragGestures { change, dragAmount ->
+                            change.consume()
+                            panAngle += dragAmount.x * 0.35f
+                            tiltAngle = (tiltAngle - dragAmount.y * 0.25f).coerceIn(-35f, 35f)
+                            rendererRef?.panAngle = panAngle
+                            rendererRef?.tiltAngle = tiltAngle
+                        }
+                    }
+            )
+        }
 
         // 2. Top Navigation Bar
         Row(
