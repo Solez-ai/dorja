@@ -783,7 +783,8 @@ private fun StatTile(label: String, value: String, modifier: Modifier = Modifier
 }
 
 // ═════════════════════════════════════════════════════════════
-//  STITCHING — combine frames into one equirectangular image
+//  STITCHING — feature-based panorama reconstruction
+//  Uses only core OpenCV: ORB, BFMatcher, Calib3d, Imgproc
 // ═════════════════════════════════════════════════════════════
 
 private fun stitchFrames(ctx: android.content.Context, paths: List<String>): String? {
@@ -792,152 +793,308 @@ private fun stitchFrames(ctx: android.content.Context, paths: List<String>): Str
     Log.i("Stitcher", "=== PANORAMA STITCHING PIPELINE ===")
     Log.i("Stitcher", "Input frames: ${paths.size}")
 
-    // Step 1: Load frames as OpenCV Mats
-    val mats = mutableListOf<org.opencv.core.Mat>()
-    val validPaths = mutableListOf<String>()
+    // Step 1: Load frames as grayscale Mats + color Mats
+    val grayMats = mutableListOf<org.opencv.core.Mat>()
+    val colorMats = mutableListOf<org.opencv.core.Mat>()
 
     for ((i, path) in paths.withIndex()) {
         try {
             val bmp = BitmapFactory.decodeFile(path)
             if (bmp != null && !bmp.isRecycled && bmp.width > 100 && bmp.height > 100) {
-                val mat = org.opencv.android.Utils.bitmapToMat(bmp)
-                mats.add(mat)
-                validPaths.add(path)
-                Log.i("Stitcher", "Frame $i: ${bmp.width}x${bmp.height} loaded from $path")
+                val colorMat = org.opencv.android.Utils.bitmapToMat(bmp)
+                val grayMat = org.opencv.core.Mat()
+                org.opencv.imgproc.Imgproc.cvtColor(colorMat, grayMat, org.opencv.imgproc.Imgproc.COLOR_BGR2GRAY)
+                grayMats.add(grayMat)
+                colorMats.add(colorMat)
+                Log.i("Stitcher", "Frame $i: ${bmp.width}x${bmp.height}")
                 bmp.recycle()
             } else {
-                Log.w("Stitcher", "Frame $i: SKIPPED (too small or null: ${bmp?.width}x${bmp?.height})")
+                Log.w("Stitcher", "Frame $i: SKIPPED (${bmp?.width}x${bmp?.height})")
                 bmp?.recycle()
             }
         } catch (e: Exception) {
-            Log.e("Stitcher", "Frame $i: FAILED to load - ${e.message}")
+            Log.e("Stitcher", "Frame $i: FAILED - ${e.message}")
         }
     }
 
-    if (mats.size < 2) {
-        Log.e("Stitcher", "Not enough valid frames (${mats.size}) for stitching")
-        mats.forEach { it.release() }
+    if (grayMats.size < 2) {
+        Log.e("Stitcher", "Not enough frames (${grayMats.size})")
+        grayMats.forEach { it.release() }
+        colorMats.forEach { it.release() }
+        return null
+    }
+    Log.i("Stitcher", "Loaded ${grayMats.size} frames")
+
+    // Step 2: Estimate focal length from image width (rough: FOV ~60°)
+    val focalLength = grayMats[0].cols() * 1.2
+    Log.i("Stitcher", "Estimated focal length: ${"%.0f".format(focalLength)}")
+
+    // Step 3: Warp all frames to cylindrical projection
+    val cylGray = mutableListOf<org.opencv.core.Mat>()
+    val cylColor = mutableListOf<org.opencv.core.Mat>()
+    for (i in grayMats.indices) {
+        cylGray.add(cylindricalWarp(grayMats[i], focalLength))
+        cylColor.add(cylindricalWarp(colorMats[i], focalLength))
+        Log.i("Stitcher", "Cylindrical warp frame $i: ${cylGray.last().cols()}x${cylGray.last().rows()}")
+    }
+
+    // Step 4: Detect ORB features + match consecutive pairs
+    val orb = org.opencv.features2d.ORB.create(5000)
+    val matcher = org.opencv.features2d.BFMatcher(org.opencv.features2d.BFMatcher.NORM_HAMMING, false)
+
+    // Store cumulative homographies: H_cumul[i] maps frame i → frame 0's coordinate space
+    val cumulativeH = mutableListOf<org.opencv.core.Mat>()
+    cumulativeH.add(org.opencv.core.Mat().eye(3, 3, org.opencv.core.CvType.CV_64F)) // frame 0 = identity
+
+    var totalInliers = 0
+
+    for (i in 0 until grayMats.size - 1) {
+        val img1 = cylGray[i]
+        val img2 = cylGray[i + 1]
+
+        // Detect keypoints
+        val kp1 = org.opencv.core.MatOfKeyPoint()
+        val kp2 = org.opencv.core.MatOfKeyPoint()
+        val des1 = org.opencv.core.Mat()
+        val des2 = org.opencv.core.Mat()
+        orb.detectAndCompute(img1, org.opencv.core.Mat(), kp1, des1)
+        orb.detectAndCompute(img2, org.opencv.core.Mat(), kp2, des2)
+
+        Log.i("Stitcher", "Pair $i→${i + 1}: kp1=${kp1.toArray().size} kp2=${kp2.toArray().size} des1=${des1.rows()} des2=${des2.rows()}")
+
+        if (des1.empty() || des2.empty() || des1.rows() < 10 || des2.rows() < 10) {
+            Log.w("Stitcher", "Pair $i→${i + 1}: NOT ENOUGH FEATURES, skipping")
+            // Use identity (no alignment)
+            cumulativeH.add(cumulativeH.last().clone())
+            kp1.release(); kp2.release(); des1.release(); des2.release()
+            continue
+        }
+
+        // Match descriptors (k=2 for ratio test)
+        val matches = org.opencv.core.MatOfDMatch()
+        matcher.knnMatch(des1, des2, matches, 2)
+
+        // Lowe's ratio test
+        val goodMatches = mutableListOf<org.opencv.features2d.DMatch>()
+        val matchArr = matches.toArray()
+        for (m in matchArr) {
+            if (m.distance < 0.75f * matchArr[matchArr.indexOf(m) + 1].distance) {
+                goodMatches.add(m)
+            }
+        }
+        Log.i("Stitcher", "Pair $i→${i + 1}: ${goodMatches.size} good matches (ratio test)")
+
+        kp1.release(); kp2.release(); des1.release(); des2.release(); matches.release()
+
+        if (goodMatches.size < 10) {
+            Log.w("Stitcher", "Pair $i→${i + 1}: TOO FEW matches, skipping")
+            cumulativeH.add(cumulativeH.last().clone())
+            continue
+        }
+
+        // Compute homography with RANSAC
+        val srcPts = org.opencv.core.MatOfPoint2f()
+        val dstPts = org.opencv.core.MatOfPoint2f()
+        val kp1Arr = kp1.toArray()
+        val kp2Arr = kp2.toArray()
+        srcPts.from(goodMatches.map { org.opencv.core.Point(kp1Arr[it.queryIdx].pt.x.toDouble(), kp1Arr[it.queryIdx].pt.y.toDouble()) }.toTypedArray())
+        dstPts.from(goodMatches.map { org.opencv.core.Point(kp2Arr[it.trainIdx].pt.x.toDouble(), kp2Arr[it.trainIdx].pt.y.toDouble()) }.toTypedArray())
+
+        val inliers = org.opencv.core.Mat()
+        val H = org.opencv.calib3d.Calib3d.findHomography(srcPts, dstPts, org.opencv.calib3d.Calib3d.RANSAC, 5.0, inliers, 2000, 0.995)
+        val inlierCount = org.opencv.core.Core.countNonZero(inliers)
+        totalInliers += inlierCount
+        Log.i("Stitcher", "Pair $i→${i + 1}: H computed, $inlierCount inliers")
+
+        srcPts.release(); dstPts.release(); inliers.release()
+
+        if (H.empty() || inlierCount < 10) {
+            Log.w("Stitcher", "Pair $i→${i + 1}: BAD HOMOGRAPHY, skipping")
+            cumulativeH.add(cumulativeH.last().clone())
+            H.release()
+            continue
+        }
+
+        // Chain: cumulativeH[i+1] = H * cumulativeH[i]
+        val chained = org.opencv.core.Mat()
+        org.opencv.core.Core.gemm(H, cumulativeH.last(), 1.0, org.opencv.core.Mat(), 0.0, chained)
+        cumulativeH.add(chained)
+        H.release()
+    }
+
+    // Release gray Mats (keep color for blending)
+    grayMats.forEach { it.release() }
+    cylGray.forEach { it.release() }
+
+    Log.i("Stitcher", "Total inliers across all pairs: $totalInliers")
+
+    // Step 5: Find bounding box of all warped frames
+    var minX = 0.0; var minY = 0.0; var maxX = 0.0; var maxY = 0.0
+    for (i in cylColor.indices) {
+        val corners = arrayOf(
+            org.opencv.core.Point(0.0, 0.0),
+            org.opencv.core.Point(cylColor[i].cols().toDouble(), 0.0),
+            org.opencv.core.Point(cylColor[i].cols().toDouble(), cylColor[i].rows().toDouble()),
+            org.opencv.core.Point(0.0, cylColor[i].rows().toDouble())
+        )
+        val dst = arrayOfNulls<org.opencv.core.Point>(4)
+        for (j in 0..3) {
+            dst[j] = org.opencv.core.Point()
+            val hv = org.opencv.core.Mat(3, 1, org.opencv.core.CvType.CV_64F)
+            hv.put(0, 0, corners[j].x, corners[j].y, 1.0)
+            val result = org.opencv.core.Mat()
+            org.opencv.core.Core.gemm(cumulativeH[i], hv, 1.0, org.opencv.core.Mat(), 0.0, result)
+            val data = DoubleArray(3)
+            result.get(0, 0, data)
+            dst[j]!!.x = data[0] / data[2]
+            dst[j]!!.y = data[1] / data[2]
+            hv.release(); result.release()
+            minX = minOf(minX, dst[j]!!.x); minY = minOf(minY, dst[j]!!.y)
+            maxX = maxOf(maxX, dst[j]!!.x); maxY = maxOf(maxY, dst[j]!!.y)
+        }
+    }
+
+    val canvasW = (maxX - minX).toInt() + 1
+    val canvasH = (maxY - minY).toInt() + 1
+    Log.i("Stitcher", "Canvas size: ${canvasW}x${canvasH}")
+
+    // Cap canvas to prevent OOM
+    if (canvasW > 12000 || canvasH > 6000 || canvasW * canvasH > 40_000_000) {
+        Log.e("Stitcher", "Canvas too large, aborting")
+        cylColor.forEach { it.release() }
+        cumulativeH.forEach { it.release() }
         return null
     }
 
-    Log.i("Stitcher", "Valid frames for stitching: ${mats.size}")
+    // Translation matrix to shift everything to positive coordinates
+    val T = org.opencv.core.Mat.eye(3, 3, org.opencv.core.CvType.CV_64F)
+    T.put(0, 2, -minX)
+    T.put(1, 2, -minY)
 
-    // Step 2: Initialize OpenCV Stitcher
-    val stitcher = org.opencv.stitching.Stitcher.create()
-    stitcher.setWaveCorrection(true)
-    // Try different resolution scales if first attempt fails
-    val scales = floatArrayOf(1.0f, 0.8f, 0.5f, 0.3f)
-    var resultMat: org.opencv.core.Mat? = null
-    var stitchSuccess = false
+    // Step 6: Warp all frames onto the canvas + accumulate weights for blending
+    val canvas = org.opencv.core.Mat.zeros(canvasH, canvasW, org.opencv.core.CvType.CV_32FC3)
+    val weights = org.opencv.core.Mat.zeros(canvasH, canvasW, org.opencv.core.CvType.CV_32FC1)
 
-    for (scale in scales) {
-        Log.i("Stitcher", "Attempting stitch at scale=$scale")
-        stitcher.setRegistrationResol(scale)
-        stitcher.setSeamEstResol(scale)
-        stitcher.setCompositingResol(scale)
+    for (i in cylColor.indices) {
+        val fullH = org.opencv.core.Mat()
+        org.opencv.core.Core.gemm(T, cumulativeH[i], 1.0, org.opencv.core.Mat(), 0.0, fullH)
 
-        val output = org.opencv.core.Mat()
-        val status = stitcher.stitch(mats, output)
+        val warped = org.opencv.core.Mat()
+        org.opencv.imgproc.Imgproc.warpPerspective(
+            cylColor[i], warped, fullH,
+            org.opencv.core.Size(canvasW.toDouble(), canvasH.toDouble())
+        )
 
-        when (status) {
-            org.opencv.stitching.Stitcher.OK -> {
-                Log.i("Stitcher", "STITCH SUCCESSFUL at scale=$scale")
-                Log.i("Stitcher", "Output dimensions: ${output.cols()}x${output.rows()}")
-                resultMat = output
-                stitchSuccess = true
-                break
-            }
-            org.opencv.stitching.Stitcher.ERR_NEED_MORE_IMGS -> {
-                Log.w("Stitcher", "Need more images at scale=$scale, trying smaller scale...")
-                output.release()
-            }
-            org.opencv.stitching.Stitcher.ERR_HOMOGRAPHY_EST_FAIL -> {
-                Log.w("Stitcher", "Homography failed at scale=$scale, trying smaller scale...")
-                output.release()
-            }
-            org.opencv.stitching.Stitcher.ERR_CAMERA_PARAMS_ADJUST_FAIL -> {
-                Log.w("Stitcher", "Camera params adjust failed at scale=$scale")
-                output.release()
-            }
-            else -> {
-                Log.w("Stitcher", "Stitch returned status=$status at scale=$scale")
-                output.release()
+        // Create weight mask: distance from center (feathered)
+        val mask = org.opencv.core.Mat.zeros(cylColor[i].size(), org.opencv.core.CvType.CV_32FC1)
+        val cx = cylColor[i].cols() / 2.0
+        val cy = cylColor[i].rows() / 2.0
+        val maxDist = kotlin.math.sqrt(cx * cx + cy * cy)
+        for (row in 0 until mask.rows()) {
+            for (col in 0 until mask.cols()) {
+                val d = kotlin.math.sqrt((col - cx) * (col - cx) + (row - cy) * (row - cy))
+                val w = (1.0 - d / maxDist).coerceIn(0.1, 1.0).toFloat()
+                mask.put(row, col, w)
             }
         }
+
+        val warpedMask = org.opencv.core.Mat()
+        org.opencv.imgproc.Imgproc.warpPerspective(
+            mask, warpedMask, fullH,
+            org.opencv.core.Size(canvasW.toDouble(), canvasH.toDouble())
+        )
+
+        // Accumulate
+        org.opencv.core.Core.add(canvas, warped, canvas, warpedMask)
+        org.opencv.core.Core.add(weights, warpedMask, weights)
+
+        fullH.release(); warped.release(); mask.release(); warpedMask.release()
+        Log.i("Stitcher", "Frame $i warped and blended onto canvas")
     }
 
-    // Release input mats
-    mats.forEach { it.release() }
+    // Step 7: Normalize by weight
+    val panorama = org.opencv.core.Mat()
+    org.opencv.core.Core.divide(canvas, weights, panorama, 1.0, org.opencv.core.CvType.CV_8UC3)
+    canvas.release(); weights.release(); T.release()
+    cylColor.forEach { it.release() }
+    cumulativeH.forEach { it.release() }
 
-    if (!stitchSuccess || resultMat == null) {
-        Log.e("Stitcher", "ALL STITCH ATTEMPTS FAILED - falling back to simple concat")
-        return fallbackStitch(ctx, paths)
-    }
+    Log.i("Stitcher", "Panorama normalized: ${panorama.cols()}x${panorama.rows()}")
 
-    // Step 3: Convert result Mat to Bitmap
+    // Step 8: Crop black borders
+    val cropped = cropBlackBorders(panorama)
+    panorama.release()
+
+    Log.i("Stitcher", "Cropped: ${cropped.cols()}x${cropped.rows()}, ratio: ${"%.2f".format(cropped.cols().toDouble() / cropped.rows())}")
+
+    // Step 9: Save to file
     try {
-        val resultBmp = Bitmap.createBitmap(resultMat.cols(), resultMat.rows(), Bitmap.Config.ARGB_8888)
-        org.opencv.android.Utils.matToBitmap(resultMat, resultBmp)
-        resultMat.release()
+        val resultBmp = Bitmap.createBitmap(cropped.cols(), cropped.rows(), Bitmap.Config.ARGB_8888)
+        org.opencv.android.Utils.matToBitmap(cropped, resultBmp)
+        cropped.release()
 
-        Log.i("Stitcher", "Final panorama: ${resultBmp.width}x${resultBmp.height}")
-        Log.i("Stitcher", "Aspect ratio: ${resultBmp.width.toFloat() / resultBmp.height.toFloat()}")
-
-        // Save to file
         val out = File(ctx.cacheDir, "panorama_${System.currentTimeMillis()}.jpg")
         FileOutputStream(out).use { resultBmp.compress(Bitmap.CompressFormat.JPEG, 90, it) }
         resultBmp.recycle()
 
-        Log.i("Stitcher", "Saved to: ${out.absolutePath}")
+        Log.i("Stitcher", "Saved: ${out.absolutePath}")
         Log.i("Stitcher", "=== STITCHING COMPLETE ===")
         return out.absolutePath
     } catch (e: Exception) {
-        Log.e("Stitcher", "Failed to convert/save result: ${e.message}")
-        resultMat?.release()
+        Log.e("Stitcher", "Save failed: ${e.message}")
+        cropped.release()
         return null
     }
 }
 
-/** Fallback: simple concatenation if OpenCV stitcher fails */
-private fun fallbackStitch(ctx: android.content.Context, paths: List<String>): String? {
-    Log.w("Stitcher", "Using fallback concatenation stitch")
-    try {
-        val targetHeight = 800
-        val bitmaps = paths.mapNotNull { p ->
-            try {
-                val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-                BitmapFactory.decodeFile(p, opts)
-                val sampleSize = (opts.outHeight / targetHeight).coerceAtLeast(1)
-                BitmapFactory.decodeFile(p, BitmapFactory.Options().apply { inSampleSize = sampleSize })
-            } catch (_: Exception) { null }
+/** Warp an image to cylindrical coordinates */
+private fun cylindricalWarp(src: org.opencv.core.Mat, f: Double): org.opencv.core.Mat {
+    val h = src.rows()
+    val w = src.cols()
+    val cx = w / 2.0
+    val cy = h / 2.0
+    val dst = org.opencv.core.Mat.zeros(h, w, src.type())
+
+    for (y in 0 until h) {
+        for (x in 0 until w) {
+            val dx = x - cx
+            val dy = y - cy
+            val denom = kotlin.math.sqrt(dx * dx + f * f)
+            val newX = (f * kotlin.math.atan2(dx, f) + cx).toInt()
+            val newY = (f * dy / denom + cy).toInt()
+            if (newX in 0 until w && newY in 0 until h) {
+                dst.put(newY, newX, *src.get(y, x))
+            }
         }
-        if (bitmaps.isEmpty()) return null
-
-        val height = targetHeight
-        val totalWidth = bitmaps.sumOf { it.width }
-        val maxWidth = 8000
-        val scale = if (totalWidth > maxWidth) maxWidth.toFloat() / totalWidth else 1f
-        val finalWidth = (totalWidth * scale).toInt()
-        val finalHeight = (height * scale).toInt()
-
-        val result = Bitmap.createBitmap(finalWidth, finalHeight, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(result)
-        var x = 0f
-        bitmaps.forEach { bmp ->
-            val drawW = bmp.width * scale
-            canvas.drawBitmap(bmp, null, RectF(x, 0f, x + drawW, finalHeight.toFloat()), null)
-            x += drawW
-        }
-
-        val out = File(ctx.cacheDir, "panorama_fallback_${System.currentTimeMillis()}.jpg")
-        FileOutputStream(out).use { result.compress(Bitmap.CompressFormat.JPEG, 85, it) }
-        bitmaps.forEach { it.recycle() }
-        result.recycle()
-        return out.absolutePath
-    } catch (e: Exception) {
-        Log.e("Stitcher", "Fallback stitch also failed", e)
-        return null
     }
+    return dst
+}
+
+/** Crop black borders from a stitched panorama */
+private fun cropBlackBorders(src: org.opencv.core.Mat): org.opencv.core.Mat {
+    val gray = org.opencv.core.Mat()
+    org.opencv.imgproc.Imgproc.cvtColor(src, gray, org.opencv.imgproc.Imgproc.COLOR_BGR2GRAY)
+    val thresh = org.opencv.core.Mat()
+    org.opencv.imgproc.Imgproc.threshold(gray, thresh, 5.0, 255.0, org.opencv.imgproc.Imgproc.THRESH_BINARY)
+    val contours = java.util.ArrayList<org.opencv.core.MatOfPoint>()
+    val hierarchy = org.opencv.core.Mat()
+    org.opencv.imgproc.Imgproc.findContours(thresh, contours, hierarchy, org.opencv.imgproc.Imgproc.RETR_EXTERNAL, org.opencv.imgproc.Imgproc.CHAIN_APPROX_SIMPLE)
+    gray.release(); thresh.release(); hierarchy.release()
+
+    if (contours.isEmpty()) return src
+
+    // Find the largest contour (the stitched area)
+    val largest = contours.maxByOrNull { org.opencv.imgproc.Imgproc.contourArea(it) } ?: return src
+    val rect = org.opencv.imgproc.Imgproc.boundingRect(largest)
+    contours.forEach { it.release() }
+
+    // Crop with small padding
+    val pad = 2
+    val x = (rect.x - pad).coerceAtLeast(0)
+    val y = (rect.y - pad).coerceAtLeast(0)
+    val w = (rect.width + pad * 2).coerceAtMost(src.cols() - x)
+    val h = (rect.height + pad * 2).coerceAtMost(src.rows() - y)
+    return org.opencv.core.Mat(src, org.opencv.core.Rect(x, y, w, h)).clone()
 }
 
 private fun buildJson(stitchedPath: String?, frames: List<String>, roomId: String): String {
