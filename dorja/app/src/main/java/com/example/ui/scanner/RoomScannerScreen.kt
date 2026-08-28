@@ -801,7 +801,8 @@ private fun stitchFrames(ctx: android.content.Context, paths: List<String>): Str
         try {
             val bmp = BitmapFactory.decodeFile(path)
             if (bmp != null && !bmp.isRecycled && bmp.width > 100 && bmp.height > 100) {
-                val colorMat = org.opencv.android.Utils.bitmapToMat(bmp)
+                val colorMat = org.opencv.core.Mat()
+                org.opencv.android.Utils.bitmapToMat(bmp, colorMat)
                 val grayMat = org.opencv.core.Mat()
                 org.opencv.imgproc.Imgproc.cvtColor(colorMat, grayMat, org.opencv.imgproc.Imgproc.COLOR_BGR2GRAY)
                 grayMats.add(grayMat)
@@ -840,7 +841,7 @@ private fun stitchFrames(ctx: android.content.Context, paths: List<String>): Str
 
     // Step 4: Detect ORB features + match consecutive pairs
     val orb = org.opencv.features2d.ORB.create(5000)
-    val matcher = org.opencv.features2d.BFMatcher(org.opencv.features2d.BFMatcher.NORM_HAMMING, false)
+    val matcher = org.opencv.features2d.BFMatcher(30, false) // NORM_HAMMING = 30
 
     // Store cumulative homographies: H_cumul[i] maps frame i → frame 0's coordinate space
     val cumulativeH = mutableListOf<org.opencv.core.Mat>()
@@ -871,20 +872,21 @@ private fun stitchFrames(ctx: android.content.Context, paths: List<String>): Str
         }
 
         // Match descriptors (k=2 for ratio test)
-        val matches = org.opencv.core.MatOfDMatch()
-        matcher.knnMatch(des1, des2, matches, 2)
+        val matchList = mutableListOf<org.opencv.core.MatOfDMatch>()
+        matcher.knnMatch(des1, des2, matchList, 2)
 
         // Lowe's ratio test
         val goodMatches = mutableListOf<org.opencv.features2d.DMatch>()
-        val matchArr = matches.toArray()
-        for (m in matchArr) {
-            if (m.distance < 0.75f * matchArr[matchArr.indexOf(m) + 1].distance) {
-                goodMatches.add(m)
+        for (pair in matchList) {
+            val m = pair.toArray()
+            if (m.size >= 2 && m[0].distance < 0.75f * m[1].distance) {
+                goodMatches.add(m[0])
             }
+            pair.release()
         }
         Log.i("Stitcher", "Pair $i→${i + 1}: ${goodMatches.size} good matches (ratio test)")
 
-        kp1.release(); kp2.release(); des1.release(); des2.release(); matches.release()
+        kp1.release(); kp2.release(); des1.release(); des2.release()
 
         if (goodMatches.size < 10) {
             Log.w("Stitcher", "Pair $i→${i + 1}: TOO FEW matches, skipping")
