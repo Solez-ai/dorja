@@ -48,12 +48,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
@@ -70,371 +67,227 @@ import com.example.ui.theme.DorjaColors
 import org.json.JSONObject
 import java.io.File
 import kotlin.math.roundToInt
+import kotlin.math.tan
 
-private val CyanAccent = Color(0xFF00BCD4)
+private val Accent = Color(0xFF00BCD4)
 
 @Composable
 fun PanoramaViewerScreen(
     listingId: String,
     onBack: () -> Unit
 ) {
-    val repository = DorjaApp.instance.repository
-    val context = LocalContext.current
+    val repo = DorjaApp.instance.repository
+    val ctx = LocalContext.current
 
-    val listing by repository.observeListingById(listingId).collectAsState(initial = null)
-    val rooms by repository.getRoomsByListing(listingId).collectAsState(initial = emptyList())
+    val listing by repo.observeListingById(listingId).collectAsState(initial = null)
+    val rooms by repo.getRoomsByListing(listingId).collectAsState(initial = emptyList())
 
-    // Filter rooms that have 3D scans with stitched panorama
+    // Rooms with stitched panoramas
     val scannedRooms = remember(rooms) {
-        rooms.filter { room ->
-            room.has3DScan && room.panoramaData.isNotBlank() && try {
-                val json = JSONObject(room.panoramaData)
-                json.has("stitchedPanorama") && json.getString("stitchedPanorama").isNotBlank()
-            } catch (e: Exception) { false }
+        rooms.filter { r ->
+            r.has3DScan && r.panoramaData.isNotBlank() && try {
+                val j = JSONObject(r.panoramaData)
+                j.has("stitchedPanorama") && j.getString("stitchedPanorama").isNotBlank()
+            } catch (_: Exception) { false }
         }
     }
 
-    var selectedRoomIndex by remember { mutableIntStateOf(0) }
-    val selectedRoom = scannedRooms.getOrNull(selectedRoomIndex)
+    var selectedIdx by remember { mutableIntStateOf(0) }
+    val selectedRoom = scannedRooms.getOrNull(selectedIdx)
 
-    // Get stitched panorama path
     val panoramaPath = remember(selectedRoom) {
         try {
-            if (selectedRoom?.panoramaData.isNullOrBlank()) null
-            else {
-                val json = JSONObject(selectedRoom!!.panoramaData)
-                json.optString("stitchedPanorama", null)
-            }
-        } catch (e: Exception) { null }
+            selectedRoom?.panoramaData?.let { JSONObject(it).optString("stitchedPanorama", null) }
+        } catch (_: Exception) { null }
     }
 
     // Load bitmap
-    val panoramaBitmap = remember(panoramaPath) {
+    val bitmap = remember(panoramaPath) {
         try {
-            if (panoramaPath == null) null
-            else {
-                val file = File(panoramaPath)
-                if (file.exists()) {
-                    BitmapFactory.decodeFile(panoramaPath)?.asImageBitmap()
-                } else {
-                    BitmapFactory.decodeStream(
-                        context.contentResolver.openInputStream(Uri.parse(panoramaPath))
-                    )?.asImageBitmap()
-                }
+            panoramaPath?.let { p ->
+                val f = File(p)
+                val bmp = if (f.exists()) BitmapFactory.decodeFile(p)
+                else ctx.contentResolver.openInputStream(Uri.parse(p))?.use { BitmapFactory.decodeStream(it) }
+                bmp?.asImageBitmap()
             }
-        } catch (e: Exception) { null }
+        } catch (_: Exception) { null }
     }
 
-    // Pan offset (horizontal scroll in pixels, wraps around)
-    var panOffsetX by remember { mutableFloatStateOf(0f) }
-    var gyroEnabled by remember { mutableStateOf(true) }
-
-    // Gyroscope state
+    // Pan state — horizontal offset in world units (radians mapped to pixels)
+    var panX by remember { mutableFloatStateOf(0f) }
+    var gyroOn by remember { mutableStateOf(true) }
     var gyroYaw by remember { mutableFloatStateOf(0f) }
-    var lastGyroTime by remember { mutableStateOf(0L) }
 
-    val sensorManager = remember { context.getSystemService(SensorManager::class.java) }
-    val rotationVector = remember { sensorManager?.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR) }
-    val rotationMatrix = FloatArray(9)
-    val orientationAngles = FloatArray(3)
+    // Gyroscope
+    val sensorMgr = remember { ctx.getSystemService(SensorManager::class.java) }
+    val rotVec = remember { sensorMgr?.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR) }
+    val rotMat = FloatArray(9)
+    val orient = FloatArray(3)
 
-    DisposableEffect(sensorManager, gyroEnabled) {
-        val listener = object : SensorEventListener {
-            override fun onSensorChanged(event: SensorEvent?) {
-                if (event?.sensor?.type == Sensor.TYPE_ROTATION_VECTOR && gyroEnabled) {
-                    val now = System.currentTimeMillis()
-                    if (now - lastGyroTime > 33) { // ~30fps throttle
-                        lastGyroTime = now
-                        SensorManager.getRotationMatrixFromVector(rotationMatrix, event.values)
-                        SensorManager.getOrientation(rotationMatrix, orientationAngles)
-                        gyroYaw = Math.toDegrees(orientationAngles[0].toDouble()).toFloat()
+    DisposableEffect(sensorMgr, gyroOn) {
+        if (sensorMgr == null || rotVec == null || !gyroOn) {
+            onDispose { }
+        } else {
+            val listener = object : SensorEventListener {
+                override fun onSensorChanged(e: SensorEvent?) {
+                    if (e?.sensor?.type == Sensor.TYPE_ROTATION_VECTOR) {
+                        SensorManager.getRotationMatrixFromVector(rotMat, e.values)
+                        SensorManager.getOrientation(rotMat, orient)
+                        gyroYaw = Math.toDegrees(orient[0].toDouble()).toFloat()
                     }
                 }
+                override fun onAccuracyChanged(s: Sensor?, a: Int) {}
             }
-            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+            sensorMgr.registerListener(listener, rotVec, SensorManager.SENSOR_DELAY_UI)
+            onDispose { sensorMgr.unregisterListener(listener) }
         }
-        sensorManager?.registerListener(listener, rotationVector, SensorManager.SENSOR_DELAY_GAME)
-        onDispose { sensorManager?.unregisterListener(listener) }
     }
 
-    // Auto-pan with gyroscope
-    LaunchedEffect(gyroYaw, gyroEnabled, panoramaBitmap) {
-        if (!gyroEnabled || panoramaBitmap == null) return@LaunchedEffect
-        val bmpWidth = panoramaBitmap.width.toFloat()
-        if (bmpWidth <= 0f) return@LaunchedEffect
-        // Map yaw (0-360) to pan offset (0 to bmpWidth)
-        // The panorama repeats every 360°, so we map yaw directly
-        val targetOffset = (gyroYaw / 360f) * bmpWidth
-        panOffsetX = targetOffset
+    // Map gyro yaw to pan offset
+    LaunchedEffect(gyroYaw, gyroOn, bitmap) {
+        if (!gyroOn || bitmap == null) return@LaunchedEffect
+        // Map yaw to pixel offset across the panorama
+        val bmpW = bitmap.width.toFloat()
+        panX = (gyroYaw / 360f) * bmpW
     }
 
-    Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
-        if (panoramaBitmap == null || scannedRooms.isEmpty()) {
-            EmptyPanoramaView(
-                listingTitle = listing?.title ?: "Listing",
-                onBack = onBack,
-                hasScannedRooms = scannedRooms.isNotEmpty()
+    Box(Modifier.fillMaxSize().background(Color.Black)) {
+        if (bitmap == null || scannedRooms.isEmpty()) {
+            EmptyView(
+                title = listing?.title ?: "Listing",
+                msg = if (scannedRooms.isNotEmpty()) "Panorama not available. Re-scan this room."
+                else "No 3D scans captured yet.",
+                onBack = onBack
             )
         } else {
-            // Panorama canvas with gyroscope + drag panning
-            val imageBitmap = panoramaBitmap
+            val bmp = bitmap
 
+            // ── Sphere-projected panorama canvas ────────────────
             Canvas(
-                modifier = Modifier
+                Modifier
                     .fillMaxSize()
                     .pointerInput(Unit) {
-                        detectDragGestures { change, dragAmount ->
+                        detectDragGestures { change, drag ->
                             change.consume()
-                            // Drag to pan: negative drag = move image right
-                            panOffsetX -= dragAmount.x
+                            panX -= drag.x
                         }
                     }
             ) {
-                val canvasWidth = size.width
-                val canvasHeight = size.height
-                val bmpW = imageBitmap.width.toFloat()
-                val bmpH = imageBitmap.height.toFloat()
+                val cw = size.width
+                val ch = size.height
+                val bw = bmp.width.toFloat()
+                val bh = bmp.height.toFloat()
 
-                // Scale: fit height, tile width
-                val scale = canvasHeight / bmpH
-                val scaledWidth = bmpW * scale
+                // The panorama image is equirectangular:
+                //   horizontal = 360° longitude
+                //   vertical = 180° latitude (top=90°, bottom=-90°)
+                //
+                // For a sphere-mapped view, each screen column maps to a longitude,
+                // and each screen row maps to a latitude.
+                //
+                // We use cylindrical projection: the image horizontal axis maps
+                // to longitude, and vertical to latitude.
+                // Screen column `x` → longitude = panX + (x / cw) * 360°
+                // Screen row `y` → latitude = 90° - (y / ch) * 180°
+                //
+                // Source pixel in the panorama image:
+                //   srcX = (longitude / 360°) * bw
+                //   srcY = ((90° - latitude) / 180°) * bh
 
-                // Normalize panOffsetX to [0, scaledWidth) for seamless wrapping
-                var offsetX = ((panOffsetX % scaledWidth) + scaledWidth) % scaledWidth
+                // For each screen column, draw a vertical strip from the panorama
+                val stripWidth = 2f // draw in 2px wide strips for performance
 
-                // Draw enough copies to fill the screen width
-                // We need at least ceil(canvasWidth / scaledWidth) + 2 copies
-                val copiesNeeded = ((canvasWidth / scaledWidth).toInt()) + 2
+                var screenX = 0f
+                while (screenX < cw) {
+                    // This screen column's longitude (degrees)
+                    val longitude = (panX / bw * 360f) + (screenX / cw * 360f)
 
-                for (i in 0..copiesNeeded) {
-                    val drawX = (i * scaledWidth) - offsetX
-                    // Only draw if visible
-                    if (drawX + scaledWidth > 0 && drawX < canvasWidth) {
-                        drawImage(
-                            image = imageBitmap,
-                            srcOffset = IntOffset(0, 0),
-                            srcSize = IntSize(imageBitmap.width, imageBitmap.height),
-                            dstOffset = IntOffset(drawX.roundToInt(), 0),
-                            dstSize = IntSize(scaledWidth.roundToInt(), canvasHeight.roundToInt())
-                        )
-                    }
+                    // Source X in panorama bitmap (wraps around)
+                    val srcX = ((longitude % 360f + 360f) % 360f / 360f * bw).toInt()
+                    val srcXClamped = srcX.coerceIn(0, bw.toInt() - 1)
+
+                    // Draw the full vertical column from the panorama
+                    // Source rect: full height of bitmap at srcX
+                    drawImage(
+                        image = bmp,
+                        srcOffset = IntOffset(srcXClamped, 0),
+                        srcSize = IntSize(1, bh.toInt()),
+                        dstOffset = IntOffset(screenX.roundToInt(), 0),
+                        dstSize = IntSize(stripWidth.roundToInt() + 1, ch.roundToInt())
+                    )
+
+                    screenX += stripWidth
                 }
             }
 
-            // Top gradient overlay
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(100.dp)
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(Color.Black.copy(alpha = 0.7f), Color.Transparent)
-                        )
-                    )
-                    .zIndex(10f)
-                    .align(Alignment.TopCenter)
-            )
+            // ── Overlays ────────────────────────────────────────
+            // Top gradient
+            Box(Modifier.fillMaxWidth().height(80.dp).background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.7f), Color.Transparent))).zIndex(10f).align(Alignment.TopCenter))
+            // Bottom gradient
+            Box(Modifier.fillMaxWidth().height(80.dp).background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.7f)))).zIndex(10f).align(Alignment.BottomCenter))
 
-            // Bottom gradient overlay
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(100.dp)
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(Color.Transparent, Color.Black.copy(alpha = 0.7f))
-                        )
-                    )
-                    .zIndex(10f)
-                    .align(Alignment.BottomCenter)
-            )
-
-            // 360° Badge (top center)
-            Surface(
-                shape = RoundedCornerShape(20.dp),
-                color = Color.Black.copy(alpha = 0.65f),
-                border = androidx.compose.foundation.BorderStroke(1.dp, CyanAccent.copy(alpha = 0.4f)),
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = 50.dp)
-                    .zIndex(11f)
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(CyanAccent))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = "360° PANORAMA • INTERACTIVE VIEW",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color.White,
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 10.sp
-                    )
+            // Badge
+            Surface(shape = RoundedCornerShape(20.dp), color = Color.Black.copy(alpha = 0.65f), border = androidx.compose.foundation.BorderStroke(1.dp, Accent.copy(alpha = 0.4f)),
+                modifier = Modifier.align(Alignment.TopCenter).padding(top = 50.dp).zIndex(11f)) {
+                Row(Modifier.padding(horizontal = 14.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(8.dp).clip(CircleShape).background(Accent))
+                    Spacer(Modifier.width(8.dp))
+                    Text("360° PANORAMA • DRAG TO LOOK AROUND", color = Color.White, fontSize = 10.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
                 }
             }
 
-            // Back button (top left)
-            IconButton(
-                onClick = onBack,
-                modifier = Modifier
-                    .padding(top = 44.dp, start = 12.dp)
-                    .size(38.dp)
-                    .clip(CircleShape)
-                    .background(Color.Black.copy(alpha = 0.5f))
-                    .zIndex(11f)
-                    .align(Alignment.TopStart)
-            ) {
+            // Back button
+            IconButton(onClick = onBack, Modifier.padding(top = 44.dp, start = 12.dp).size(38.dp).clip(CircleShape).background(Color.Black.copy(alpha = 0.5f)).zIndex(11f).align(Alignment.TopStart)) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = Color.White, modifier = Modifier.size(20.dp))
             }
 
-            // Gyro toggle button (top right)
-            Surface(
-                shape = RoundedCornerShape(20.dp),
-                color = if (gyroEnabled) CyanAccent.copy(alpha = 0.3f) else Color.Black.copy(alpha = 0.5f),
-                border = androidx.compose.foundation.BorderStroke(1.dp, if (gyroEnabled) CyanAccent else Color.White.copy(alpha = 0.3f)),
-                modifier = Modifier
-                    .padding(top = 44.dp, end = 12.dp)
-                    .zIndex(11f)
-                    .align(Alignment.TopEnd)
-                    .clip(RoundedCornerShape(20.dp))
-                    .clickable { gyroEnabled = !gyroEnabled }
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(if (gyroEnabled) CyanAccent else Color.Gray))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        if (gyroEnabled) "GYRO ON" else "GYRO OFF",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = if (gyroEnabled) CyanAccent else Color.Gray,
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 9.sp
-                    )
+            // Gyro toggle
+            Surface(shape = RoundedCornerShape(20.dp), color = if (gyroOn) Accent.copy(alpha = 0.3f) else Color.Black.copy(alpha = 0.5f),
+                border = androidx.compose.foundation.BorderStroke(1.dp, if (gyroOn) Accent else Color.White.copy(alpha = 0.3f)),
+                modifier = Modifier.padding(top = 44.dp, end = 12.dp).zIndex(11f).align(Alignment.TopEnd)
+                    .clip(RoundedCornerShape(20.dp)).clickable { gyroOn = !gyroOn }) {
+                Row(Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(6.dp).clip(CircleShape).background(if (gyroOn) Accent else Color.Gray))
+                    Spacer(Modifier.width(4.dp))
+                    Text(if (gyroOn) "GYRO ON" else "GYRO OFF", color = if (gyroOn) Accent else Color.Gray, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
                 }
             }
 
-            // Room selector tabs (bottom)
+            // Room tabs
             if (scannedRooms.size > 1) {
-                LazyRow(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 16.dp, start = 12.dp, end = 12.dp)
-                        .zIndex(11f)
-                        .align(Alignment.BottomCenter),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    itemsIndexed(scannedRooms) { index, room ->
-                        Surface(
-                            shape = RoundedCornerShape(20.dp),
-                            color = if (index == selectedRoomIndex) CyanAccent else Color.Black.copy(alpha = 0.5f),
-                            border = androidx.compose.foundation.BorderStroke(
-                                1.dp,
-                                if (index == selectedRoomIndex) CyanAccent else Color.White.copy(alpha = 0.3f)
-                            ),
-                            modifier = Modifier.clickable { selectedRoomIndex = index }
-                        ) {
-                            Text(
-                                text = room.displayName,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = if (index == selectedRoomIndex) Color.White else Color.White.copy(alpha = 0.7f),
-                                fontWeight = if (index == selectedRoomIndex) FontWeight.Bold else FontWeight.Normal,
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                            )
+                LazyRow(Modifier.fillMaxWidth().padding(bottom = 16.dp, start = 12.dp, end = 12.dp).zIndex(11f).align(Alignment.BottomCenter), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    itemsIndexed(scannedRooms) { idx, room ->
+                        Surface(shape = RoundedCornerShape(20.dp), color = if (idx == selectedIdx) Accent else Color.Black.copy(alpha = 0.5f),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, if (idx == selectedIdx) Accent else Color.White.copy(alpha = 0.3f)),
+                            modifier = Modifier.clickable { selectedIdx = idx }) {
+                            Text(room.displayName, color = if (idx == selectedIdx) Color.White else Color.White.copy(alpha = 0.7f),
+                                fontWeight = if (idx == selectedIdx) FontWeight.Bold else FontWeight.Normal, fontSize = 12.sp,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp))
                         }
                     }
                 }
             }
-
-            // Hint text (bottom)
-            Text(
-                text = "DRAG OR ROTATE PHONE TO LOOK AROUND",
-                style = MaterialTheme.typography.labelSmall,
-                color = Color.White.copy(alpha = 0.5f),
-                fontFamily = FontFamily.Monospace,
-                fontSize = 9.sp,
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = if (scannedRooms.size > 1) 60.dp else 24.dp)
-                    .zIndex(11f)
-            )
         }
     }
 }
 
 @Composable
-private fun EmptyPanoramaView(listingTitle: String, onBack: () -> Unit, hasScannedRooms: Boolean) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(DorjaColors.Ink950),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.padding(24.dp)
-        ) {
-            IconButton(
-                onClick = onBack,
-                modifier = Modifier
-                    .align(Alignment.Start)
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(DorjaColors.Gray700)
-            ) {
+private fun EmptyView(title: String, msg: String, onBack: () -> Unit) {
+    Box(Modifier.fillMaxSize().background(DorjaColors.Ink950), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(24.dp)) {
+            IconButton(onClick = onBack, Modifier.align(Alignment.Start).size(40.dp).clip(CircleShape).background(DorjaColors.Gray700)) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = DorjaColors.White)
             }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            Box(
-                modifier = Modifier
-                    .size(64.dp)
-                    .clip(CircleShape)
-                    .background(DorjaColors.Gray700),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.ViewInAr,
-                    contentDescription = null,
-                    tint = CyanAccent,
-                    modifier = Modifier.size(32.dp)
-                )
+            Spacer(Modifier.height(24.dp))
+            Box(Modifier.size(64.dp).clip(CircleShape).background(DorjaColors.Gray700), contentAlignment = Alignment.Center) {
+                Icon(Icons.Default.ViewInAr, null, tint = Accent, modifier = Modifier.size(32.dp))
             }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Text(
-                text = if (hasScannedRooms) "Panorama Not Available" else "No 3D Scans Available",
-                style = MaterialTheme.typography.titleMedium,
-                color = DorjaColors.White,
-                fontWeight = FontWeight.Bold
-            )
-
-            Spacer(modifier = Modifier.height(6.dp))
-
-            Text(
-                text = if (hasScannedRooms) {
-                    "This room's panorama was captured before the stitching update. Re-scan to get the full 360° experience."
-                } else {
-                    "The host hasn't captured a 3D panorama for this listing yet. Check back soon!"
-                },
-                style = MaterialTheme.typography.bodySmall,
-                color = DorjaColors.Sand300,
-                textAlign = TextAlign.Center
-            )
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            DorjaButton(
-                text = "Go Back",
-                onClick = onBack,
-                modifier = Modifier.width(140.dp)
-            )
+            Spacer(Modifier.height(16.dp))
+            Text("No 3D Scans Available", color = DorjaColors.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(6.dp))
+            Text(msg, color = DorjaColors.Sand300, textAlign = TextAlign.Center, style = MaterialTheme.typography.bodySmall)
+            Spacer(Modifier.height(20.dp))
+            DorjaButton("Go Back", onClick = onBack, modifier = Modifier.width(140.dp))
         }
     }
 }
