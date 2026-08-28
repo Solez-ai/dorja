@@ -382,7 +382,9 @@ private fun StatTile(label: String, value: String, modifier: Modifier = Modifier
 
 // ═════════════════════════════════════════════════════════════
 //  STITCHING — pure Android, no OpenCV
-// ═════════════════════════════════════════════════════════════private fun stitchFrames(ctx: android.content.Context, paths: List<String>): String? {
+// ═════════════════════════════════════════════════════════════
+
+private fun stitchFrames(ctx: android.content.Context, paths: List<String>): String? {
     if (paths.isEmpty()) return null
     return try {
         stitchFramesInternal(ctx, paths)
