@@ -1,20 +1,11 @@
 package com.example.ui.tour
 
-import android.content.Context
-import android.graphics.BitmapFactory
-import android.hardware.Sensor
-import android.hardware.SensorEvent
-import android.hardware.SensorEventListener
-import android.hardware.SensorManager
 import android.net.Uri
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.Canvas
+import android.os.Handler
+import android.os.Looper
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,20 +16,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.IosShare
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.ViewInAr
-import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -46,43 +31,33 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.zIndex
-import coil.compose.AsyncImage
 import com.example.DorjaApp
-import com.example.data.model.RoomItem
-import com.example.ui.components.DorjaBadge
 import com.example.ui.components.DorjaButton
 import com.example.ui.theme.DorjaColors
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
+import com.gjiazhe.panoramaimageview.PanoramaImageView
 import org.json.JSONObject
-import kotlin.math.roundToInt
+import java.io.File
+
+private val CyanAccent = Color(0xFF00BCD4)
 
 @Composable
 fun PanoramaViewerScreen(
@@ -91,133 +66,104 @@ fun PanoramaViewerScreen(
 ) {
     val repository = DorjaApp.instance.repository
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
 
     val listing by repository.observeListingById(listingId).collectAsState(initial = null)
     val rooms by repository.getRoomsByListing(listingId).collectAsState(initial = emptyList())
 
-    // Filter rooms that have 3D scans
-    val scannedRooms = remember(rooms) { rooms.filter { it.has3DScan && it.panoramaData.isNotBlank() } }
+    // Filter rooms that have 3D scans with stitched panorama
+    val scannedRooms = remember(rooms) {
+        rooms.filter { room ->
+            room.has3DScan && room.panoramaData.isNotBlank() && try {
+                val json = JSONObject(room.panoramaData)
+                json.has("stitchedPanorama") && json.getString("stitchedPanorama").isNotBlank()
+            } catch (e: Exception) { false }
+        }
+    }
+
     var selectedRoomIndex by remember { mutableIntStateOf(0) }
     val selectedRoom = scannedRooms.getOrNull(selectedRoomIndex)
 
-    // Parse panorama JSON
-    val panoramaFrames = remember(selectedRoom) {
+    // Get stitched panorama path
+    val panoramaPath = remember(selectedRoom) {
         try {
-            if (selectedRoom?.panoramaData.isNullOrBlank()) emptyList()
+            if (selectedRoom?.panoramaData.isNullOrBlank()) null
             else {
                 val json = JSONObject(selectedRoom!!.panoramaData)
-                val frames = json.getJSONArray("frames")
-                (0 until frames.length()).map { frames.getString(it) }
+                json.optString("stitchedPanorama", null)
             }
-        } catch (e: Exception) { emptyList() }
+        } catch (e: Exception) { null }
     }
 
-    // Pan state
-    var scrollOffset by remember { mutableFloatStateOf(0f) }
-    val listState = rememberLazyListState()
-
-    // Gyroscope pan
-    var gyroYaw by remember { mutableFloatStateOf(0f) }
+    // Gyroscope state
     var gyroEnabled by remember { mutableStateOf(true) }
-    var lastGyroTime by remember { mutableStateOf(0L) }
+    var panoramaView by remember { mutableStateOf<PanoramaImageView?>(null) }
 
-    // Sensor
-    val sensorManager = remember { context.getSystemService(SensorManager::class.java) }
-    val rotationVector = remember { sensorManager?.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR) }
-    val rotationMatrix = FloatArray(9)
-    val orientationAngles = FloatArray(3)
-
-    DisposableEffect(sensorManager, gyroEnabled) {
-        val listener = object : SensorEventListener {
-            override fun onSensorChanged(event: SensorEvent?) {
-                if (event?.sensor?.type == Sensor.TYPE_ROTATION_VECTOR && gyroEnabled) {
-                    val now = System.currentTimeMillis()
-                    if (now - lastGyroTime > 33) { // ~30fps throttle
-                        lastGyroTime = now
-                        SensorManager.getRotationMatrixFromVector(rotationMatrix, event.values)
-                        SensorManager.getOrientation(rotationMatrix, orientationAngles)
-                        gyroYaw = Math.toDegrees(orientationAngles[0].toDouble()).toFloat()
-                    }
+    // Start/stop gyroscope on the PanoramaImageView
+    DisposableEffect(panoramaView, gyroEnabled) {
+        val view = panoramaView
+        if (view != null && gyroEnabled) {
+            view.enableScrollWithGyroscope(true)
+            val handler = Handler(Looper.getMainLooper())
+            val updater = object : Runnable {
+                override fun run() {
+                    view.updateGyroscopeSensor()
+                    handler.postDelayed(this, 33) // ~30fps
                 }
             }
-            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+            handler.post(updater)
+            onDispose { handler.removeCallbacks(updater) }
+        } else {
+            onDispose { }
         }
-        sensorManager?.registerListener(listener, rotationVector, SensorManager.SENSOR_DELAY_GAME)
-        onDispose { sensorManager?.unregisterListener(listener) }
-    }
-
-    // Auto-pan with gyroscope
-    LaunchedEffect(gyroYaw, gyroEnabled, panoramaFrames.size) {
-        if (!gyroEnabled || panoramaFrames.isEmpty()) return@LaunchedEffect
-        // Map yaw to scroll position
-        // Each frame covers ~30 degrees (360/12), duplicated frames for wrap
-        val degreesPerFrame = 360f / panoramaFrames.size.coerceAtLeast(1)
-        val frameWidthPx = 1080f // approximate width per frame in pixels
-        val totalWidth = panoramaFrames.size * frameWidthPx
-        // Convert yaw to pixel offset
-        val targetOffset = ((gyroYaw / 360f) * totalWidth) % totalWidth
-        scrollOffset = targetOffset
     }
 
     Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
-        if (panoramaFrames.isEmpty()) {
-            // No frames
-            EmptyPanoramaView(listingTitle = listing?.title ?: "Listing", onBack = onBack)
+        if (panoramaPath == null || scannedRooms.isEmpty()) {
+            // No panorama data
+            EmptyPanoramaView(
+                listingTitle = listing?.title ?: "Listing",
+                onBack = onBack,
+                hasScannedRooms = scannedRooms.isNotEmpty()
+            )
         } else {
-            // Panorama strip
+            // Panorama viewer
             Box(modifier = Modifier.fillMaxSize()) {
-                // Horizontal scrollable panorama
-                val duplicatedFrames = panoramaFrames + panoramaFrames // duplicate for seamless wrap
-
-                LazyRow(
-                    state = listState,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .pointerInput(Unit) {
-                            detectDragGestures { change, dragAmount ->
-                                change.consume()
-                                scrollOffset -= dragAmount.x
+                // PanoramaImageView via AndroidView
+                AndroidView(
+                    factory = { ctx ->
+                        PanoramaImageView(ctx).also { view ->
+                            // Load the stitched panorama image
+                            try {
+                                val file = File(panoramaPath)
+                                if (file.exists()) {
+                                    view.setImageDrawable(
+                                        android.graphics.drawable.BitmapDrawable(
+                                            ctx.resources,
+                                            android.graphics.BitmapFactory.decodeFile(panoramaPath)
+                                        )
+                                    )
+                                } else {
+                                    // Try as URI
+                                    view.setImageURI(Uri.parse(panoramaPath))
+                                }
+                            } catch (e: Exception) {
+                                view.setImageURI(Uri.parse(panoramaPath))
                             }
-                        },
-                    userScrollEnabled = !gyroEnabled
-                ) {
-                    items(duplicatedFrames.size) { index ->
-                        val framePath = duplicatedFrames[index]
-                        Box(
-                            modifier = Modifier
-                                .width(1080.dp)
-                                .height(800.dp)
-                        ) {
-                            AsyncImage(
-                                model = framePath,
-                                contentDescription = "Panorama frame ${(index % panoramaFrames.size) + 1}",
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.fillMaxSize()
-                            )
+                            view.enableScrollWithGyroscope(true)
+                            view.isHardwareAccelerated = true
+                            panoramaView = view
                         }
-                    }
-                }
+                    },
+                    modifier = Modifier.fillMaxSize()
+                )
 
-                // Gyro-driven scroll override
-                if (gyroEnabled) {
-                    LaunchedEffect(scrollOffset) {
-                        // Convert pixel offset to approximate scroll index
-                        val frameWidth = 1080
-                        val targetIndex = ((scrollOffset / frameWidth).roundToInt()).coerceIn(0, duplicatedFrames.size - 1)
-                        if (targetIndex in 0 until duplicatedFrames.size) {
-                            listState.animateScrollToItem(targetIndex)
-                        }
-                    }
-                }
-
-                // Top gradient overlay (depth effect)
+                // Top gradient overlay
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(100.dp)
                         .background(
-                            Brush.verticalGradient(
+                            androidx.compose.ui.graphics.Brush.verticalGradient(
                                 listOf(Color.Black.copy(alpha = 0.7f), Color.Transparent)
                             )
                         )
@@ -225,13 +171,13 @@ fun PanoramaViewerScreen(
                         .align(Alignment.TopCenter)
                 )
 
-                // Bottom gradient overlay (depth effect)
+                // Bottom gradient overlay
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(100.dp)
                         .background(
-                            Brush.verticalGradient(
+                            androidx.compose.ui.graphics.Brush.verticalGradient(
                                 listOf(Color.Transparent, Color.Black.copy(alpha = 0.7f))
                             )
                         )
@@ -256,7 +202,7 @@ fun PanoramaViewerScreen(
                         Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(CyanAccent))
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "360° REAL PANORAMA • ${panoramaFrames.size} FRAMES STITCHED",
+                            text = "360° PANORAMA • INTERACTIVE VIEW",
                             style = MaterialTheme.typography.labelSmall,
                             color = Color.White,
                             fontFamily = FontFamily.Monospace,
@@ -289,7 +235,9 @@ fun PanoramaViewerScreen(
                         .padding(top = 44.dp, end = 12.dp)
                         .zIndex(11f)
                         .align(Alignment.TopEnd)
+                        .clip(RoundedCornerShape(20.dp))
                         .graphicsLayer { }
+                        .clickable { gyroEnabled = !gyroEnabled }
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
@@ -338,13 +286,26 @@ fun PanoramaViewerScreen(
                         }
                     }
                 }
+
+                // Hint text (bottom)
+                Text(
+                    text = "DRAG OR ROTATE PHONE TO LOOK AROUND",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.White.copy(alpha = 0.5f),
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 9.sp,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = if (scannedRooms.size > 1) 60.dp else 24.dp)
+                        .zIndex(11f)
+                )
             }
         }
     }
 }
 
 @Composable
-private fun EmptyPanoramaView(listingTitle: String, onBack: () -> Unit) {
+private fun EmptyPanoramaView(listingTitle: String, onBack: () -> Unit, hasScannedRooms: Boolean) {
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -386,7 +347,7 @@ private fun EmptyPanoramaView(listingTitle: String, onBack: () -> Unit) {
             Spacer(modifier = Modifier.height(16.dp))
 
             Text(
-                text = "No 3D Scans Available",
+                text = if (hasScannedRooms) "Panorama Not Available" else "No 3D Scans Available",
                 style = MaterialTheme.typography.titleMedium,
                 color = DorjaColors.White,
                 fontWeight = FontWeight.Bold
@@ -395,7 +356,11 @@ private fun EmptyPanoramaView(listingTitle: String, onBack: () -> Unit) {
             Spacer(modifier = Modifier.height(6.dp))
 
             Text(
-                text = "The host hasn't captured a 3D panorama for this listing yet. Check back soon!",
+                text = if (hasScannedRooms) {
+                    "This room's panorama was captured before the stitching update. Re-scan to get the full 360° experience."
+                } else {
+                    "The host hasn't captured a 3D panorama for this listing yet. Check back soon!"
+                },
                 style = MaterialTheme.typography.bodySmall,
                 color = DorjaColors.Sand300,
                 textAlign = TextAlign.Center
@@ -411,5 +376,3 @@ private fun EmptyPanoramaView(listingTitle: String, onBack: () -> Unit) {
         }
     }
 }
-
-private val CyanAccent = Color(0xFF00BCD4)

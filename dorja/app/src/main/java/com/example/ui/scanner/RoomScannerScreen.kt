@@ -341,8 +341,14 @@ fun RoomScannerScreen(
                 frameCount = framePaths.size,
                 coveragePercent = (framePaths.size.toFloat() / TOTAL_ANGLES * 100f).toInt(),
                 onSave = {
-                    val json = buildPanoramaJson(framePaths, selectedRoom?.id ?: "")
                     scope.launch {
+                        // Stitch frames into equirectangular panorama
+                        val stitchedPath = stitchPanorama(context, framePaths.toList())
+                        val json = if (stitchedPath != null) {
+                            buildStitchedPanoramaJson(stitchedPath, framePaths.toList(), selectedRoom?.id ?: "")
+                        } else {
+                            buildPanoramaJson(framePaths.toList(), selectedRoom?.id ?: "")
+                        }
                         repository.updateRoom3DScan(selectedRoom?.id ?: "", json)
                         onScanComplete(selectedRoom?.id ?: "", json)
                     }
@@ -1404,6 +1410,91 @@ private fun angleDifference(a: Float, b: Float): Float {
 
 private fun buildPanoramaJson(framePaths: List<String>, roomId: String): String {
     val json = JSONObject()
+    val framesArray = JSONArray()
+    framePaths.forEach { framesArray.put(it) }
+    json.put("frames", framesArray)
+    json.put("angleCount", framePaths.size)
+    json.put("roomId", roomId)
+    json.put("timestamp", System.currentTimeMillis())
+    return json.toString()
+}
+
+/**
+ * Stitches captured frames into a single equirectangular panorama bitmap.
+ * Frames are arranged left-to-right based on their capture order.
+ * Each frame is stretched to fit the equirectangular grid.
+ */
+private fun stitchPanorama(context: android.content.Context, framePaths: List<String>): String? {
+    if (framePaths.isEmpty()) return null
+    try {
+        // Load all bitmaps
+        val bitmaps = framePaths.mapNotNull { path ->
+            try {
+                val uri = if (path.startsWith("content://") || path.startsWith("file://")) {
+                    android.net.Uri.parse(path)
+                } else {
+                    android.net.Uri.fromFile(java.io.File(path))
+                }
+                android.graphics.BitmapFactory.decodeStream(
+                    context.contentResolver.openInputStream(uri)
+                        ?: java.io.FileInputStream(java.io.File(path))
+                )
+            } catch (e: Exception) {
+                Log.e("RoomScanner", "Failed to load frame: $path", e)
+                null
+            }
+        }
+        if (bitmaps.isEmpty()) return null
+
+        // Target: equirectangular panorama
+        // Width = sum of frame widths (each frame covers ~30°)
+        // Height = max frame height (maintains aspect ratio)
+        val frameHeight = bitmaps.maxOf { it.height }
+        val totalWidth = bitmaps.sumOf { it.width }
+
+        // Create stitched bitmap
+        val stitched = android.graphics.Bitmap.createBitmap(
+            totalWidth,
+            frameHeight,
+            android.graphics.Bitmap.Config.ARGB_8888
+        )
+        val canvas = android.graphics.Canvas(stitched)
+
+        var xOffset = 0f
+        bitmaps.forEach { bmp ->
+            // Stretch each frame to fill its vertical space
+            val destRect = android.graphics.RectF(
+                xOffset, 0f,
+                xOffset + bmp.width,
+                frameHeight.toFloat()
+            )
+            canvas.drawBitmap(bmp, null, destRect, null)
+            xOffset += bmp.width
+        }
+
+        // Save stitched panorama to cache
+        val outFile = java.io.File(
+            context.cacheDir,
+            "stitched_panorama_${System.currentTimeMillis()}.jpg"
+        )
+        java.io.FileOutputStream(outFile).use { out ->
+            stitched.compress(android.graphics.Bitmap.CompressFormat.JPEG, 92, out)
+        }
+
+        // Recycle bitmaps
+        bitmaps.forEach { it.recycle() }
+        stitched.recycle()
+
+        return outFile.absolutePath
+    } catch (e: Exception) {
+        Log.e("RoomScanner", "Panorama stitch failed", e)
+        return null
+    }
+}
+
+private fun buildStitchedPanoramaJson(stitchedPath: String, framePaths: List<String>, roomId: String): String {
+    val json = JSONObject()
+    json.put("stitchedPanorama", stitchedPath)
     val framesArray = JSONArray()
     framePaths.forEach { framesArray.put(it) }
     json.put("frames", framesArray)
