@@ -91,8 +91,10 @@ import com.example.data.model.RoomItem
 import com.example.ui.components.DorjaButton
 import com.example.ui.components.DorjaOutlinedButton
 import com.example.ui.theme.DorjaColors
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -251,9 +253,15 @@ fun RoomScannerScreen(
                 frameCount = capturedPaths.size,
                 onSave = {
                     scope.launch {
-                        val stitched = stitchFrames(ctx, capturedPaths.toList())
-                        val json = buildJson(stitched, capturedPaths.toList(), selectedRoom?.id ?: "")
-                        repo.updateRoom3DScan(selectedRoom?.id ?: "", json)
+                        val paths = capturedPaths.toList()
+                        // Stitch on IO thread to avoid main thread OOM
+                        val stitched = withContext(kotlinx.coroutines.Dispatchers.IO) {
+                            stitchFrames(ctx, paths)
+                        }
+                        val json = buildJson(stitched, paths, selectedRoom?.id ?: "")
+                        withContext(kotlinx.coroutines.Dispatchers.IO) {
+                            repo.updateRoom3DScan(selectedRoom?.id ?: "", json)
+                        }
                         onScanComplete(selectedRoom?.id ?: "", json)
                     }
                 },
@@ -766,25 +774,43 @@ private fun StatTile(label: String, value: String, modifier: Modifier = Modifier
 private fun stitchFrames(ctx: android.content.Context, paths: List<String>): String? {
     if (paths.isEmpty()) return null
     try {
+        // Max height per frame to keep final panorama manageable
+        val targetHeight = 800
+
         val bitmaps = paths.mapNotNull { p ->
-            try { BitmapFactory.decodeFile(p) } catch (_: Exception) { null }
+            try {
+                val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                BitmapFactory.decodeFile(p, opts)
+                // Calculate sample size to fit target height
+                val sampleSize = (opts.outHeight / targetHeight).coerceAtLeast(1)
+                val decodeOpts = BitmapFactory.Options().apply { inSampleSize = sampleSize }
+                BitmapFactory.decodeFile(p, decodeOpts)
+            } catch (_: Exception) { null }
         }
         if (bitmaps.isEmpty()) return null
 
-        val height = bitmaps.maxOf { it.height }
+        // All frames resized to same height
+        val height = targetHeight
         val totalWidth = bitmaps.sumOf { it.width }
 
-        val result = Bitmap.createBitmap(totalWidth, height, Bitmap.Config.ARGB_8888)
+        // Cap total width to prevent OOM
+        val maxWidth = 8000
+        val scale = if (totalWidth > maxWidth) maxWidth.toFloat() / totalWidth else 1f
+        val finalWidth = (totalWidth * scale).toInt()
+        val finalHeight = (height * scale).toInt()
+
+        val result = Bitmap.createBitmap(finalWidth, finalHeight, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(result)
 
         var x = 0f
         bitmaps.forEach { bmp ->
-            canvas.drawBitmap(bmp, null, RectF(x, 0f, x + bmp.width, height.toFloat()), null)
-            x += bmp.width
+            val drawW = bmp.width * scale
+            canvas.drawBitmap(bmp, null, RectF(x, 0f, x + drawW, finalHeight.toFloat()), null)
+            x += drawW
         }
 
         val out = File(ctx.cacheDir, "panorama_${System.currentTimeMillis()}.jpg")
-        FileOutputStream(out).use { result.compress(Bitmap.CompressFormat.JPEG, 90, it) }
+        FileOutputStream(out).use { result.compress(Bitmap.CompressFormat.JPEG, 85, it) }
         bitmaps.forEach { it.recycle() }
         result.recycle()
         return out.absolutePath

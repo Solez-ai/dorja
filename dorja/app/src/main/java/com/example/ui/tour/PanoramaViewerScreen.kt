@@ -6,6 +6,7 @@ import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.net.Uri
+import android.util.Log
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -101,16 +102,24 @@ fun PanoramaViewerScreen(
         } catch (_: Exception) { null }
     }
 
-    // Load bitmap
+    // Load bitmap — scaled down to prevent OOM
     val bitmap = remember(panoramaPath) {
         try {
             panoramaPath?.let { p ->
                 val f = File(p)
-                val bmp = if (f.exists()) BitmapFactory.decodeFile(p)
-                else ctx.contentResolver.openInputStream(Uri.parse(p))?.use { BitmapFactory.decodeStream(it) }
-                bmp?.asImageBitmap()
+                if (!f.exists()) return@let null
+                // Decode bounds first to calculate sample size
+                val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                BitmapFactory.decodeFile(p, opts)
+                val maxW = 4096 // max width for viewer performance
+                val sample = (opts.outWidth / maxW).coerceAtLeast(1)
+                val decodeOpts = BitmapFactory.Options().apply { inSampleSize = sample }
+                BitmapFactory.decodeFile(p, decodeOpts)?.asImageBitmap()
             }
-        } catch (_: Exception) { null }
+        } catch (e: Exception) {
+            Log.e("PanoramaViewer", "Failed to load panorama", e)
+            null
+        }
     }
 
     // Pan state — horizontal offset in world units (radians mapped to pixels)
