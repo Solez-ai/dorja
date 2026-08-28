@@ -151,12 +151,14 @@ fun PanoramaViewerScreen(
         }
     }
 
-    // Map gyro yaw to pan offset
+    // Map gyro yaw to pan offset (in radians, matching the Canvas projection)
     LaunchedEffect(gyroYaw, gyroOn, bitmap) {
         if (!gyroOn || bitmap == null) return@LaunchedEffect
-        // Map yaw to pixel offset across the panorama
-        val bmpW = bitmap.width.toFloat()
-        panX = (gyroYaw / 360f) * bmpW
+        // Convert yaw degrees to radians for the projection
+        val yawRad = Math.toRadians(gyroYaw.toDouble()).toFloat()
+        // panX is in "panorama pixel units" where f pixels = 1 radian
+        val f = bitmap.width.toFloat() / (2.0f * Math.PI.toFloat())
+        panX = yawRad * f
     }
 
     Box(Modifier.fillMaxSize().background(Color.Black)) {
@@ -192,35 +194,56 @@ fun PanoramaViewerScreen(
                     .pointerInput(Unit) {
                         detectDragGestures { change, drag ->
                             change.consume()
-                            panX -= drag.x
+                            panX += drag.x // drag right = look right
                         }
                     }
             ) {
                 val cw = size.width
                 val ch = size.height
-                val bw = bmp.width.toFloat()
-                val bh = bmp.height.toFloat()
+                val bmpW = bmp.width.toFloat()
+                val bmpH = bmp.height.toFloat()
 
-                // Draw in vertical strips (2px wide) for performance
+                // Focal length: how much panorama pixels = 1 radian
+                // The panorama's horizontal extent maps to some total angle.
+                // For a proper equirectangular: totalAngle = 2π (360°)
+                //   and bmpW = totalAngle * f, so f = bmpW / 2π
+                // For a concatenated panorama: we don't know the total angle,
+                // but we can still use f = bmpW / 2π as an approximation
+                // and let the user drag to look around.
+                val f = bmpW / (2.0 * Math.PI).toFloat()
+
+                // Horizontal FOV of the viewport
+                val hfov = 2.0f * kotlin.math.atan(cw / (2.0f * f))
+
+                // Draw vertical strips with cylindrical projection
                 val stripW = 2f
                 var sx = 0f
                 while (sx < cw) {
-                    // Longitude for this screen column (degrees)
-                    val lonDeg = (panX / bw * 360f) + (sx / cw * 360f)
-                    // Wrap to 0..360
-                    val lonWrapped = ((lonDeg % 360f) + 360f) % 360f
+                    // Screen column to longitude angle
+                    val screenAngle = kotlin.math.atan((sx - cw / 2f) / f)
+                    val lon = screenAngle + panX / f // panX is in panorama-pixel units
 
                     // Source X in panorama bitmap
-                    val srcX = (lonWrapped / 360f * bw).toInt().coerceIn(0, bw.toInt() - 1)
+                    val srcX = (f * lon + bmpW / 2f).toInt()
+                    // Wrap around for seamless panorama
+                    val srcXWrapped = ((srcX % bmpW.toInt()) + bmpW.toInt()) % bmpW.toInt()
 
-                    // Draw the full vertical column from the panorama
-                    drawImage(
-                        image = bmp,
-                        srcOffset = IntOffset(srcX, 0),
-                        srcSize = IntSize(1, bh.toInt()),
-                        dstOffset = IntOffset(sx.roundToInt(), 0),
-                        dstSize = IntSize(stripW.roundToInt() + 1, ch.roundToInt())
-                    )
+                    // Source Y: sample the center band (vertically)
+                    // For a 2:1 equirectangular, the center half = ±45° latitude
+                    val srcYCenter = (bmpH / 2f).toInt()
+                    val srcYRange = (bmpH * 0.4f).toInt() // show 80% of height
+                    val srcY = (srcYCenter - srcYRange / 2).coerceAtLeast(0)
+                    val srcH = srcYRange.coerceAtMost(bmpH.toInt() - srcY)
+
+                    if (srcXWrapped in 0 until bmpW.toInt() && srcH > 0) {
+                        drawImage(
+                            image = bmp,
+                            srcOffset = IntOffset(srcXWrapped, srcY),
+                            srcSize = IntSize(1, srcH),
+                            dstOffset = IntOffset(sx.roundToInt(), 0),
+                            dstSize = IntSize(stripW.roundToInt() + 1, ch.roundToInt())
+                        )
+                    }
 
                     sx += stripW
                 }
