@@ -49,7 +49,6 @@ import com.example.ui.util.Formatters
 @Composable
 fun CaptureScreen(
     onCreateListing: () -> Unit,
-    onStartScanner: (String?) -> Unit,
     onOpenListing: (String) -> Unit
 ) {
     val repository = DorjaApp.instance.repository
@@ -124,26 +123,14 @@ fun CaptureScreen(
                 )
             }
 
-            // 2. 3D Room Scanner
-            item {
-                ActionHubCard(
-                    title = "3D Room Scanner (ARCore)",
-                    description = "Record spatial geometry and surfaces to build verified Reality Passports.",
-                    icon = Icons.Default.ViewInAr,
-                    accentColor = DorjaColors.Ink950,
-                    onClick = { onStartScanner(myListings.firstOrNull()?.id) },
-                    testTag = "action_room_scanner"
-                )
-            }
-
-            // 3. Guided Photo Capture
+            // 2. Guided Photo Capture
             item {
                 ActionHubCard(
                     title = "Guided Optical Capture",
                     description = "Anti-distortion wide-angle photo sequencing for structural verification.",
                     icon = Icons.Default.CameraAlt,
                     accentColor = DorjaColors.Gray700,
-                    onClick = { onStartScanner(myListings.firstOrNull()?.id) },
+                    onClick = { /* TODO: implement guided photo capture */ },
                     testTag = "action_photo_capture"
                 )
             }

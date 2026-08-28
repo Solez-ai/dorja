@@ -73,7 +73,7 @@ import kotlinx.coroutines.launch
 fun HostListingsScreen(
     onCreateListing: () -> Unit,
     onOpenListingDetail: (String) -> Unit,
-    onOpenRoomScanner: (String?) -> Unit = {}
+
 ) {
     val repository = DorjaApp.instance.repository
     val scope = rememberCoroutineScope()
@@ -249,7 +249,7 @@ fun HostListingsScreen(
                     HostListingCard(
                         listing = listing,
                         onClick = { onOpenListingDetail(listing.id) },
-                        onScanRooms = { onOpenRoomScanner(listing.id) },
+
                         onDelete = { listingToDelete = listing }
                     )
                 }
@@ -262,7 +262,6 @@ fun HostListingsScreen(
 private fun HostListingCard(
     listing: Listing,
     onClick: () -> Unit,
-    onScanRooms: () -> Unit,
     onDelete: () -> Unit
 ) {
     var showMenu by remember { mutableStateOf(false) }
@@ -337,13 +336,6 @@ private fun HostListingCard(
                             }
                         )
                         DropdownMenuItem(
-                            text = { Text("Scan 3D Rooms") },
-                            onClick = {
-                                showMenu = false
-                                onScanRooms()
-                            }
-                        )
-                        DropdownMenuItem(
                             text = { Text("Delete Listing", color = DorjaColors.Error) },
                             onClick = {
                                 showMenu = false
@@ -402,13 +394,6 @@ private fun HostListingCard(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                DorjaOutlinedButton(
-                    text = "Scan 3D Rooms",
-                    onClick = onScanRooms,
-                    icon = Icons.Default.ViewInAr,
-                    modifier = Modifier.weight(1f),
-                    testTag = "host_card_scan_${listing.id}"
-                )
                 DorjaButton(
                     text = "View Details",
                     onClick = onClick,

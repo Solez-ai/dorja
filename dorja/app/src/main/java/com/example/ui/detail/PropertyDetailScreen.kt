@@ -104,7 +104,7 @@ fun PropertyDetailScreen(
     onOpen3DTour: (String) -> Unit,
     onChatWithSeller: (String, String, String) -> Unit,
     onViewHandoverPassport: (String) -> Unit,
-    onOpenRoomScanner: (String) -> Unit = {}
+
 ) {
     val repository = DorjaApp.instance.repository
     val scope = rememberCoroutineScope()
@@ -839,14 +839,7 @@ fun PropertyDetailScreen(
                                 )
                             }
 
-                            if (isOwner) {
-                                DorjaOutlinedButton(
-                                    text = "3D Scan",
-                                    onClick = { onOpenRoomScanner(safeListing.id) },
-                                    icon = Icons.Default.ViewInAr,
-                                    modifier = Modifier.height(32.dp),
-                                    testTag = "detail_scan_rooms_btn"
-                                )
+
                             }
                         }
 
@@ -951,16 +944,7 @@ fun PropertyDetailScreen(
                                                     modifier = Modifier.height(30.dp),
                                                     testTag = "detail_room_3d_btn_${room.id}"
                                                 )
-                                            } else if (isOwner) {
-                                                Spacer(modifier = Modifier.width(6.dp))
-                                                DorjaOutlinedButton(
-                                                    text = if (room.has3DScan) "Rescan" else "Scan 3D",
-                                                    onClick = { onOpenRoomScanner(safeListing.id) },
-                                                    icon = Icons.Default.CameraAlt,
-                                                    modifier = Modifier.height(30.dp),
-                                                    testTag = "detail_room_scan_btn_${room.id}"
-                                                )
-                                            }
+
                                         }
                                     }
                                 }

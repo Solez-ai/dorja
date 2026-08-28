@@ -42,7 +42,6 @@ import com.example.ui.explore.ExploreScreen
 import com.example.ui.handover.HandoverPassportScreen
 import com.example.ui.listing.CreateListingScreen
 import com.example.ui.pass.ViewingPassScreen
-import com.example.ui.scanner.RoomScannerScreen
 import androidx.compose.runtime.collectAsState
 import com.example.ui.seller.HostListingsScreen
 import com.example.ui.splash.SplashScreen
@@ -73,9 +72,7 @@ sealed class Screen(val route: String) {
     object HandoverPassport : Screen("handover_passport/{listingId}") {
         fun createRoute(listingId: String) = "handover_passport/$listingId"
     }
-    object RoomScanner : Screen("room_scanner?listingId={listingId}") {
-        fun createRoute(listingId: String? = null) = if (listingId != null) "room_scanner?listingId=$listingId" else "room_scanner"
-    }
+
 }
 
 enum class HostTab(val title: String, val icon: ImageVector, val tag: String) {
@@ -134,9 +131,7 @@ fun DorjaNavHost() {
                 onNavigateToCreateListing = {
                     navController.navigate(Screen.CreateListing.route)
                 },
-                onNavigateToRoomScanner = { listingId ->
-                    navController.navigate(Screen.RoomScanner.createRoute(listingId))
-                },
+
                 onNavigateToChatThread = { conversationId ->
                     navController.navigate(Screen.ChatThread.createRoute(conversationId))
                 },
@@ -167,8 +162,7 @@ fun DorjaNavHost() {
                         }
                     }
                 },
-                onViewHandoverPassport = { id -> navController.navigate(Screen.HandoverPassport.createRoute(id)) },
-                onOpenRoomScanner = { id -> navController.navigate(Screen.RoomScanner.createRoute(id)) }
+                onViewHandoverPassport = { id -> navController.navigate(Screen.HandoverPassport.createRoute(id)) }
             )
         }
 
@@ -180,26 +174,6 @@ fun DorjaNavHost() {
             TourViewerScreen(
                 listingId = listingId,
                 onBack = { navController.popBackStack() }
-            )
-        }
-
-        composable(
-            route = Screen.RoomScanner.route,
-            arguments = listOf(
-                navArgument("listingId") {
-                    type = NavType.StringType
-                    nullable = true
-                    defaultValue = null
-                }
-            )
-        ) { backStackEntry ->
-            val listingId = backStackEntry.arguments?.getString("listingId")
-            RoomScannerScreen(
-                initialListingId = listingId,
-                onBack = { navController.popBackStack() },
-                onScanSaved = {
-                    navController.popBackStack()
-                }
             )
         }
 
@@ -254,7 +228,7 @@ fun MainContainer(
     onNavigateToDetail: (String) -> Unit,
     onNavigateToTour: (String) -> Unit,
     onNavigateToCreateListing: () -> Unit,
-    onNavigateToRoomScanner: (String?) -> Unit,
+
     onNavigateToChatThread: (String) -> Unit,
     onNavigateToPass: (String) -> Unit,
     onNavigateToHandover: (String) -> Unit
@@ -341,8 +315,7 @@ fun MainContainer(
                 when (currentHostTab) {
                     HostTab.PROPERTIES -> HostListingsScreen(
                         onCreateListing = onNavigateToCreateListing,
-                        onOpenListingDetail = onNavigateToDetail,
-                        onOpenRoomScanner = onNavigateToRoomScanner
+                        onOpenListingDetail = onNavigateToDetail
                     )
                     HostTab.VISITS -> VisitsScreen(onOpenPass = onNavigateToPass)
                     HostTab.INBOX -> InboxScreen(onOpenConversation = onNavigateToChatThread)

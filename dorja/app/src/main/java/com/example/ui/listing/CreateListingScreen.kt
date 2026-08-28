@@ -216,8 +216,6 @@ fun CreateListingScreen(
     var cropAssignedRoomId by remember { mutableStateOf<String?>(null) }
     var cropCaption by remember { mutableStateOf("") }
 
-    // 4. 3D Scan Section States
-    var showMarkScannedDialog by remember { mutableStateOf<RoomItem?>(null) }
 
     // 5. Legal Documents (Empty by default - no fake documents)
     val customLegalDocs = remember {
@@ -266,30 +264,7 @@ fun CreateListingScreen(
         "High Speed Fiber", "Fire Safety", "Water Reservoir", "Solar Power", "Servant Room"
     )
 
-    // Mark Room as Scanned Dialog
-    if (showMarkScannedDialog != null) {
-        val targetRoom = showMarkScannedDialog!!
-        AlertDialog(
-            onDismissRequest = { showMarkScannedDialog = null },
-            icon = {
-                Icon(Icons.Default.ViewInAr, "Scan", tint = DorjaColors.Jol600, modifier = Modifier.size(36.dp))
-            },
-            title = { Text("Mark Room as 3D Scanned", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold) },
-            text = {
-                Text("Mark '${targetRoom.displayName}' as 3D scanned? You can re-scan later from the Host Scanner.", style = MaterialTheme.typography.bodyMedium, color = DorjaColors.Gray700)
-            },
-            confirmButton = {
-                DorjaButton(text = "Mark Scanned", onClick = {
-                    val idx = customRooms.indexOfFirst { it.id == targetRoom.id }
-                    if (idx != -1) customRooms[idx] = customRooms[idx].copy(has3DScan = true)
-                    showMarkScannedDialog = null
-                }, modifier = Modifier.width(140.dp))
-            },
-            dismissButton = {
-                TextButton(onClick = { showMarkScannedDialog = null }) { Text("Cancel", color = DorjaColors.Gray700) }
-            }
-        )
-    }
+
 
     // CROP DIALOG (4:5 aspect ratio enforcement)
     if (showCropDialog && cropBitmap != null) {
@@ -846,7 +821,6 @@ fun CreateListingScreen(
         )
     }
 
-    // (3D scanner is now in the standalone RoomScannerScreen)
 
     Scaffold(
         modifier = Modifier
@@ -1558,135 +1532,7 @@ fun CreateListingScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // ==========================================
-            // ______ 3. 3D SCAN SECTION ______
-            // ==========================================
-            BentoCard(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(12.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = Icons.Default.ViewInAr,
-                                    contentDescription = null,
-                                    tint = DorjaColors.Jol600,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = "3. 3D SPATIAL ROOM SCAN (${customRooms.count { it.has3DScan }}/${customRooms.size})",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = DorjaColors.Ink950,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                            Text(
-                                text = "Pick which room to scan with guided 360° dots & arrows HUD",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = DorjaColors.Gray700
-                            )
-                        }
-
-                        if (customRooms.isNotEmpty()) {
-                            DorjaButton(
-                                text = "Scan 3D Room",
-                                onClick = {
-                                    val firstUnscanned = customRooms.find { !it.has3DScan }
-                                    if (firstUnscanned != null) {
-                                        showMarkScannedDialog = firstUnscanned
-                                    } else {
-                                        showMarkScannedDialog = customRooms.first()
-                                    }
-                                },
-                                icon = Icons.Default.ViewInAr,
-                                modifier = Modifier.height(36.dp),
-                                testTag = "start_3d_scan_button"
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    if (customRooms.isEmpty()) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 8.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text("Please add rooms in Step 1 first before scanning 3D tours.", color = DorjaColors.Gray500, fontSize = 12.sp)
-                        }
-                    } else {
-                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            customRooms.forEach { room ->
-                                Surface(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(12.dp),
-                                    color = DorjaColors.White,
-                                    border = BorderStroke(
-                                        1.dp,
-                                        if (room.has3DScan) DorjaColors.Success.copy(alpha = 0.5f) else DorjaColors.BentoCardBorder
-                                    )
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(10.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            modifier = Modifier.weight(1f)
-                                        ) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .size(34.dp)
-                                                    .clip(RoundedCornerShape(8.dp))
-                                                    .background(if (room.has3DScan) DorjaColors.Success.copy(alpha = 0.15f) else DorjaColors.Sand100),
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                Icon(
-                                                    imageVector = if (room.has3DScan) Icons.Default.CheckCircle else Icons.Default.MeetingRoom,
-                                                    contentDescription = null,
-                                                    tint = if (room.has3DScan) DorjaColors.Success else DorjaColors.Gray700,
-                                                    modifier = Modifier.size(18.dp)
-                                                )
-                                            }
-                                            Spacer(modifier = Modifier.width(10.dp))
-                                            Column {
-                                                Text(
-                                                    text = room.displayName,
-                                                    style = MaterialTheme.typography.titleSmall,
-                                                    color = DorjaColors.Ink950,
-                                                    fontWeight = FontWeight.Bold
-                                                )
-                                                Text(
-                                                    text = if (room.has3DScan) "360° Panorama Scanned" else "Not Scanned",
-                                                    style = MaterialTheme.typography.bodySmall,
-                                                    color = if (room.has3DScan) DorjaColors.Success else DorjaColors.Gray500,
-                                                    fontSize = 11.sp
-                                                )
-                                            }
-                                        }
-
-                                        DorjaOutlinedButton(
-                                            text = if (room.has3DScan) "Re-Scan" else "Scan 3D",
-                                            onClick = { showMarkScannedDialog = room },
-                                            icon = Icons.Default.ViewInAr,
-                                            modifier = Modifier.height(32.dp),
-                                            testTag = "scan_btn_${room.id}"
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
+            // 3D Scanner removed — see SCANNER.md for rebuild plan
             Spacer(modifier = Modifier.height(8.dp))
 
             // Verified Legal Documents Bento Card
