@@ -42,11 +42,11 @@ import com.example.ui.explore.ExploreScreen
 import com.example.ui.handover.HandoverPassportScreen
 import com.example.ui.listing.CreateListingScreen
 import com.example.ui.pass.ViewingPassScreen
-import androidx.compose.runtime.collectAsState
 import com.example.ui.seller.HostListingsScreen
 import com.example.ui.splash.SplashScreen
 import com.example.ui.theme.DorjaColors
 import com.example.ui.tour.TourViewerScreen
+import com.example.ui.scanner.RoomScannerScreen
 import com.example.ui.visits.VisitsScreen
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -71,6 +71,9 @@ sealed class Screen(val route: String) {
     }
     object HandoverPassport : Screen("handover_passport/{listingId}") {
         fun createRoute(listingId: String) = "handover_passport/$listingId"
+    }
+    object RoomScanner : Screen("room_scanner/{listingId}") {
+        fun createRoute(listingId: String) = "room_scanner/$listingId"
     }
 
 }
@@ -131,7 +134,9 @@ fun DorjaNavHost() {
                 onNavigateToCreateListing = {
                     navController.navigate(Screen.CreateListing.route)
                 },
-
+                onNavigateToScanner = { listingId ->
+                    navController.navigate(Screen.RoomScanner.createRoute(listingId))
+                },
                 onNavigateToChatThread = { conversationId ->
                     navController.navigate(Screen.ChatThread.createRoute(conversationId))
                 },
@@ -154,6 +159,7 @@ fun DorjaNavHost() {
                 listingId = listingId,
                 onBack = { navController.popBackStack() },
                 onOpen3DTour = { id -> navController.navigate(Screen.TourViewer.createRoute(id)) },
+                onOpenScanner = { id -> navController.navigate(Screen.RoomScanner.createRoute(id)) },
                 onChatWithSeller = { id, seekerId, hostId ->
                     scope.launch(Dispatchers.IO) {
                         val conv = DorjaApp.instance.repository.getOrCreateConversation(id, seekerId, hostId)
@@ -174,6 +180,20 @@ fun DorjaNavHost() {
             TourViewerScreen(
                 listingId = listingId,
                 onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(
+            route = Screen.RoomScanner.route,
+            arguments = listOf(navArgument("listingId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val listingId = backStackEntry.arguments?.getString("listingId") ?: "l1"
+            RoomScannerScreen(
+                listingId = listingId,
+                onBack = { navController.popBackStack() },
+                onScanComplete = { _, _ ->
+                    navController.popBackStack()
+                }
             )
         }
 
@@ -228,7 +248,7 @@ fun MainContainer(
     onNavigateToDetail: (String) -> Unit,
     onNavigateToTour: (String) -> Unit,
     onNavigateToCreateListing: () -> Unit,
-
+    onNavigateToScanner: (String) -> Unit,
     onNavigateToChatThread: (String) -> Unit,
     onNavigateToPass: (String) -> Unit,
     onNavigateToHandover: (String) -> Unit
@@ -315,7 +335,8 @@ fun MainContainer(
                 when (currentHostTab) {
                     HostTab.PROPERTIES -> HostListingsScreen(
                         onCreateListing = onNavigateToCreateListing,
-                        onOpenListingDetail = onNavigateToDetail
+                        onOpenListingDetail = onNavigateToDetail,
+                        onScan3DRooms = onNavigateToScanner
                     )
                     HostTab.VISITS -> VisitsScreen(onOpenPass = onNavigateToPass)
                     HostTab.INBOX -> InboxScreen(onOpenConversation = onNavigateToChatThread)

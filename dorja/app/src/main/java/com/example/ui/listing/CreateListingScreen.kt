@@ -496,7 +496,7 @@ fun CreateListingScreen(
 
                     Spacer(modifier = Modifier.height(4.dp))
 
-                    // Pick buttons (both go through 4:5 crop)
+                    // Pick buttons — auto-crop to 4:5 silently (no dialog)
                     val ctx = LocalContext.current
                     val galleryLauncher = rememberLauncherForActivityResult(
                         contract = ActivityResultContracts.GetContent()
@@ -507,10 +507,16 @@ fun CreateListingScreen(
                                 val bmp = BitmapFactory.decodeStream(inputStream)
                                 inputStream?.close()
                                 if (bmp != null) {
-                                    cropBitmap = bmp
-                                    cropAssignedRoomId = selectedRoomForNewPhoto
-                                    cropCaption = customCaptionInput
-                                    showCropDialog = true
+                                    val croppedFile = autoCropToFourFive(ctx, bmp)
+                                    if (croppedFile != null) {
+                                        photoAssignments.add(
+                                            PhotoAssignmentItem(
+                                                url = "file://${croppedFile.absolutePath}",
+                                                caption = customCaptionInput.ifBlank { "Photo ${photoAssignments.size + 1}" },
+                                                assignedRoomId = selectedRoomForNewPhoto
+                                            )
+                                        )
+                                    }
                                 }
                             } catch (_: Exception) {}
                             customCaptionInput = ""
@@ -521,10 +527,16 @@ fun CreateListingScreen(
                         contract = ActivityResultContracts.TakePicturePreview()
                     ) { bitmap ->
                         if (bitmap != null) {
-                            cropBitmap = bitmap
-                            cropAssignedRoomId = selectedRoomForNewPhoto
-                            cropCaption = customCaptionInput
-                            showCropDialog = true
+                            val croppedFile = autoCropToFourFive(ctx, bitmap)
+                            if (croppedFile != null) {
+                                photoAssignments.add(
+                                    PhotoAssignmentItem(
+                                        url = "file://${croppedFile.absolutePath}",
+                                        caption = customCaptionInput.ifBlank { "Photo ${photoAssignments.size + 1}" },
+                                        assignedRoomId = selectedRoomForNewPhoto
+                                    )
+                                )
+                            }
                             customCaptionInput = ""
                         }
                     }
@@ -1416,6 +1428,22 @@ fun CreateListingScreen(
                                                     )
                                                 }
                                             }
+
+                                            // 4:5 ratio enforcement badge
+                                            Surface(
+                                                shape = RoundedCornerShape(topStart = 6.dp),
+                                                color = Color(0xFF00BCD4).copy(alpha = 0.85f),
+                                                modifier = Modifier.align(Alignment.BottomEnd)
+                                            ) {
+                                                Text(
+                                                    text = "4:5",
+                                                    color = DorjaColors.White,
+                                                    fontSize = 7.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontFamily = FontFamily.Monospace,
+                                                    modifier = Modifier.padding(horizontal = 3.dp, vertical = 1.5.dp)
+                                                )
+                                            }
                                         }
 
                                         Spacer(modifier = Modifier.width(10.dp))
@@ -1532,7 +1560,117 @@ fun CreateListingScreen(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // 3D Scanner removed — see SCANNER.md for rebuild plan
+            // ==========================================
+            // ______ 3. 3D PANORAMA SCANNER SECTION ______
+            // ==========================================
+            BentoCard(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.ViewInAr,
+                                    contentDescription = null,
+                                    tint = Color(0xFF00BCD4),
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "3. 3D PANORAMA SCANNER",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = DorjaColors.Ink950,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            Text(
+                                text = "Capture 360° cylindrical panoramas for each room",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = DorjaColors.Gray700
+                            )
+                        }
+
+                        DorjaButton(
+                            text = "Scan Rooms",
+                            onClick = { /* Scanner launched from listing detail after creation */ },
+                            icon = Icons.Default.ViewInAr,
+                            modifier = Modifier.height(36.dp),
+                            testTag = "scan_rooms_button"
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    if (customRooms.isEmpty()) {
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = DorjaColors.Sand100,
+                            border = BorderStroke(1.dp, DorjaColors.BentoCardBorder),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(16.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Icon(Icons.Default.ViewInAr, contentDescription = null, tint = Color(0xFF00BCD4), modifier = Modifier.size(28.dp))
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text("Add rooms first, then scan", fontWeight = FontWeight.Bold, color = DorjaColors.Ink950)
+                                Text("3D panoramas are captured per-room. Add rooms above first.", style = MaterialTheme.typography.bodySmall, color = DorjaColors.Gray700)
+                            }
+                        }
+                    } else {
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            customRooms.forEach { room ->
+                                Surface(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = if (room.has3DScan) Color(0xFF00BCD4).copy(alpha = 0.08f) else DorjaColors.White,
+                                    border = BorderStroke(1.dp, if (room.has3DScan) Color(0xFF00BCD4) else DorjaColors.BentoCardBorder)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(10.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(34.dp)
+                                                .clip(RoundedCornerShape(8.dp))
+                                                .background(if (room.has3DScan) Color(0xFF00BCD4).copy(alpha = 0.15f) else DorjaColors.BentoBlueBg),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = if (room.has3DScan) Icons.Default.Check else Icons.Default.ViewInAr,
+                                                contentDescription = null,
+                                                tint = if (room.has3DScan) Color(0xFF00BCD4) else DorjaColors.Gray500,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.width(10.dp))
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(room.displayName, style = MaterialTheme.typography.titleSmall, color = DorjaColors.Ink950, fontWeight = FontWeight.Bold)
+                                            Text(
+                                                if (room.has3DScan) "3D Scan Ready" else "Scan Pending",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = if (room.has3DScan) Color(0xFF00BCD4) else DorjaColors.Gray500,
+                                                fontSize = 11.sp
+                                            )
+                                        }
+                                        if (room.has3DScan) {
+                                            DorjaBadge(text = "SCANNED", backgroundColor = Color(0xFF00BCD4).copy(alpha = 0.15f), textColor = Color(0xFF00BCD4))
+                                        } else {
+                                            DorjaBadge(text = "PENDING", backgroundColor = DorjaColors.Sand300.copy(alpha = 0.3f), textColor = DorjaColors.Gray700)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             Spacer(modifier = Modifier.height(8.dp))
 
             // Verified Legal Documents Bento Card
@@ -2087,4 +2225,38 @@ private fun CounterBox(
     }
 }
 
+/**
+ * Auto-crops a bitmap to strict 4:5 ratio (center crop) and saves as JPEG.
+ * Returns the saved file, or null on failure.
+ */
+private fun autoCropToFourFive(context: android.content.Context, bitmap: Bitmap): java.io.File? {
+    return try {
+        val ratio = 4f / 5f
+        val cropW: Int
+        val cropH: Int
+        if (bitmap.width.toFloat() / bitmap.height.toFloat() > ratio) {
+            cropH = bitmap.height
+            cropW = (bitmap.height * ratio).toInt()
+        } else {
+            cropW = bitmap.width
+            cropH = (bitmap.width / ratio).toInt()
+        }
+        val x = (bitmap.width - cropW) / 2
+        val y = (bitmap.height - cropH) / 2
+        val cropped = Bitmap.createBitmap(
+            bitmap,
+            max(0, x),
+            max(0, y),
+            min(cropW, bitmap.width),
+            min(cropH, bitmap.height)
+        )
+        val file = java.io.File(context.cacheDir, "photo_4x5_${System.currentTimeMillis()}.jpg")
+        java.io.FileOutputStream(file).use { out ->
+            cropped.compress(Bitmap.CompressFormat.JPEG, 92, out)
+        }
+        file
+    } catch (_: Exception) {
+        null
+    }
+}
 

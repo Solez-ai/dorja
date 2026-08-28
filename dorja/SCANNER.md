@@ -1,6 +1,6 @@
 # 3D Panorama Scanner — Architecture & Rebuild Guide
 
-> **Status:** Removed as of August 2026. The scanner code was removed to eliminate fake/simulated data. This document preserves the architecture so it can be rebuilt properly.
+> **Status:** We need to add it
 
 ---
 
@@ -21,10 +21,10 @@ The 3D Panorama Scanner was a room-scanning feature that let hosts capture 360°
    - "PRESS TO START" label with down-caret icon above a green circular shutter button
    - Bottom bar: settings/layers icon (left), gyro status toggle (right)
 3. **Active Scanning** — Gyroscope-driven capture phase:
-   - 12 target angles spaced 30° apart (0°, 30°, 60° ... 330°)
+   - 12 target angles spaced 30° apart (0°, 30°, 60° ... 330°) WHICH TH SOFTARE INETRACTIVELY SHPOED TO TE SER COPIYING THEIR PHOENS PANAROMA UI
    - Compass ring with 12 angle nodes rendered on camera preview
    - Real gyroscope integration via `TYPE_ROTATION_VECTOR` sensor
-   - Auto-capture when device aligns within ±20° of each target angle (350ms hold time for stability)
+   - Auto-capture when device aligns within ±20° of each target angle (350ms hold time for stability) MUST BE VISUALLY SHOW CIONNECT WITH A CROSSHAIR THAT ACTUALLY WORKS
    - Progress strip: green = captured, blue = current target, gray = pending
    - Alignment banner: "ALIGNED — CAPTURING" or "Rotate to angle X"
    - Red stop button + "PRESS STOP WHEN DONE"
@@ -105,8 +105,7 @@ Each frame file is a JPEG captured at the corresponding angle. The viewer stitch
 
 ---
 
-## What's Needed to Rebuild
-
+## What's Needed
 ### Core Requirements
 
 1. **Real camera frame capture** — Use CameraX `ImageCapture` to take actual JPEG photos at each of the 12 angles
@@ -173,3 +172,5 @@ implementation("androidx.compose.material:material-icons-extended:...")
 3. **Why 350ms hold time?** Balances stability (prevents accidental captures during quick movements) with usability (feels responsive).
 
 4. **Why frames saved as separate JPEGs?** Allows the viewer to load frames on-demand during scrolling, rather than stitching into a single massive bitmap which would OOM on large panoramas.
+
+The pohones Macro-est lense mustbe us er(.08 or .5x)

@@ -49,7 +49,8 @@ import com.example.ui.util.Formatters
 @Composable
 fun CaptureScreen(
     onCreateListing: () -> Unit,
-    onOpenListing: (String) -> Unit
+    onOpenListing: (String) -> Unit,
+    onScan3DRooms: (String) -> Unit = {},
 ) {
     val repository = DorjaApp.instance.repository
     val currentUser by repository.currentUser.collectAsState()
@@ -123,7 +124,19 @@ fun CaptureScreen(
                 )
             }
 
-            // 2. Guided Photo Capture
+            // 2. 3D Room Scanner
+            item {
+                ActionHubCard(
+                    title = "3D Room Scanner",
+                    description = "Capture 360° cylindrical panoramas with gyroscope-guided alignment.",
+                    icon = Icons.Default.ViewInAr,
+                    accentColor = Color(0xFF00BCD4),
+                    onClick = { /* Navigate from listing detail */ },
+                    testTag = "action_3d_scanner"
+                )
+            }
+
+            // 3. Guided Photo Capture
             item {
                 ActionHubCard(
                     title = "Guided Optical Capture",

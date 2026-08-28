@@ -102,6 +102,7 @@ fun PropertyDetailScreen(
     listingId: String,
     onBack: () -> Unit,
     onOpen3DTour: (String) -> Unit,
+    onOpenScanner: (String) -> Unit = {},
     onChatWithSeller: (String, String, String) -> Unit,
     onViewHandoverPassport: (String) -> Unit,
 
@@ -165,7 +166,7 @@ fun PropertyDetailScreen(
                     AsyncImage(
                         model = fullScreenPhotoUrl,
                         contentDescription = "Full Screen Photo",
-                        contentScale = ContentScale.Crop,
+                        contentScale = ContentScale.Fit,
                         modifier = Modifier
                             .fillMaxSize()
                             .clip(RoundedCornerShape(12.dp))
@@ -272,10 +273,10 @@ fun PropertyDetailScreen(
                         AsyncImage(
                             model = room.photoPath,
                             contentDescription = room.displayName,
-                            contentScale = ContentScale.Crop,
+                            contentScale = ContentScale.Fit,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(160.dp)
+                                .aspectRatio(4f / 5f)
                                 .clip(RoundedCornerShape(8.dp))
                         )
                         Spacer(modifier = Modifier.height(10.dp))
@@ -469,7 +470,7 @@ fun PropertyDetailScreen(
                         .clip(RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp))
                         .background(DorjaColors.Ink950)
                 ) {
-                    // Swipeable / Scrollable High-Res Photo Gallery
+                    // Swipeable / Scrollable High-Res Photo Gallery (full 4:5 display)
                     HorizontalPager(
                         state = pagerState,
                         modifier = Modifier.fillMaxSize()
@@ -479,7 +480,7 @@ fun PropertyDetailScreen(
                             AsyncImage(
                                 model = photo.url,
                                 contentDescription = photo.caption,
-                                contentScale = ContentScale.Crop,
+                                contentScale = ContentScale.Fit,
                                 modifier = Modifier
                                     .fillMaxSize()
                                     .clickable { fullScreenPhotoUrl = photo.url }
@@ -811,6 +812,67 @@ fun PropertyDetailScreen(
                                 icon = Icons.Default.ViewInAr,
                                 modifier = Modifier.height(34.dp),
                                 testTag = "see_3d_scans_hero_button"
+                            )
+                        }
+                    }
+                }
+
+                // HOST: Scan 3D Rooms button (only visible to owner)
+                if (isOwner) {
+                    BentoCard(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onOpenScanner(safeListing.id) }
+                            .testTag("host_scan_3d_rooms_card")
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(38.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(androidx.compose.ui.graphics.Color(0xFF00BCD4).copy(alpha = 0.15f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.ViewInAr,
+                                        contentDescription = "Scan 3D",
+                                        tint = androidx.compose.ui.graphics.Color(0xFF00BCD4),
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Column {
+                                    Text(
+                                        text = "Scan 3D Rooms",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        color = DorjaColors.Ink950,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = "Capture 360° panoramas with gyroscope guidance",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = androidx.compose.ui.graphics.Color(0xFF00BCD4),
+                                        fontSize = 11.sp
+                                    )
+                                }
+                            }
+
+                            DorjaButton(
+                                text = "Start Scan",
+                                onClick = { onOpenScanner(safeListing.id) },
+                                icon = Icons.Default.ViewInAr,
+                                modifier = Modifier.height(34.dp),
+                                testTag = "host_start_scan_button"
                             )
                         }
                     }

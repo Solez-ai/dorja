@@ -73,7 +73,7 @@ import kotlinx.coroutines.launch
 fun HostListingsScreen(
     onCreateListing: () -> Unit,
     onOpenListingDetail: (String) -> Unit,
-
+    onScan3DRooms: (String) -> Unit = {},
 ) {
     val repository = DorjaApp.instance.repository
     val scope = rememberCoroutineScope()
@@ -249,7 +249,7 @@ fun HostListingsScreen(
                     HostListingCard(
                         listing = listing,
                         onClick = { onOpenListingDetail(listing.id) },
-
+                        onScan = { onScan3DRooms(listing.id) },
                         onDelete = { listingToDelete = listing }
                     )
                 }
@@ -262,6 +262,7 @@ fun HostListingsScreen(
 private fun HostListingCard(
     listing: Listing,
     onClick: () -> Unit,
+    onScan: () -> Unit = {},
     onDelete: () -> Unit
 ) {
     var showMenu by remember { mutableStateOf(false) }
@@ -399,6 +400,13 @@ private fun HostListingCard(
                     onClick = onClick,
                     modifier = Modifier.weight(1f),
                     testTag = "host_card_view_${listing.id}"
+                )
+                DorjaOutlinedButton(
+                    text = "Scan 3D",
+                    onClick = onScan,
+                    icon = Icons.Default.ViewInAr,
+                    modifier = Modifier.height(40.dp),
+                    testTag = "host_card_scan_3d_${listing.id}"
                 )
             }
 
