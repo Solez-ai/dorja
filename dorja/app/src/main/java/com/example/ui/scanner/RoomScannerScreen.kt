@@ -845,7 +845,7 @@ private fun stitchFrames(ctx: android.content.Context, paths: List<String>): Str
 
     // Store cumulative homographies: H_cumul[i] maps frame i → frame 0's coordinate space
     val cumulativeH = mutableListOf<org.opencv.core.Mat>()
-    cumulativeH.add(org.opencv.core.Mat().eye(3, 3, org.opencv.core.CvType.CV_64F)) // frame 0 = identity
+    cumulativeH.add(org.opencv.core.Mat.eye(3, 3, org.opencv.core.CvType.CV_64F)) // frame 0 = identity
 
     var totalInliers = 0
 
@@ -899,8 +899,10 @@ private fun stitchFrames(ctx: android.content.Context, paths: List<String>): Str
         val dstPts = org.opencv.core.MatOfPoint2f()
         val kp1Arr = kp1.toArray()
         val kp2Arr = kp2.toArray()
-        srcPts.from(goodMatches.map { org.opencv.core.Point(kp1Arr[it.queryIdx].pt.x.toDouble(), kp1Arr[it.queryIdx].pt.y.toDouble()) }.toTypedArray())
-        dstPts.from(goodMatches.map { org.opencv.core.Point(kp2Arr[it.trainIdx].pt.x.toDouble(), kp2Arr[it.trainIdx].pt.y.toDouble()) }.toTypedArray())
+        val srcPoints = goodMatches.map { org.opencv.core.Point(kp1Arr[it.queryIdx].pt.x.toDouble(), kp1Arr[it.queryIdx].pt.y.toDouble()) }
+        srcPts.fromArray(*srcPoints.toTypedArray())
+        val dstPoints = goodMatches.map { org.opencv.core.Point(kp2Arr[it.trainIdx].pt.x.toDouble(), kp2Arr[it.trainIdx].pt.y.toDouble()) }
+        dstPts.fromArray(*dstPoints.toTypedArray())
 
         val inliers = org.opencv.core.Mat()
         val H = org.opencv.calib3d.Calib3d.findHomography(srcPts, dstPts, org.opencv.calib3d.Calib3d.RANSAC, 5.0, inliers, 2000, 0.995)
