@@ -386,16 +386,16 @@ private fun StatTile(label: String, value: String, modifier: Modifier = Modifier
 
 private fun stitchFrames(ctx: android.content.Context, paths: List<String>): String? {
     if (paths.isEmpty()) return null
-    Log.i("Stitcher", "=== PANORAMA STITCHING ===")
+    Log.i("Stitcher", "=== PANORAMA STITCHING PIPELINE ===")
     Log.i("Stitcher", "Input: ${paths.size} frames")
 
-    // Step 1: Load frames at reasonable size
+    // ── Step 1: Load frames ──────────────────────────────
     val targetH = 800
     val rawFrames = paths.mapNotNull { p ->
         try {
             val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
             BitmapFactory.decodeFile(p, opts)
-            Log.i("Stitcher", "  Frame file: ${opts.outWidth}x${opts.outHeight} — $p")
+            Log.i("Stitcher", "  Raw frame: ${opts.outWidth}x${opts.outHeight} — $p")
             val sample = (opts.outHeight / targetH).coerceAtLeast(1)
             BitmapFactory.decodeFile(p, BitmapFactory.Options().apply { inSampleSize = sample })
         } catch (e: Exception) { Log.e("Stitcher", "Load failed: $p"); null }
@@ -404,66 +404,133 @@ private fun stitchFrames(ctx: android.content.Context, paths: List<String>): Str
     if (rawFrames.size < 2) { Log.e("Stitcher", "Not enough: ${rawFrames.size}"); rawFrames.forEach { it.recycle() }; return null }
     Log.i("Stitcher", "Loaded ${rawFrames.size} frames, first: ${rawFrames[0].width}x${rawFrames[0].height}")
 
-    // Step 2: Estimate focal length from image width
-    // Typical phone camera FOV ~60-70°. f = w / (2 * tan(FOV/2))
-    // For FOV=63°: f ≈ w * 0.84
-    val f = rawFrames[0].width * 0.84
-    Log.i("Stitcher", "Estimated focal length: ${"%.0f".format(f)} (from width ${rawFrames[0].width})")
-
-    // Step 3: Warp each frame to cylindrical projection
-    // This removes perspective distortion so horizontal lines stay horizontal
-    val warpedFrames = rawFrames.mapIndexed { i, frame ->
-        val warped = cylindricalWarp(frame, f)
-        Log.i("Stitcher", "Cylindrical warp frame $i: ${frame.width}x${frame.height} → ${warped.width}x${warped.height}")
-        frame.recycle()
-        warped
+    // Save raw frames for debug
+    val debugDir = File(ctx.cacheDir, "stitch_debug"); debugDir.mkdirs()
+    rawFrames.forEachIndexed { i, f ->
+        val out = File(debugDir, "raw_frame_$i.jpg")
+        FileOutputStream(out).use { f.compress(Bitmap.CompressFormat.JPEG, 90, it) }
+        Log.i("Stitcher", "  Saved raw frame $i: ${f.width}x${f.height} → ${out.absolutePath}")
     }
 
-    // Step 4: Find overlap between consecutive warped frames
-    val overlaps = mutableListOf<Int>()
-    for (i in 0 until warpedFrames.size - 1) {
-        val overlap = findOverlap(warpedFrames[i], warpedFrames[i + 1])
-        overlaps.add(overlap)
-        Log.i("Stitcher", "Pair $i→${i+1}: overlap = ${overlap}px")
+    // ── Step 2: Detect features in each frame ─────────────
+    val f = rawFrames[0].width * 0.84 // estimated focal length
+    Log.i("Stitcher", "Focal length: ${"%.0f".format(f)}")
+
+    val allKeypoints = mutableListOf<List<FeaturePoint>>()
+    val allDescriptors = mutableListOf<List<IntArray>>()
+    for (i in rawFrames.indices) {
+        val gray = toGrayscale(rawFrames[i])
+        val kp = detectCorners(gray, maxCorners = 300)
+        val desc = computeBriefLikeDescriptors(gray, kp)
+        allKeypoints.add(kp)
+        allDescriptors.add(desc)
+        Log.i("Stitcher", "Frame $i: ${kp.size} keypoints detected")
+        gray.recycle()
     }
 
-    // Step 5: Compute intermediate canvas width from overlaps
-    var intermediateW = warpedFrames[0].width
-    for (i in 1 until warpedFrames.size) { intermediateW += warpedFrames[i].width - overlaps[i - 1] }
-    val intermediateH = warpedFrames[0].height
-    Log.i("Stitcher", "Intermediate canvas: ${intermediateW}x${intermediateH}")
+    // ── Step 3: Match consecutive pairs ───────────────────
+    // cumulativeTransforms[i] maps frame i → frame 0 coordinate space
+    val cumulativeTransforms = mutableListOf(doubleArrayOf(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0)) // identity
 
-    // Step 6: Composite warped frames onto intermediate canvas
-    val intermediate = Bitmap.createBitmap(intermediateW, intermediateH, Bitmap.Config.ARGB_8888)
-    val g = Canvas(intermediate)
-    var xOff = 0
-    for (i in warpedFrames.indices) {
-        val f = warpedFrames[i]
-        val overlap = if (i > 0) overlaps[i - 1] else 0
-        if (i == 0) {
-            g.drawBitmap(f, 0f, 0f, null)
-            xOff = f.width
-        } else {
-            val srcX = overlap
-            g.drawBitmap(f, android.graphics.Rect(srcX, 0, f.width, f.height), RectF(xOff.toFloat(), 0f, (xOff + f.width - srcX).toFloat(), intermediateH.toFloat()), null)
-            xOff += f.width - srcX
+    for (i in 0 until rawFrames.size - 1) {
+        val matches = matchFeatures(allKeypoints[i], allDescriptors[i], allKeypoints[i + 1], allDescriptors[i + 1])
+        Log.i("Stitcher", "Pair $i→${i + 1}: ${matches.size} feature matches")
+
+        if (matches.size < 10) {
+            Log.w("Stitcher", "Pair $i→${i + 1}: TOO FEW matches, using identity")
+            cumulativeTransforms.add(cumulativeTransforms.last().clone())
+            continue
+        }
+
+        // Compute homography with RANSAC
+        val srcPts = matches.map { allKeypoints[i][it.first] }
+        val dstPts = matches.map { allKeypoints[i + 1][it.second] }
+        val homography = ransacHomography(srcPts, dstPts, iterations = 2000, threshold = 5.0)
+
+        if (homography == null) {
+            Log.w("Stitcher", "Pair $i→${i + 1}: RANSAC failed, using identity")
+            cumulativeTransforms.add(cumulativeTransforms.last().clone())
+            continue
+        }
+
+        // Chain: cumulative[i+1] = H * cumulative[i]
+        val chained = multiplyHomographies(homography, cumulativeTransforms.last())
+        cumulativeTransforms.add(chained)
+        Log.i("Stitcher", "Pair $i→${i + 1}: homography computed and chained")
+    }
+
+    // ── Step 4: Find canvas bounds ────────────────────────
+    var minX = 0.0; var minY = 0.0; var maxX = 0.0; var maxY = 0.0
+    for (i in rawFrames.indices) {
+        val w = rawFrames[i].width.toDouble()
+        val h = rawFrames[i].height.toDouble()
+        val corners = arrayOf(doubleArrayOf(0.0, 0.0, 1.0), doubleArrayOf(w, 0.0, 1.0), doubleArrayOf(w, h, 1.0), doubleArrayOf(0.0, h, 1.0))
+        val H = cumulativeTransforms[i]
+        for (c in corners) {
+            val x = H[0] * c[0] + H[1] * c[1] + H[2] * c[2]
+            val y = H[3] * c[0] + H[4] * c[1] + H[5] * c[2]
+            val z = H[6] * c[0] + H[7] * c[1] + H[8] * c[2]
+            val px = x / z; val py = y / z
+            minX = minOf(minX, px); minY = minOf(minY, py)
+            maxX = maxOf(maxX, px); maxY = maxOf(maxY, py)
         }
     }
-    warpedFrames.forEach { it.recycle() }
+    val canvasW = (maxX - minX + 1).toInt()
+    val canvasH = (maxY - minY + 1).toInt()
+    Log.i("Stitcher", "Canvas bounds: ${canvasW}x${canvasH}")
 
-    // Step 7: Crop black borders from intermediate
-    val cropped = cropBlackBorders(intermediate)
-    intermediate.recycle()
-    Log.i("Stitcher", "Cropped intermediate: ${cropped.width}x${cropped.height}, ratio: ${"%.2f".format(cropped.width.toFloat() / cropped.height)}")
+    if (canvasW <= 0 || canvasH <= 0 || canvasW * canvasH > 80_000_000) {
+        Log.e("Stitcher", "Invalid or too-large canvas")
+        rawFrames.forEach { it.recycle() }; return null
+    }
 
-    // Step 8: Resize to fixed 2:1 equirectangular (2048x1024)
-    val finalW = 2048
-    val finalH = 1024
+    // Translation to shift all frames to positive coordinates
+    val Tx = -minX; val Ty = -minY
+
+    // ── Step 5: Warp and composite ───────────────────────
+    val canvas = Bitmap.createBitmap(canvasW, canvasH, Bitmap.Config.ARGB_8888)
+    val g = Canvas(canvas)
+    val paint = android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG)
+
+    for (i in rawFrames.indices) {
+        val H = cumulativeTransforms[i]
+        // Full transform: Translation * Homography
+        val fullH = doubleArrayOf(
+            H[0], H[1], H[2] + Tx,
+            H[3], H[4], H[5] + Ty,
+            H[6], H[7], H[8]
+        )
+        val matrix = android.graphics.Matrix()
+        matrix.setValues(fullH.map { it.toFloat() }.toFloatArray())
+
+        g.drawBitmap(rawFrames[i], matrix, paint)
+        Log.i("Stitcher", "Frame $i warped onto canvas")
+    }
+
+    rawFrames.forEach { it.recycle() }
+
+    // Save debug intermediate
+    val debugInter = File(debugDir, "stitched_intermediate.jpg")
+    FileOutputStream(debugInter).use { canvas.compress(Bitmap.CompressFormat.JPEG, 90, it) }
+    Log.i("Stitcher", "Debug intermediate: ${canvasW}x${canvasH} → ${debugInter.absolutePath}")
+
+    // ── Step 6: Crop black borders ───────────────────────
+    val cropped = cropBlackBorders(canvas)
+    canvas.recycle()
+    Log.i("Stitcher", "Cropped: ${cropped.width}x${cropped.height}, ratio: ${"%.2f".format(cropped.width.toFloat() / cropped.height)}")
+
+    // ── Step 7: Resize to 2:1 equirectangular ────────────
+    val finalW = 2048; val finalH = 1024
     val panorama = Bitmap.createScaledBitmap(cropped, finalW, finalH, true)
     cropped.recycle()
-    Log.i("Stitcher", "Final panorama: ${panorama.width}x${panorama.height} (ratio: ${"%.2f".format(panorama.width.toFloat() / panorama.height)})")
+    Log.i("Stitcher", "Final: ${panorama.width}x${panorama.height} (ratio: ${"%.2f".format(panorama.width.toFloat() / panorama.height)})")
 
-    // Step 9: Save
+    // Save debug final
+    val debugFinal = File(debugDir, "panorama_final.jpg")
+    FileOutputStream(debugFinal).use { panorama.compress(Bitmap.CompressFormat.JPEG, 90, it) }
+    Log.i("Stitcher", "Debug final: ${debugFinal.absolutePath}")
+
+    // ── Step 8: Save to cache ────────────────────────────
     try {
         val out = File(ctx.cacheDir, "panorama_${System.currentTimeMillis()}.jpg")
         FileOutputStream(out).use { panorama.compress(Bitmap.CompressFormat.JPEG, 90, it) }
@@ -474,47 +541,232 @@ private fun stitchFrames(ctx: android.content.Context, paths: List<String>): Str
     } catch (e: Exception) { Log.e("Stitcher", "Save failed", e); panorama.recycle(); return null }
 }
 
-/** Warp a perspective image to cylindrical coordinates.
- *  This removes the perspective distortion that causes vertical
- *  lines to converge. After warping, horizontal pixel position
- *  maps linearly to longitude. */
-private fun cylindricalWarp(src: Bitmap, focalLength: Double): Bitmap {
-    val w = src.width
-    val h = src.height
-    val cx = w / 2.0
-    val cy = h / 2.0
+// ═════════════════════════════════════════════════════════════
+//  FEATURE DETECTION + MATCHING + HOMOGRAPHY
+// ═════════════════════════════════════════════════════════════
 
-    // Source pixel array
-    val srcPixels = IntArray(w * h)
-    src.getPixels(srcPixels, 0, w, 0, 0, w, h)
+data class FeaturePoint(val x: Double, val y: Double)
 
-    // Output bitmap — slightly narrower due to cylindrical compression at edges
-    val outW = (2.0 * focalLength * kotlin.math.atan(cx / focalLength)).toInt()
-    val outH = h
-    val result = Bitmap.createBitmap(outW, outH, Bitmap.Config.ARGB_8888)
-    val dstPixels = IntArray(outW * outH)
+/** Convert bitmap to grayscale pixel array */
+private fun toGrayscale(bmp: Bitmap): Bitmap {
+    val result = Bitmap.createBitmap(bmp.width, bmp.height, Bitmap.Config.ARGB_8888)
+    val g = Canvas(result)
+    val paint = android.graphics.Paint()
+    val cm = android.graphics.ColorMatrix().apply { setSaturation(0f) }
+    paint.colorFilter = android.graphics.ColorMatrixColorFilter(cm)
+    g.drawBitmap(bmp, 0f, 0f, paint)
+    return result
+}
 
-    // For each destination pixel, find the corresponding source pixel
-    for (dstY in 0 until outH) {
-        for (dstX in 0 until outW) {
-            // Map destination back to perspective coordinates
-            val theta = (dstX - outW / 2.0) / focalLength // longitude angle
-            val repX = focalLength * kotlin.math.tan(theta) + cx // perspective x
-            val repY = (dstY - cy) * focalLength / kotlin.math.sqrt(focalLength * focalLength + (repX - cx) * (repX - cx)) + cy // perspective y
+/** Get grayscale pixel value (0-255) */
+private fun getGrayPixel(pixels: IntArray, w: Int, x: Int, y: Int): Int {
+    if (x < 0 || x >= w || y < 0) return 0
+    val px = pixels[y * w + x]
+    return (AndroidColor.red(px) + AndroidColor.green(px) + AndroidColor.blue(px)) / 3
+}
 
-            val srcX = repX.toInt()
-            val srcY = repY.toInt()
+/** Detect corner features using a simplified FAST-like detector */
+private fun detectCorners(gray: Bitmap, maxCorners: Int): List<FeaturePoint> {
+    val w = gray.width; val h = gray.height
+    val pixels = IntArray(w * h)
+    gray.getPixels(pixels, 0, w, 0, 0, w, h)
 
-            if (srcX in 0 until w && srcY in 0 until h) {
-                dstPixels[dstY * outW + dstX] = srcPixels[srcY * w + srcX]
+    val threshold = 30
+    val candidates = mutableListOf<FeaturePoint>()
+
+    // Sample a grid of candidate positions
+    val step = 8
+    for (y in 16 until h - 16 step step) {
+        for (x in 16 until w - 16 step step) {
+            val center = getGrayPixel(pixels, w, x, y)
+            // Check 16 surrounding points (FAST-16 pattern)
+            var brighter = 0; var darker = 0
+            val offsets = intArrayOf(-8, -4, 0, 4, 8) // simplified: check 8 points on axes + diagonals
+            for (dx in offsets) {
+                for (dy in offsets) {
+                    if (dx == 0 && dy == 0) continue
+                    val neighbor = getGrayPixel(pixels, w, x + dx, y + dy)
+                    if (neighbor > center + threshold) brighter++
+                    if (neighbor < center - threshold) darker++
+                }
             }
-            // else: black (default 0)
+            // Corner: enough points significantly brighter OR darker
+            if (brighter >= 6 || darker >= 6) {
+                candidates.add(FeaturePoint(x.toDouble(), y.toDouble()))
+            }
         }
     }
 
-    result.setPixels(dstPixels, 0, outW, 0, 0, outW, outH)
+    // Non-maximum suppression: keep strongest corners
+    // Sort by "corner strength" (simplified: count of extreme neighbors)
+    val scored = candidates.map { pt ->
+        val cx = pt.x.toInt(); val cy = pt.y.toInt()
+        val center = getGrayPixel(pixels, w, cx, cy)
+        var score = 0
+        for (dx in -4..4 step 2) {
+            for (dy in -4..4 step 2) {
+                val n = getGrayPixel(pixels, w, cx + dx, cy + dy)
+                if (kotlin.math.abs(n - center) > threshold) score++
+            }
+        }
+        Pair(pt, score)
+    }.sortedByDescending { it.second }
+
+    // Keep top N with minimum distance
+    val selected = mutableListOf<FeaturePoint>()
+    val minDist = 15.0
+    for ((pt, _) in scored) {
+        if (selected.size >= maxCorners) break
+        val tooClose = selected.any { kotlin.math.sqrt((it.x - pt.x) * (it.x - pt.x) + (it.y - pt.y) * (it.y - pt.y)) < minDist }
+        if (!tooClose) selected.add(pt)
+    }
+
+    return selected
+}
+
+/** Compute simple binary descriptor (BRIEF-like) for each keypoint */
+private fun computeBriefLikeDescriptors(gray: Bitmap, keypoints: List<FeaturePoint>): List<IntArray> {
+    val w = gray.width; val h = gray.height
+    val pixels = IntArray(w * h)
+    gray.getPixels(pixels, 0, w, 0, 0, w, h)
+
+    val descriptorSize = 32 // 32 bytes = 256 bits
+    val sampleRadius = 12
+
+    return keypoints.map { kp ->
+        val cx = kp.x.toInt(); val cy = kp.y.toInt()
+        val desc = IntArray(descriptorSize)
+        for (byteIdx in 0 until descriptorSize) {
+            var bits = 0
+            for (bitIdx in 0 until 8) {
+                // Random-ish sample pairs (deterministic from keypoint position)
+                val seed = cx * 31 + cy * 17 + byteIdx * 7 + bitIdx * 13
+                val dx1 = (seed % (sampleRadius * 2)) - sampleRadius
+                val dy1 = ((seed / sampleRadius) % (sampleRadius * 2)) - sampleRadius
+                val dx2 = ((seed * 3) % (sampleRadius * 2)) - sampleRadius
+                val dy2 = (((seed * 3) / sampleRadius) % (sampleRadius * 2)) - sampleRadius
+                val p1 = getGrayPixel(pixels, w, cx + dx1, cy + dy1)
+                val p2 = getGrayPixel(pixels, w, cx + dx2, cy + dy2)
+                if (p1 > p2) bits = bits or (1 shl bitIdx)
+            }
+            desc[byteIdx] = bits
+        }
+        desc
+    }
+}
+
+/** Match features between two frames using descriptor hamming distance */
+private fun matchFeatures(
+    kp1: List<FeaturePoint>, desc1: List<IntArray>,
+    kp2: List<FeaturePoint>, desc2: List<IntArray>
+): List<Pair<Int, Int>> {
+    if (desc1.isEmpty() || desc2.isEmpty()) return emptyList()
+
+    val matches = mutableListOf<Pair<Int, Int>>()
+    for (i in desc1.indices) {
+        var bestDist = Int.MAX_VALUE; var bestJ = -1
+        var secondDist = Int.MAX_VALUE
+        for (j in desc2.indices) {
+            var dist = 0
+            for (k in desc1[i].indices) {
+                dist += Integer.bitCount(desc1[i][k] xor desc2[j][k])
+            }
+            if (dist < bestDist) { secondDist = bestDist; bestDist = dist; bestJ = j }
+            else if (dist < secondDist) { secondDist = dist }
+        }
+        // Lowe's ratio test
+        if (bestJ >= 0 && bestDist < 0.75f * secondDist && bestDist < 60) {
+            matches.add(Pair(i, bestJ))
+        }
+    }
+    return matches
+}
+
+/** Compute homography using RANSAC + DLT */
+private fun ransacHomography(src: List<FeaturePoint>, dst: List<FeaturePoint>, iterations: Int, threshold: Double): DoubleArray? {
+    if (src.size < 4) return null
+
+    var bestH = doubleArrayOf(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0)
+    var bestInliers = 0
+
+    val rng = java.util.Random(42)
+    for (iter in 0 until iterations) {
+        // Pick 4 random correspondences
+        val idx = (0 until src.size).shuffled(rng).take(4)
+        val s = idx.map { src[it] }
+        val d = idx.map { dst[it] }
+
+        val H = computeHomographyDLT(s, d) ?: continue
+
+        // Count inliers
+        var inliers = 0
+        for (i in src.indices) {
+            val px = H[0] * src[i].x + H[1] * src[i].y + H[2]
+            val py = H[3] * src[i].x + H[4] * src[i].y + H[5]
+            val pz = H[6] * src[i].x + H[7] * src[i].y + H[8]
+            val projX = px / pz; val projY = py / pz
+            val err = kotlin.math.sqrt((projX - dst[i].x) * (projX - dst[i].x) + (projY - dst[i].y) * (projY - dst[i].y))
+            if (err < threshold) inliers++
+        }
+
+        if (inliers > bestInliers) { bestInliers = inliers; bestH = H }
+    }
+
+    Log.i("Stitcher", "  RANSAC: best inliers = $bestInliers/${src.size}")
+    return if (bestInliers >= 4) bestH else null
+}
+
+/** Compute homography from 4 point correspondences using DLT */
+private fun computeHomographyDLT(src: List<FeaturePoint>, dst: List<FeaturePoint>): DoubleArray? {
+    if (src.size != 4 || dst.size != 4) return null
+
+    // Build 8x9 matrix A from the 4 correspondences
+    val A = Array(8) { DoubleArray(9) }
+    for (i in 0..3) {
+        val sx = src[i].x; val sy = src[i].y
+        val dx = dst[i].x; val dy = dst[i].y
+        A[i * 2] = doubleArrayOf(sx, sy, 1.0, 0.0, 0.0, 0.0, -dx * sx, -dx * sy, -dx)
+        A[i * 2 + 1] = doubleArrayOf(0.0, 0.0, 0.0, sx, sy, 1.0, -dy * sx, -dy * sy, -dy)
+    }
+
+    // Solve via Gaussian elimination
+    val n = 8; val m = 9
+    for (col in 0 until n) {
+        // Find pivot
+        var maxRow = col
+        for (row in col + 1 until n) { if (kotlin.math.abs(A[row][col]) > kotlin.math.abs(A[maxRow][col])) maxRow = row }
+        val tmp = A[col]; A[col] = A[maxRow]; A[maxRow] = tmp
+        if (kotlin.math.abs(A[col][col]) < 1e-10) return null
+        // Eliminate below
+        for (row in col + 1 until n) {
+            val factor = A[row][col] / A[col][col]
+            for (j in col until m) { A[row][j] -= factor * A[col][j] }
+        }
+    }
+    // Back-substitute
+    val H = DoubleArray(9)
+    for (i in n - 1 downTo 0) {
+        H[i] = A[i][n]
+        for (j in i + 1 until n) { H[i] -= A[i][j] * H[j] }
+        H[i] /= A[i][i]
+    }
+    return H
+}
+
+/** Multiply two 3x3 homography matrices */
+private fun multiplyHomographies(a: DoubleArray, b: DoubleArray): DoubleArray {
+    val result = DoubleArray(9)
+    for (row in 0..2) {
+        for (col in 0..2) {
+            result[row * 3 + col] = a[row * 3] * b[col] + a[row * 3 + 1] * b[3 + col] + a[row * 3 + 2] * b[6 + col]
+        }
+    }
     return result
 }
+
+// ═════════════════════════════════════════════════════════════
+//  LEGACY: SAD overlap detection (kept as fallback reference)
+// ═════════════════════════════════════════════════════════════
 
 /** Find overlap: how many pixels from right of A match left of B via SAD */
 private fun findOverlap(a: Bitmap, b: Bitmap): Int {
