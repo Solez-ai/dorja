@@ -205,6 +205,7 @@ fun RoomScannerScreen(
                     currentHeading = ((yawDegrees % 360f) + 360f) % 360f
                 }
             }
+
             override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
         }
         sensorManager?.registerListener(listener, rotationVector, SensorManager.SENSOR_DELAY_GAME)
@@ -254,7 +255,10 @@ fun RoomScannerScreen(
                         override fun onImageSaved(output: ImageCapture.OutputFileResults) {
                             val savedUri = output.savedUri
                             val path = savedUri?.toString()
-                                ?: File(context.cacheDir, "pano_${target}_${System.currentTimeMillis()}.jpg").absolutePath
+                                ?: File(
+                                    context.cacheDir,
+                                    "pano_${target}_${System.currentTimeMillis()}.jpg"
+                                ).absolutePath
                             if (path !in framePaths) {
                                 framePaths.add(path)
                                 capturedAngles.add(target)
@@ -270,6 +274,7 @@ fun RoomScannerScreen(
                                 }
                             }
                         }
+
                         override fun onError(exception: ImageCaptureException) {
                             Log.e("RoomScanner", "Capture failed: ${exception.message}", exception)
                         }
@@ -301,6 +306,7 @@ fun RoomScannerScreen(
                 },
                 onBack = onBack
             )
+
             ScanPhase.PRE_CAPTURE -> PreCapturePhase(
                 imageCapture = imageCapture,
                 onImageCaptureReady = { imageCapture = it },
@@ -311,6 +317,7 @@ fun RoomScannerScreen(
                 onStartScan = { phase = ScanPhase.SCANNING },
                 onBack = { phase = ScanPhase.ROOM_SELECT }
             )
+
             ScanPhase.SCANNING -> ScanningPhase(
                 imageCapture = imageCapture,
                 onImageCaptureReady = { imageCapture = it },
@@ -328,6 +335,7 @@ fun RoomScannerScreen(
                 onStop = { phase = ScanPhase.RESULT },
                 onBack = { phase = ScanPhase.PRE_CAPTURE }
             )
+
             ScanPhase.RESULT -> ResultPhase(
                 roomName = selectedRoom?.displayName ?: "Room",
                 frameCount = framePaths.size,
@@ -377,7 +385,12 @@ private fun RoomSelectPhase(
                 }
                 Spacer(modifier = Modifier.width(12.dp))
                 Column {
-                    Text("Select Room to Scan", style = MaterialTheme.typography.titleLarge, color = DorjaColors.White, fontWeight = FontWeight.Bold)
+                    Text(
+                        "Select Room to Scan",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = DorjaColors.White,
+                        fontWeight = FontWeight.Bold
+                    )
                     Text("3D Panorama Scanner", style = MaterialTheme.typography.bodySmall, color = CyanAccent)
                 }
             }
@@ -395,8 +408,18 @@ private fun RoomSelectPhase(
                     Icon(Icons.Default.ViewInAr, null, tint = CyanAccent, modifier = Modifier.size(20.dp))
                     Spacer(modifier = Modifier.width(10.dp))
                     Column {
-                        Text("Cylindrical 360° Panorama", style = MaterialTheme.typography.titleSmall, color = DorjaColors.White, fontWeight = FontWeight.Bold)
-                        Text("Captures 12 real frames at 30° intervals using CameraX", style = MaterialTheme.typography.bodySmall, color = DorjaColors.Sand300, fontSize = 11.sp)
+                        Text(
+                            "Cylindrical 360° Panorama",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = DorjaColors.White,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            "Captures 12 real frames at 30° intervals using CameraX",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = DorjaColors.Sand300,
+                            fontSize = 11.sp
+                        )
                     }
                 }
             }
@@ -406,10 +429,19 @@ private fun RoomSelectPhase(
             if (rooms.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(Icons.Default.MeetingRoom, null, tint = DorjaColors.Gray500, modifier = Modifier.size(48.dp))
+                        Icon(
+                            Icons.Default.MeetingRoom,
+                            null,
+                            tint = DorjaColors.Gray500,
+                            modifier = Modifier.size(48.dp)
+                        )
                         Spacer(modifier = Modifier.height(12.dp))
                         Text("No Rooms Added", style = MaterialTheme.typography.titleMedium, color = DorjaColors.White)
-                        Text("Add rooms to your listing first", style = MaterialTheme.typography.bodySmall, color = DorjaColors.Sand300)
+                        Text(
+                            "Add rooms to your listing first",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = DorjaColors.Sand300
+                        )
                     }
                 }
             } else {
@@ -439,16 +471,31 @@ private fun RoomSelectPhase(
                                 }
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Column(modifier = Modifier.weight(1f)) {
-                                    Text(room.displayName, style = MaterialTheme.typography.titleSmall, color = DorjaColors.White, fontWeight = FontWeight.Bold)
+                                    Text(
+                                        room.displayName,
+                                        style = MaterialTheme.typography.titleSmall,
+                                        color = DorjaColors.White,
+                                        fontWeight = FontWeight.Bold
+                                    )
                                     Text(
                                         room.roomType.replace("_", " ").lowercase().replaceFirstChar { it.uppercase() },
-                                        style = MaterialTheme.typography.bodySmall, color = DorjaColors.Sand300, fontSize = 11.sp
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = DorjaColors.Sand300,
+                                        fontSize = 11.sp
                                     )
                                 }
                                 if (room.has3DScan) {
-                                    DorjaBadge(text = "SCANNED", backgroundColor = CyanAccent.copy(alpha = 0.2f), textColor = CyanAccent)
+                                    DorjaBadge(
+                                        text = "SCANNED",
+                                        backgroundColor = CyanAccent.copy(alpha = 0.2f),
+                                        textColor = CyanAccent
+                                    )
                                 } else {
-                                    DorjaButton(text = "Scan 3D", onClick = { onSelect(room) }, modifier = Modifier.height(32.dp))
+                                    DorjaButton(
+                                        text = "Scan 3D",
+                                        onClick = { onSelect(room) },
+                                        modifier = Modifier.height(32.dp)
+                                    )
                                 }
                             }
                         }
@@ -482,17 +529,7 @@ private fun PreCapturePhase(
         try {
             val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
             val cameraProvider = cameraProviderFuture.get()
-            val preview = Preview.Builder().build().also {
-                it.setSurfaceProvider(
-                    PreviewView(context).also { pv -> onImageCaptureReady(
-                        ImageCapture.Builder()
-                            .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
-                            .setTargetRotation(android.view.Surface.ROTATION_0)
-                            .build()
-                    ) }
-                )
-            }
-            // Actually bind properly
+
             val previewView = PreviewView(context)
             val previewUseCase = Preview.Builder().build().also {
                 it.setSurfaceProvider(previewView.surfaceProvider)
@@ -530,7 +567,12 @@ private fun PreCapturePhase(
                             onImageCaptureReady(capture)
                             try {
                                 cameraProvider.unbindAll()
-                                cameraProvider.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, capture)
+                                cameraProvider.bindToLifecycle(
+                                    lifecycleOwner,
+                                    CameraSelector.DEFAULT_BACK_CAMERA,
+                                    preview,
+                                    capture
+                                )
                             } catch (e: Exception) {
                                 Log.e("RoomScanner", "Bind failed", e)
                             }
@@ -544,7 +586,11 @@ private fun PreCapturePhase(
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(Icons.Default.Warning, null, tint = DorjaColors.Warning, modifier = Modifier.size(48.dp))
                     Spacer(modifier = Modifier.height(12.dp))
-                    Text("Camera permission required", color = DorjaColors.White, style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "Camera permission required",
+                        color = DorjaColors.White,
+                        style = MaterialTheme.typography.titleMedium
+                    )
                     Spacer(modifier = Modifier.height(8.dp))
                     DorjaButton(text = "Grant Permission", onClick = { /* handled by launcher */ })
                 }
@@ -572,12 +618,26 @@ private fun PreCapturePhase(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClick = onBack, modifier = Modifier.size(38.dp).clip(CircleShape).background(Color.Black.copy(alpha = 0.5f))) {
+            IconButton(
+                onClick = onBack,
+                modifier = Modifier.size(38.dp).clip(CircleShape).background(Color.Black.copy(alpha = 0.5f))
+            ) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = Color.White)
             }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("SCANNING", style = MaterialTheme.typography.labelSmall, color = CyanAccent, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
-                Text(roomName, style = MaterialTheme.typography.titleSmall, color = Color.White, fontWeight = FontWeight.Bold)
+                Text(
+                    "SCANNING",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = CyanAccent,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    roomName,
+                    style = MaterialTheme.typography.titleSmall,
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold
+                )
             }
             Spacer(modifier = Modifier.size(38.dp))
         }
@@ -634,7 +694,14 @@ private fun PreCapturePhase(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // "PRESS TO START" label with down-caret
-            Text("PRESS TO START", style = MaterialTheme.typography.labelSmall, color = Color.White, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+            Text(
+                "PRESS TO START",
+                style = MaterialTheme.typography.labelSmall,
+                color = Color.White,
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.sp
+            )
 
             Spacer(modifier = Modifier.height(4.dp))
             Icon(
@@ -675,7 +742,10 @@ private fun PreCapturePhase(
             verticalAlignment = Alignment.CenterVertically
         ) {
             // Settings icon placeholder
-            IconButton(onClick = { }, modifier = Modifier.size(36.dp).clip(CircleShape).background(Color.Black.copy(alpha = 0.4f))) {
+            IconButton(
+                onClick = { },
+                modifier = Modifier.size(36.dp).clip(CircleShape).background(Color.Black.copy(alpha = 0.4f))
+            ) {
                 Icon(Icons.Default.Settings, null, tint = Color.White, modifier = Modifier.size(18.dp))
             }
 
@@ -683,10 +753,16 @@ private fun PreCapturePhase(
             Surface(
                 shape = RoundedCornerShape(20.dp),
                 color = if (gyroEnabled) CyanAccent.copy(alpha = 0.2f) else Color.Black.copy(alpha = 0.4f),
-                border = androidx.compose.foundation.BorderStroke(1.dp, if (gyroEnabled) CyanAccent else Color.White.copy(alpha = 0.3f)),
+                border = androidx.compose.foundation.BorderStroke(
+                    1.dp,
+                    if (gyroEnabled) CyanAccent else Color.White.copy(alpha = 0.3f)
+                ),
                 modifier = Modifier.clickable { onToggleGyro() }
             ) {
-                Row(modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Box(
                         modifier = Modifier.size(8.dp).clip(CircleShape)
                             .background(if (gyroEnabled) CyanAccent else Color.Gray)
@@ -770,7 +846,12 @@ private fun ScanningPhase(
                             onImageCaptureReady(capture)
                             try {
                                 cameraProvider.unbindAll()
-                                cameraProvider.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, capture)
+                                cameraProvider.bindToLifecycle(
+                                    lifecycleOwner,
+                                    CameraSelector.DEFAULT_BACK_CAMERA,
+                                    preview,
+                                    capture
+                                )
                             } catch (e: Exception) {
                                 Log.e("RoomScanner", "Bind failed in scan", e)
                             }
@@ -911,29 +992,55 @@ private fun ScanningPhase(
                         .clip(RoundedCornerShape(8.dp))
                         .background(Color(0xFFE53935))
                 ) {
-                    Icon(Icons.Default.Stop, "Stop", tint = Color.White, modifier = Modifier.size(20.dp).align(Alignment.Center))
+                    Icon(
+                        Icons.Default.Stop,
+                        "Stop",
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp).align(Alignment.Center)
+                    )
                 }
             }
 
             Spacer(modifier = Modifier.width(12.dp))
 
-            Text("PRESS STOP WHEN DONE", style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.7f), fontFamily = FontFamily.Monospace, fontSize = 10.sp)
+            Text(
+                "PRESS STOP WHEN DONE",
+                style = MaterialTheme.typography.labelSmall,
+                color = Color.White.copy(alpha = 0.7f),
+                fontFamily = FontFamily.Monospace,
+                fontSize = 10.sp
+            )
         }
 
         // Gyro toggle (bottom right)
         Surface(
             shape = RoundedCornerShape(20.dp),
             color = if (gyroEnabled) CyanAccent.copy(alpha = 0.2f) else Color.Black.copy(alpha = 0.4f),
-            border = androidx.compose.foundation.BorderStroke(1.dp, if (gyroEnabled) CyanAccent else Color.White.copy(alpha = 0.3f)),
+            border = androidx.compose.foundation.BorderStroke(
+                1.dp,
+                if (gyroEnabled) CyanAccent else Color.White.copy(alpha = 0.3f)
+            ),
             modifier = Modifier
                 .align(Alignment.BottomStart)
                 .padding(bottom = 88.dp, start = 16.dp)
                 .clickable { onToggleGyro() }
         ) {
-            Row(modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(modifier = Modifier.size(6.dp).clip(CircleShape).background(if (gyroEnabled) CyanAccent else Color.Gray))
+            Row(
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier.size(6.dp).clip(CircleShape)
+                        .background(if (gyroEnabled) CyanAccent else Color.Gray)
+                )
                 Spacer(modifier = Modifier.width(4.dp))
-                Text("GYRO", style = MaterialTheme.typography.labelSmall, color = if (gyroEnabled) CyanAccent else Color.Gray, fontFamily = FontFamily.Monospace, fontSize = 9.sp)
+                Text(
+                    "GYRO",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (gyroEnabled) CyanAccent else Color.Gray,
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 9.sp
+                )
             }
         }
     }
@@ -976,7 +1083,12 @@ private fun ResultPhase(
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            Text("Scan Complete", style = MaterialTheme.typography.headlineLarge, color = DorjaColors.White, fontWeight = FontWeight.Bold)
+            Text(
+                "Scan Complete",
+                style = MaterialTheme.typography.headlineLarge,
+                color = DorjaColors.White,
+                fontWeight = FontWeight.Bold
+            )
 
             Spacer(modifier = Modifier.height(6.dp))
 
@@ -1014,8 +1126,19 @@ private fun ResultPhase(
                     Icon(Icons.Default.ViewInAr, null, tint = CyanAccent, modifier = Modifier.size(20.dp))
                     Spacer(modifier = Modifier.width(10.dp))
                     Column {
-                        Text("360° REAL PANORAMA • $frameCount FRAMES STITCHED", style = MaterialTheme.typography.labelSmall, color = CyanAccent, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
-                        Text("Cylindrical panorama saved to $roomName", style = MaterialTheme.typography.bodySmall, color = DorjaColors.Sand300, fontSize = 11.sp)
+                        Text(
+                            "360° REAL PANORAMA • $frameCount FRAMES STITCHED",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = CyanAccent,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            "Cylindrical panorama saved to $roomName",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = DorjaColors.Sand300,
+                            fontSize = 11.sp
+                        )
                     }
                 }
             }
@@ -1250,9 +1373,20 @@ private fun SummaryTile(label: String, value: String, modifier: Modifier = Modif
             modifier = Modifier.padding(12.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(value, style = MaterialTheme.typography.headlineMedium, color = CyanAccent, fontWeight = FontWeight.Bold)
+            Text(
+                value,
+                style = MaterialTheme.typography.headlineMedium,
+                color = CyanAccent,
+                fontWeight = FontWeight.Bold
+            )
             Spacer(modifier = Modifier.height(2.dp))
-            Text(label, style = MaterialTheme.typography.labelSmall, color = DorjaColors.Sand300, fontFamily = FontFamily.Monospace, fontSize = 9.sp)
+            Text(
+                label,
+                style = MaterialTheme.typography.labelSmall,
+                color = DorjaColors.Sand300,
+                fontFamily = FontFamily.Monospace,
+                fontSize = 9.sp
+            )
         }
     }
 }
