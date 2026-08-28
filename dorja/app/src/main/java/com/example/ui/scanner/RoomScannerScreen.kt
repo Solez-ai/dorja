@@ -382,15 +382,26 @@ private fun StatTile(label: String, value: String, modifier: Modifier = Modifier
 
 // ═════════════════════════════════════════════════════════════
 //  STITCHING — pure Android, no OpenCV
-// ═════════════════════════════════════════════════════════════
-
-private fun stitchFrames(ctx: android.content.Context, paths: List<String>): String? {
+// ═════════════════════════════════════════════════════════════private fun stitchFrames(ctx: android.content.Context, paths: List<String>): String? {
     if (paths.isEmpty()) return null
+    return try {
+        stitchFramesInternal(ctx, paths)
+    } catch (e: OutOfMemoryError) {
+        Log.e("Stitcher", "OOM during stitching", e)
+        System.gc()
+        null
+    } catch (e: Exception) {
+        Log.e("Stitcher", "Stitching failed: ${e.message}", e)
+        null
+    }
+}
+
+private fun stitchFramesInternal(ctx: android.content.Context, paths: List<String>): String? {
     Log.i("Stitcher", "=== PANORAMA STITCHING PIPELINE ===")
     Log.i("Stitcher", "Input: ${paths.size} frames")
 
     // ── Step 1: Load frames ──────────────────────────────
-    val targetH = 800
+    val targetH = 600 // reduced for speed/memory
     val rawFrames = paths.mapNotNull { p ->
         try {
             val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
@@ -420,7 +431,7 @@ private fun stitchFrames(ctx: android.content.Context, paths: List<String>): Str
     val allDescriptors = mutableListOf<List<IntArray>>()
     for (i in rawFrames.indices) {
         val gray = toGrayscale(rawFrames[i])
-        val kp = detectCorners(gray, maxCorners = 300)
+        val kp = detectCorners(gray, maxCorners = 150)
         val desc = computeBriefLikeDescriptors(gray, kp)
         allKeypoints.add(kp)
         allDescriptors.add(desc)
@@ -445,7 +456,7 @@ private fun stitchFrames(ctx: android.content.Context, paths: List<String>): Str
         // Compute homography with RANSAC
         val srcPts = matches.map { allKeypoints[i][it.first] }
         val dstPts = matches.map { allKeypoints[i + 1][it.second] }
-        val homography = ransacHomography(srcPts, dstPts, iterations = 2000, threshold = 5.0)
+        val homography = ransacHomography(srcPts, dstPts, iterations = 500, threshold = 5.0)
 
         if (homography == null) {
             Log.w("Stitcher", "Pair $i→${i + 1}: RANSAC failed, using identity")
@@ -479,15 +490,18 @@ private fun stitchFrames(ctx: android.content.Context, paths: List<String>): Str
     val canvasH = (maxY - minY + 1).toInt()
     Log.i("Stitcher", "Canvas bounds: ${canvasW}x${canvasH}")
 
-    if (canvasW <= 0 || canvasH <= 0 || canvasW * canvasH > 80_000_000) {
-        Log.e("Stitcher", "Invalid or too-large canvas")
-        rawFrames.forEach { it.recycle() }; return null
+    if (canvasW <= 0 || canvasH <= 0 || canvasW * canvasH > 40_000_000) {
+        Log.e("Stitcher", "Canvas too large (${canvasW}x${canvasH}), falling back to simple concat")
+        rawFrames.forEach { it.recycle() }
+        return simpleConcatStitch(ctx, paths)
     }
 
     // Translation to shift all frames to positive coordinates
     val Tx = -minX; val Ty = -minY
 
     // ── Step 5: Warp and composite ───────────────────────
+    System.gc() // free memory before large allocation
+    Log.i("Stitcher", "Creating canvas: ${canvasW}x${canvasH} (${canvasW * canvasH * 4 / 1024 / 1024}MB)")
     val canvas = Bitmap.createBitmap(canvasW, canvasH, Bitmap.Config.ARGB_8888)
     val g = Canvas(canvas)
     val paint = android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG)
@@ -807,6 +821,44 @@ private fun cropBlackBorders(bitmap: Bitmap): Bitmap {
     for (x in w - 1 downTo left) { var found = false; for (y in top until bottom step 10) { if (!isBlack(pixels[y * w + x])) { found = true; break } }; if (found) { right = x; break } }
     val cropW = (right - left + 1).coerceAtLeast(1); val cropH = (bottom - top + 1).coerceAtLeast(1)
     return Bitmap.createBitmap(bitmap, left, top, cropW, cropH)
+}
+
+/** Simple concatenation fallback when feature-based stitching fails */
+private fun simpleConcatStitch(ctx: android.content.Context, paths: List<String>): String? {
+    Log.w("Stitcher", "Using simple concatenation fallback")
+    try {
+        val targetH = 600
+        val frames = paths.mapNotNull { p ->
+            try {
+                val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                BitmapFactory.decodeFile(p, opts)
+                val sample = (opts.outHeight / targetH).coerceAtLeast(1)
+                BitmapFactory.decodeFile(p, BitmapFactory.Options().apply { inSampleSize = sample })
+            } catch (_: Exception) { null }
+        }.filter { it != null && !it.isRecycled }.map { it!! }
+        if (frames.isEmpty()) return null
+
+        var totalW = frames.sumOf { it.width }
+        if (totalW > 8000) totalW = 8000
+        val h = frames[0].height
+        val scale = totalW.toFloat() / frames.sumOf { it.width }
+
+        val canvas = Bitmap.createBitmap(totalW, h, Bitmap.Config.ARGB_8888)
+        val g = Canvas(canvas)
+        var x = 0f
+        frames.forEach { f ->
+            val drawW = f.width * scale
+            g.drawBitmap(f, null, RectF(x, 0f, x + drawW, h.toFloat()), null)
+            x += drawW
+        }
+        frames.forEach { it.recycle() }
+
+        val out = File(ctx.cacheDir, "panorama_fallback_${System.currentTimeMillis()}.jpg")
+        FileOutputStream(out).use { canvas.compress(Bitmap.CompressFormat.JPEG, 85, it) }
+        canvas.recycle()
+        Log.i("Stitcher", "Fallback saved: ${out.absolutePath}")
+        return out.absolutePath
+    } catch (e: Exception) { Log.e("Stitcher", "Fallback failed", e); return null }
 }
 
 private fun buildJson(stitchedPath: String?, frames: List<String>, roomId: String): String {
