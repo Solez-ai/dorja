@@ -5,7 +5,6 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
-import android.net.Uri
 import android.util.Log
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -67,10 +66,30 @@ import com.example.ui.components.DorjaButton
 import com.example.ui.theme.DorjaColors
 import org.json.JSONObject
 import java.io.File
+import kotlin.math.PI
+import kotlin.math.abs
+import kotlin.math.atan
 import kotlin.math.roundToInt
 
 private val Accent = Color(0xFF00BCD4)
 
+/**
+ * 360° equirectangular panorama viewer.
+ *
+ * The panorama bitmap is an equirectangular projection where:
+ *   - horizontal axis = longitude (0° to 360°)
+ *   - vertical axis = latitude (-90° to +90°)
+ *   - aspect ratio = 2:1
+ *
+ * For each column on screen, we compute the corresponding longitude angle,
+ * then sample from the panorama using cylindrical projection.
+ *
+ * Supports:
+ *   - Drag-to-pan (touch)
+ *   - Gyroscope auto-rotation
+ *   - Multiple room tabs
+ *   - Seamless horizontal wrap-around
+ */
 @Composable
 fun PanoramaViewerScreen(
     listingId: String,
@@ -107,13 +126,11 @@ fun PanoramaViewerScreen(
             panoramaPath?.let { p ->
                 val f = File(p)
                 if (!f.exists()) return@let null
-                // Decode bounds first to calculate sample size
                 val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
                 BitmapFactory.decodeFile(p, opts)
-                val maxW = 4096 // max width for viewer performance
+                val maxW = 4096
                 val sample = (opts.outWidth / maxW).coerceAtLeast(1)
-                val decodeOpts = BitmapFactory.Options().apply { inSampleSize = sample }
-                BitmapFactory.decodeFile(p, decodeOpts)?.asImageBitmap()
+                BitmapFactory.decodeFile(p, BitmapFactory.Options().apply { inSampleSize = sample })?.asImageBitmap()
             }
         } catch (e: Exception) {
             Log.e("PanoramaViewer", "Failed to load panorama", e)
@@ -121,7 +138,7 @@ fun PanoramaViewerScreen(
         }
     }
 
-    // Pan state — horizontal offset in world units (radians mapped to pixels)
+    // Pan state — panX in panorama-pixel units
     var panX by remember { mutableFloatStateOf(0f) }
     var gyroOn by remember { mutableStateOf(true) }
     var gyroYaw by remember { mutableFloatStateOf(0f) }
@@ -151,13 +168,12 @@ fun PanoramaViewerScreen(
         }
     }
 
-    // Map gyro yaw to pan offset (in radians, matching the Canvas projection)
+    // Map gyro yaw to pan offset
+    // yaw = 0° → look at the center of the panorama (panoX = bmpW/2 → lon = 0)
     LaunchedEffect(gyroYaw, gyroOn, bitmap) {
         if (!gyroOn || bitmap == null) return@LaunchedEffect
-        // Convert yaw degrees to radians for the projection
         val yawRad = Math.toRadians(gyroYaw.toDouble()).toFloat()
-        // panX is in "panorama pixel units" where f pixels = 1 radian
-        val f = bitmap.width.toFloat() / (2.0f * Math.PI.toFloat())
+        val f = bitmap.width.toFloat() / (2f * PI.toFloat())
         panX = yawRad * f
     }
 
@@ -172,21 +188,14 @@ fun PanoramaViewerScreen(
         } else {
             val bmp = bitmap
 
-            // ── Equirectangular → Sphere projection ──────────
-            // Each pixel on screen maps to a point on the inside of a sphere.
-            // The panorama texture is an equirectangular map:
-            //   U (0..1) = longitude (0..360°)
-            //   V (0..1) = latitude (90°N..90°S)
+            // ── Cylindrical projection viewer ──────────────
+            // Each screen column maps to a longitude angle on the sphere.
+            // We sample the panorama bitmap at the corresponding position.
             //
-            // For a cylindrical projection viewer:
-            //   screen column x → longitude = panX + (x / screenW) * 360°
-            //   screen row y    → latitude  = 90° - (y / screenH) * 180°
-            //
-            // Source pixel:
-            //   srcU = (longitude mod 360) / 360
-            //   srcV = (90 - latitude) / 180
-            //   srcX = srcU * bmpW
-            //   srcY = srcV * bmpH
+            // Focal length f = bmpW / (2π) — maps radians to panorama pixels
+            // Screen column sx → angle = atan((sx - cw/2) / f) relative to center
+            // Lon = angle + panX/f (panX is in panorama-pixel units)
+            // Source X = f × lon + bmpW/2
 
             Canvas(
                 Modifier
@@ -194,7 +203,7 @@ fun PanoramaViewerScreen(
                     .pointerInput(Unit) {
                         detectDragGestures { change, drag ->
                             change.consume()
-                            panX += drag.x // drag right = look right
+                            panX -= drag.x // drag left = look left (natural feel)
                         }
                     }
             ) {
@@ -203,37 +212,29 @@ fun PanoramaViewerScreen(
                 val bmpW = bmp.width.toFloat()
                 val bmpH = bmp.height.toFloat()
 
-                // Focal length: how much panorama pixels = 1 radian
-                // The panorama's horizontal extent maps to some total angle.
-                // For a proper equirectangular: totalAngle = 2π (360°)
-                //   and bmpW = totalAngle * f, so f = bmpW / 2π
-                // For a concatenated panorama: we don't know the total angle,
-                // but we can still use f = bmpW / 2π as an approximation
-                // and let the user drag to look around.
-                val f = bmpW / (2.0 * Math.PI).toFloat()
-
-                // Horizontal FOV of the viewport
-                val hfov = 2.0f * kotlin.math.atan(cw / (2.0f * f))
+                // Focal length: bmpW pixels = 2π radians (360°)
+                val f = bmpW / (2f * PI.toFloat())
 
                 // Draw vertical strips with cylindrical projection
                 val stripW = 2f
                 var sx = 0f
                 while (sx < cw) {
-                    // Screen column to longitude angle
-                    val screenAngle = kotlin.math.atan((sx - cw / 2f) / f)
-                    val lon = screenAngle + panX / f // panX is in panorama-pixel units
+                    // Screen column → longitude angle
+                    val screenAngle = atan((sx - cw / 2f) / f)
+                    val lon = screenAngle + panX / f
 
                     // Source X in panorama bitmap
+                    // lon = 0 → center of bitmap (bmpW/2)
+                    // lon = -π → left edge (0)
+                    // lon = +π → right edge (bmpW)
                     val srcX = (f * lon + bmpW / 2f).toInt()
                     // Wrap around for seamless panorama
                     val srcXWrapped = ((srcX % bmpW.toInt()) + bmpW.toInt()) % bmpW.toInt()
 
-                    // Source Y: sample the center band (vertically)
-                    // For a 2:1 equirectangular, the center half = ±45° latitude
-                    val srcYCenter = (bmpH / 2f).toInt()
-                    val srcYRange = (bmpH * 0.4f).toInt() // show 80% of height
-                    val srcY = (srcYCenter - srcYRange / 2).coerceAtLeast(0)
-                    val srcH = srcYRange.coerceAtMost(bmpH.toInt() - srcY)
+                    // Source Y: sample the full height of the panorama
+                    // For a 2:1 equirectangular, the vertical axis is latitude
+                    val srcY = 0
+                    val srcH = bmpH.toInt()
 
                     if (srcXWrapped in 0 until bmpW.toInt() && srcH > 0) {
                         drawImage(
