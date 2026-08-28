@@ -45,12 +45,10 @@ googleid = "1.1.1"
 
 zxing = "3.5.3"
 arcore = "1.47.0"
-panoramaimageview = "1.0"
 
 [libraries]
 zxing-core = { group = "com.google.zxing", name = "core", version.ref = "zxing" }
 arcore = { group = "com.google.ar", name = "core", version.ref = "arcore" }
-panoramaimageview = { group = "com.github.gjiazhe", name = "PanoramaImageView", version.ref = "panoramaimageview" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }

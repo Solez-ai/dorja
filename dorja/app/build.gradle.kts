@@ -106,7 +106,6 @@ dependencies {
   implementation(libs.androidx.camera.core)
   implementation(libs.androidx.camera.lifecycle)
   implementation(libs.androidx.camera.view)
-  implementation(libs.panoramaimageview)
   implementation(libs.coil.compose)
   implementation(libs.converter.moshi)
 
