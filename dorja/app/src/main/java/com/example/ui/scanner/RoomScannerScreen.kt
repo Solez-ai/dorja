@@ -19,6 +19,7 @@ import android.os.VibratorManager
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.camera.core.AspectRatio
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
@@ -183,7 +184,10 @@ fun RoomScannerScreen(
                 ic.takePicture(ImageCapture.OutputFileOptions.Builder(file).build(), ContextCompat.getMainExecutor(ctx), object : ImageCapture.OnImageSavedCallback {
                     override fun onImageSaved(output: ImageCapture.OutputFileResults) {
                         capturedFrames.add(FrameData(file.absolutePath, capturedHeading))
-                        Log.i("Scanner", "Captured frame ${capturedFrames.size}: heading=${"%.1f".format(capturedHeading)}° path=${file.name}")
+                        // Log actual captured frame dimensions to diagnose zoom
+                        val dimOpts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                        BitmapFactory.decodeFile(file.absolutePath, dimOpts)
+                        Log.i("Scanner", "Captured frame ${capturedFrames.size}: ${dimOpts.outWidth}×${dimOpts.outHeight} heading=${"%.1f".format(capturedHeading)}° path=${file.name}")
                         vibrateShutter(ctx)
                         currentTarget = (currentTarget + 1).coerceAtMost(TOTAL_SHOTS)
                     }
@@ -354,7 +358,31 @@ private fun DonePhase(roomName: String, frameCount: Int, onSave: () -> Unit, onR
 @Composable
 private fun CameraPreview(imageCapture: ImageCapture?, onCaptureReady: (ImageCapture) -> Unit, hasCamera: Boolean, lifecycleOwner: androidx.lifecycle.LifecycleOwner) {
     if (!hasCamera) { Box(Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) { Column(horizontalAlignment = Alignment.CenterHorizontally) { Icon(Icons.Default.Warning, null, tint = Color(0xFFFF9800), modifier = Modifier.size(48.dp)); Spacer(Modifier.height(12.dp)); Text("Camera permission required", color = Color.White, style = MaterialTheme.typography.titleMedium) } }; return }
-    AndroidView(factory = { ctx -> PreviewView(ctx).also { pv -> ProcessCameraProvider.getInstance(ctx).addListener({ val p = pv; val cp = ProcessCameraProvider.getInstance(ctx).get(); val preview = Preview.Builder().build().also { it.setSurfaceProvider(p.surfaceProvider) }; val capture = ImageCapture.Builder().setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY).build(); onCaptureReady(capture); try { cp.unbindAll(); cp.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, capture) } catch (e: Exception) { Log.e("Scanner", "Camera bind failed", e) } }, ContextCompat.getMainExecutor(ctx)) } }, modifier = Modifier.fillMaxSize())
+    AndroidView(factory = { ctx ->
+        PreviewView(ctx).also { pv ->
+            ProcessCameraProvider.getInstance(ctx).addListener({
+                val cp = ProcessCameraProvider.getInstance(ctx).get()
+                // Use 4:3 aspect ratio to get widest sensor FOV.
+                // Most phone sensors are natively 4:3; 16:9 is a crop.
+                val preview = Preview.Builder()
+                    .setTargetAspectRatio(AspectRatio.RATIO_4_3)
+                    .build()
+                    .also { it.setSurfaceProvider(pv.surfaceProvider) }
+                val capture = ImageCapture.Builder()
+                    .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
+                    .setTargetAspectRatio(AspectRatio.RATIO_4_3)
+                    .build()
+                onCaptureReady(capture)
+                try {
+                    cp.unbindAll()
+                    val camera = cp.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, capture)
+                    val info = camera.cameraInfo
+                    Log.i("Scanner", "Camera bound: id=${info.cameraId} lens=${info.lensFacing} zoom=${info.zoomState.value?.zoomRatio}")
+                    Log.i("Scanner", "ImageCapture target aspect: 4:3 (widest sensor FOV)")
+                } catch (e: Exception) { Log.e("Scanner", "Camera bind failed", e) }
+            }, ContextCompat.getMainExecutor(ctx))
+        }
+    }, modifier = Modifier.fillMaxSize())
 }
 
 @Composable
