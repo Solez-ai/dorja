@@ -503,10 +503,13 @@ fun CreateListingScreen(
                     ) { uri ->
                         if (uri != null) {
                             try {
-                                val inputStream = ctx.contentResolver.openInputStream(uri)
-                                val bmp = BitmapFactory.decodeStream(inputStream)
-                                inputStream?.close()
-                                if (bmp != null) {
+                                // Decode bounds first to avoid OOM on huge images
+                                val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                                ctx.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, opts) }
+                                val sampleSize = (opts.outHeight / 2048).coerceAtLeast(1)
+                                val decodeOpts = BitmapFactory.Options().apply { inSampleSize = sampleSize }
+                                val bmp = ctx.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, decodeOpts) }
+                                if (bmp != null && !bmp.isRecycled) {
                                     val croppedFile = autoCropToFourFive(ctx, bmp)
                                     if (croppedFile != null) {
                                         photoAssignments.add(
@@ -526,17 +529,22 @@ fun CreateListingScreen(
                     val cameraLauncher = rememberLauncherForActivityResult(
                         contract = ActivityResultContracts.TakePicturePreview()
                     ) { bitmap ->
-                        if (bitmap != null) {
-                            val croppedFile = autoCropToFourFive(ctx, bitmap)
-                            if (croppedFile != null) {
-                                photoAssignments.add(
-                                    PhotoAssignmentItem(
-                                        url = "file://${croppedFile.absolutePath}",
-                                        caption = customCaptionInput.ifBlank { "Photo ${photoAssignments.size + 1}" },
-                                        assignedRoomId = selectedRoomForNewPhoto
+                        try {
+                            if (bitmap != null && !bitmap.isRecycled && bitmap.width > 0 && bitmap.height > 0) {
+                                val croppedFile = autoCropToFourFive(ctx, bitmap)
+                                if (croppedFile != null) {
+                                    photoAssignments.add(
+                                        PhotoAssignmentItem(
+                                            url = "file://${croppedFile.absolutePath}",
+                                            caption = customCaptionInput.ifBlank { "Photo ${photoAssignments.size + 1}" },
+                                            assignedRoomId = selectedRoomForNewPhoto
+                                        )
                                     )
-                                )
+                                }
                             }
+                        } catch (_: Exception) {
+                            // Camera capture failed — silently ignore
+                        } finally {
                             customCaptionInput = ""
                         }
                     }
@@ -2231,6 +2239,8 @@ private fun CounterBox(
  */
 private fun autoCropToFourFive(context: android.content.Context, bitmap: Bitmap): java.io.File? {
     return try {
+        if (bitmap.width < 2 || bitmap.height < 2) return null
+
         val ratio = 4f / 5f
         val cropW: Int
         val cropH: Int
@@ -2241,14 +2251,16 @@ private fun autoCropToFourFive(context: android.content.Context, bitmap: Bitmap)
             cropW = bitmap.width
             cropH = (bitmap.width / ratio).toInt()
         }
-        val x = (bitmap.width - cropW) / 2
-        val y = (bitmap.height - cropH) / 2
+        val safeW = cropW.coerceIn(2, bitmap.width)
+        val safeH = cropH.coerceIn(2, bitmap.height)
+        val x = ((bitmap.width - safeW) / 2).coerceAtLeast(0)
+        val y = ((bitmap.height - safeH) / 2).coerceAtLeast(0)
         val cropped = Bitmap.createBitmap(
             bitmap,
-            max(0, x),
-            max(0, y),
-            min(cropW, bitmap.width),
-            min(cropH, bitmap.height)
+            x,
+            y,
+            min(safeW, bitmap.width - x),
+            min(safeH, bitmap.height - y)
         )
         val file = java.io.File(context.cacheDir, "photo_4x5_${System.currentTimeMillis()}.jpg")
         java.io.FileOutputStream(file).use { out ->
