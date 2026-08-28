@@ -126,6 +126,18 @@ fun RoomScannerScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     val scope = rememberCoroutineScope()
 
+    // Initialize OpenCV
+    LaunchedEffect(Unit) {
+        try {
+            if (!org.opencv.core.Core.NATIVE_LIBRARY_NAME.isNullOrEmpty()) {
+                org.opencv.android.OpenCVLoader.initLocal()
+                Log.i("Scanner", "OpenCV initialized successfully")
+            }
+        } catch (e: Exception) {
+            Log.e("Scanner", "OpenCV init failed: ${e.message}")
+        }
+    }
+
     val rooms by repo.getRoomsByListing(listingId).collectAsState(initial = emptyList())
 
     // ── Phase ──────────────────────────────────────────────
@@ -226,19 +238,22 @@ fun RoomScannerScreen(
                     val targetAngle = currentTarget * (360 / TOTAL_SHOTS)
                     val file = File(ctx.cacheDir, "frame_${targetAngle}_${System.currentTimeMillis()}.jpg")
                     val opts = ImageCapture.OutputFileOptions.Builder(file).build()
+                    Log.i("Scanner", "Capturing frame $targetAngle° (file: ${file.name})")
                     ic.takePicture(
                         opts,
                         ContextCompat.getMainExecutor(ctx),
                         object : ImageCapture.OnImageSavedCallback {
                             override fun onImageSaved(output: ImageCapture.OutputFileResults) {
+                                // Log frame details
+                                val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                                BitmapFactory.decodeFile(file.absolutePath, opts)
+                                Log.i("Scanner", "Frame saved: ${opts.outWidth}x${opts.outHeight} at ${file.absolutePath}")
                                 capturedPaths.add(file.absolutePath)
-                                // Haptic
                                 vibrateShutter(ctx)
-                                // Advance target
                                 currentTarget = (currentTarget + 1).coerceAtMost(TOTAL_SHOTS)
                             }
                             override fun onError(exc: ImageCaptureException) {
-                                Log.e("Scanner", "Capture failed", exc)
+                                Log.e("Scanner", "Capture failed at ${targetAngle}°: ${exc.message}", exc)
                             }
                         }
                     )
@@ -773,27 +788,133 @@ private fun StatTile(label: String, value: String, modifier: Modifier = Modifier
 
 private fun stitchFrames(ctx: android.content.Context, paths: List<String>): String? {
     if (paths.isEmpty()) return null
-    try {
-        // Max height per frame to keep final panorama manageable
-        val targetHeight = 800
 
+    Log.i("Stitcher", "=== PANORAMA STITCHING PIPELINE ===")
+    Log.i("Stitcher", "Input frames: ${paths.size}")
+
+    // Step 1: Load frames as OpenCV Mats
+    val mats = mutableListOf<org.opencv.core.Mat>()
+    val validPaths = mutableListOf<String>()
+
+    for ((i, path) in paths.withIndex()) {
+        try {
+            val bmp = BitmapFactory.decodeFile(path)
+            if (bmp != null && !bmp.isRecycled && bmp.width > 100 && bmp.height > 100) {
+                val mat = org.opencv.android.Utils.bitmapToMat(bmp)
+                mats.add(mat)
+                validPaths.add(path)
+                Log.i("Stitcher", "Frame $i: ${bmp.width}x${bmp.height} loaded from $path")
+                bmp.recycle()
+            } else {
+                Log.w("Stitcher", "Frame $i: SKIPPED (too small or null: ${bmp?.width}x${bmp?.height})")
+                bmp?.recycle()
+            }
+        } catch (e: Exception) {
+            Log.e("Stitcher", "Frame $i: FAILED to load - ${e.message}")
+        }
+    }
+
+    if (mats.size < 2) {
+        Log.e("Stitcher", "Not enough valid frames (${mats.size}) for stitching")
+        mats.forEach { it.release() }
+        return null
+    }
+
+    Log.i("Stitcher", "Valid frames for stitching: ${mats.size}")
+
+    // Step 2: Initialize OpenCV Stitcher
+    val stitcher = org.opencv.stitching.Stitcher.create()
+    stitcher.setWaveCorrection(true)
+    // Try different resolution scales if first attempt fails
+    val scales = floatArrayOf(1.0f, 0.8f, 0.5f, 0.3f)
+    var resultMat: org.opencv.core.Mat? = null
+    var stitchSuccess = false
+
+    for (scale in scales) {
+        Log.i("Stitcher", "Attempting stitch at scale=$scale")
+        stitcher.setRegistrationResol(scale)
+        stitcher.setSeamEstResol(scale)
+        stitcher.setCompositingResol(scale)
+
+        val output = org.opencv.core.Mat()
+        val status = stitcher.stitch(mats, output)
+
+        when (status) {
+            org.opencv.stitching.Stitcher.OK -> {
+                Log.i("Stitcher", "STITCH SUCCESSFUL at scale=$scale")
+                Log.i("Stitcher", "Output dimensions: ${output.cols()}x${output.rows()}")
+                resultMat = output
+                stitchSuccess = true
+                break
+            }
+            org.opencv.stitching.Stitcher.ERR_NEED_MORE_IMGS -> {
+                Log.w("Stitcher", "Need more images at scale=$scale, trying smaller scale...")
+                output.release()
+            }
+            org.opencv.stitching.Stitcher.ERR_HOMOGRAPHY_EST_FAIL -> {
+                Log.w("Stitcher", "Homography failed at scale=$scale, trying smaller scale...")
+                output.release()
+            }
+            org.opencv.stitching.Stitcher.ERR_CAMERA_PARAMS_ADJUST_FAIL -> {
+                Log.w("Stitcher", "Camera params adjust failed at scale=$scale")
+                output.release()
+            }
+            else -> {
+                Log.w("Stitcher", "Stitch returned status=$status at scale=$scale")
+                output.release()
+            }
+        }
+    }
+
+    // Release input mats
+    mats.forEach { it.release() }
+
+    if (!stitchSuccess || resultMat == null) {
+        Log.e("Stitcher", "ALL STITCH ATTEMPTS FAILED - falling back to simple concat")
+        return fallbackStitch(ctx, paths)
+    }
+
+    // Step 3: Convert result Mat to Bitmap
+    try {
+        val resultBmp = Bitmap.createBitmap(resultMat.cols(), resultMat.rows(), Bitmap.Config.ARGB_8888)
+        org.opencv.android.Utils.matToBitmap(resultMat, resultBmp)
+        resultMat.release()
+
+        Log.i("Stitcher", "Final panorama: ${resultBmp.width}x${resultBmp.height}")
+        Log.i("Stitcher", "Aspect ratio: ${resultBmp.width.toFloat() / resultBmp.height.toFloat()}")
+
+        // Save to file
+        val out = File(ctx.cacheDir, "panorama_${System.currentTimeMillis()}.jpg")
+        FileOutputStream(out).use { resultBmp.compress(Bitmap.CompressFormat.JPEG, 90, it) }
+        resultBmp.recycle()
+
+        Log.i("Stitcher", "Saved to: ${out.absolutePath}")
+        Log.i("Stitcher", "=== STITCHING COMPLETE ===")
+        return out.absolutePath
+    } catch (e: Exception) {
+        Log.e("Stitcher", "Failed to convert/save result: ${e.message}")
+        resultMat?.release()
+        return null
+    }
+}
+
+/** Fallback: simple concatenation if OpenCV stitcher fails */
+private fun fallbackStitch(ctx: android.content.Context, paths: List<String>): String? {
+    Log.w("Stitcher", "Using fallback concatenation stitch")
+    try {
+        val targetHeight = 800
         val bitmaps = paths.mapNotNull { p ->
             try {
                 val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
                 BitmapFactory.decodeFile(p, opts)
-                // Calculate sample size to fit target height
                 val sampleSize = (opts.outHeight / targetHeight).coerceAtLeast(1)
-                val decodeOpts = BitmapFactory.Options().apply { inSampleSize = sampleSize }
-                BitmapFactory.decodeFile(p, decodeOpts)
+                BitmapFactory.decodeFile(p, BitmapFactory.Options().apply { inSampleSize = sampleSize })
             } catch (_: Exception) { null }
         }
         if (bitmaps.isEmpty()) return null
 
-        // All frames resized to same height
         val height = targetHeight
         val totalWidth = bitmaps.sumOf { it.width }
-
-        // Cap total width to prevent OOM
         val maxWidth = 8000
         val scale = if (totalWidth > maxWidth) maxWidth.toFloat() / totalWidth else 1f
         val finalWidth = (totalWidth * scale).toInt()
@@ -801,7 +922,6 @@ private fun stitchFrames(ctx: android.content.Context, paths: List<String>): Str
 
         val result = Bitmap.createBitmap(finalWidth, finalHeight, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(result)
-
         var x = 0f
         bitmaps.forEach { bmp ->
             val drawW = bmp.width * scale
@@ -809,13 +929,13 @@ private fun stitchFrames(ctx: android.content.Context, paths: List<String>): Str
             x += drawW
         }
 
-        val out = File(ctx.cacheDir, "panorama_${System.currentTimeMillis()}.jpg")
+        val out = File(ctx.cacheDir, "panorama_fallback_${System.currentTimeMillis()}.jpg")
         FileOutputStream(out).use { result.compress(Bitmap.CompressFormat.JPEG, 85, it) }
         bitmaps.forEach { it.recycle() }
         result.recycle()
         return out.absolutePath
     } catch (e: Exception) {
-        Log.e("Scanner", "Stitch failed", e)
+        Log.e("Stitcher", "Fallback stitch also failed", e)
         return null
     }
 }

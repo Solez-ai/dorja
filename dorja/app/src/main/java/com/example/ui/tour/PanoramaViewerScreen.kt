@@ -68,7 +68,6 @@ import com.example.ui.theme.DorjaColors
 import org.json.JSONObject
 import java.io.File
 import kotlin.math.roundToInt
-import kotlin.math.tan
 
 private val Accent = Color(0xFF00BCD4)
 
@@ -171,7 +170,22 @@ fun PanoramaViewerScreen(
         } else {
             val bmp = bitmap
 
-            // ── Sphere-projected panorama canvas ────────────────
+            // ── Equirectangular → Sphere projection ──────────
+            // Each pixel on screen maps to a point on the inside of a sphere.
+            // The panorama texture is an equirectangular map:
+            //   U (0..1) = longitude (0..360°)
+            //   V (0..1) = latitude (90°N..90°S)
+            //
+            // For a cylindrical projection viewer:
+            //   screen column x → longitude = panX + (x / screenW) * 360°
+            //   screen row y    → latitude  = 90° - (y / screenH) * 180°
+            //
+            // Source pixel:
+            //   srcU = (longitude mod 360) / 360
+            //   srcV = (90 - latitude) / 180
+            //   srcX = srcU * bmpW
+            //   srcY = srcV * bmpH
+
             Canvas(
                 Modifier
                     .fillMaxSize()
@@ -187,45 +201,28 @@ fun PanoramaViewerScreen(
                 val bw = bmp.width.toFloat()
                 val bh = bmp.height.toFloat()
 
-                // The panorama image is equirectangular:
-                //   horizontal = 360° longitude
-                //   vertical = 180° latitude (top=90°, bottom=-90°)
-                //
-                // For a sphere-mapped view, each screen column maps to a longitude,
-                // and each screen row maps to a latitude.
-                //
-                // We use cylindrical projection: the image horizontal axis maps
-                // to longitude, and vertical to latitude.
-                // Screen column `x` → longitude = panX + (x / cw) * 360°
-                // Screen row `y` → latitude = 90° - (y / ch) * 180°
-                //
-                // Source pixel in the panorama image:
-                //   srcX = (longitude / 360°) * bw
-                //   srcY = ((90° - latitude) / 180°) * bh
+                // Draw in vertical strips (2px wide) for performance
+                val stripW = 2f
+                var sx = 0f
+                while (sx < cw) {
+                    // Longitude for this screen column (degrees)
+                    val lonDeg = (panX / bw * 360f) + (sx / cw * 360f)
+                    // Wrap to 0..360
+                    val lonWrapped = ((lonDeg % 360f) + 360f) % 360f
 
-                // For each screen column, draw a vertical strip from the panorama
-                val stripWidth = 2f // draw in 2px wide strips for performance
-
-                var screenX = 0f
-                while (screenX < cw) {
-                    // This screen column's longitude (degrees)
-                    val longitude = (panX / bw * 360f) + (screenX / cw * 360f)
-
-                    // Source X in panorama bitmap (wraps around)
-                    val srcX = ((longitude % 360f + 360f) % 360f / 360f * bw).toInt()
-                    val srcXClamped = srcX.coerceIn(0, bw.toInt() - 1)
+                    // Source X in panorama bitmap
+                    val srcX = (lonWrapped / 360f * bw).toInt().coerceIn(0, bw.toInt() - 1)
 
                     // Draw the full vertical column from the panorama
-                    // Source rect: full height of bitmap at srcX
                     drawImage(
                         image = bmp,
-                        srcOffset = IntOffset(srcXClamped, 0),
+                        srcOffset = IntOffset(srcX, 0),
                         srcSize = IntSize(1, bh.toInt()),
-                        dstOffset = IntOffset(screenX.roundToInt(), 0),
-                        dstSize = IntSize(stripWidth.roundToInt() + 1, ch.roundToInt())
+                        dstOffset = IntOffset(sx.roundToInt(), 0),
+                        dstSize = IntSize(stripW.roundToInt() + 1, ch.roundToInt())
                     )
 
-                    screenX += stripWidth
+                    sx += stripW
                 }
             }
 

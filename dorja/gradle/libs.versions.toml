@@ -45,10 +45,12 @@ googleid = "1.1.1"
 
 zxing = "3.5.3"
 arcore = "1.47.0"
+opencv = "4.9.0"
 
 [libraries]
 zxing-core = { group = "com.google.zxing", name = "core", version.ref = "zxing" }
 arcore = { group = "com.google.ar", name = "core", version.ref = "arcore" }
+opencv = { group = "org.opencv", name = "opencv", version.ref = "opencv" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
