@@ -364,10 +364,7 @@ private fun CameraPreview(imageCapture: ImageCapture?, onCaptureReady: (ImageCap
                 val cp = ProcessCameraProvider.getInstance(ctx).get()
                 // Use 4:3 aspect ratio to get widest sensor FOV.
                 // Most phone sensors are natively 4:3; 16:9 is a crop.
-                val preview = Preview.Builder()
-                    .setTargetAspectRatio(AspectRatio.RATIO_4_3)
-                    .build()
-                    .also { it.setSurfaceProvider(pv.surfaceProvider) }
+                val preview = Preview.Builder().build().also { it.setSurfaceProvider(pv.surfaceProvider) }
                 val capture = ImageCapture.Builder()
                     .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
                     .setTargetAspectRatio(AspectRatio.RATIO_4_3)
@@ -376,9 +373,7 @@ private fun CameraPreview(imageCapture: ImageCapture?, onCaptureReady: (ImageCap
                 try {
                     cp.unbindAll()
                     val camera = cp.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, capture)
-                    val info = camera.cameraInfo
-                    Log.i("Scanner", "Camera bound: id=${info.cameraId} lens=${info.lensFacing} zoom=${info.zoomState.value?.zoomRatio}")
-                    Log.i("Scanner", "ImageCapture target aspect: 4:3 (widest sensor FOV)")
+                    Log.i("Scanner", "Camera bound successfully. ImageCapture: 4:3 aspect ratio (widest sensor FOV)")
                 } catch (e: Exception) { Log.e("Scanner", "Camera bind failed", e) }
             }, ContextCompat.getMainExecutor(ctx))
         }
