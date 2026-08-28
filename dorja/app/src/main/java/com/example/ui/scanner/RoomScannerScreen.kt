@@ -386,69 +386,134 @@ private fun StatTile(label: String, value: String, modifier: Modifier = Modifier
 
 private fun stitchFrames(ctx: android.content.Context, paths: List<String>): String? {
     if (paths.isEmpty()) return null
-    Log.i("Stitcher", "=== PANORAMA STITCHING ===\nInput: ${paths.size} frames")
+    Log.i("Stitcher", "=== PANORAMA STITCHING ===")
+    Log.i("Stitcher", "Input: ${paths.size} frames")
 
+    // Step 1: Load frames at reasonable size
     val targetH = 800
-    val frames = paths.mapNotNull { p ->
+    val rawFrames = paths.mapNotNull { p ->
         try {
             val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
             BitmapFactory.decodeFile(p, opts)
+            Log.i("Stitcher", "  Frame file: ${opts.outWidth}x${opts.outHeight} — $p")
             val sample = (opts.outHeight / targetH).coerceAtLeast(1)
             BitmapFactory.decodeFile(p, BitmapFactory.Options().apply { inSampleSize = sample })
         } catch (e: Exception) { Log.e("Stitcher", "Load failed: $p"); null }
     }.filter { it != null && !it.isRecycled && it.width > 50 && it.height > 50 }.map { it!! }
 
-    if (frames.size < 2) { Log.e("Stitcher", "Not enough: ${frames.size}"); frames.forEach { it.recycle() }; return null }
-    Log.i("Stitcher", "Loaded ${frames.size}, first: ${frames[0].width}x${frames[0].height}")
+    if (rawFrames.size < 2) { Log.e("Stitcher", "Not enough: ${rawFrames.size}"); rawFrames.forEach { it.recycle() }; return null }
+    Log.i("Stitcher", "Loaded ${rawFrames.size} frames, first: ${rawFrames[0].width}x${rawFrames[0].height}")
 
-    // Find overlap between consecutive pairs using SAD on pixel columns
-    val overlaps = mutableListOf<Int>()
-    for (i in 0 until frames.size - 1) {
-        val overlap = findOverlap(frames[i], frames[i + 1])
-        overlaps.add(overlap)
-        Log.i("Stitcher", "Pair $i→${i+1}: overlap=${overlap}px")
+    // Step 2: Estimate focal length from image width
+    // Typical phone camera FOV ~60-70°. f = w / (2 * tan(FOV/2))
+    // For FOV=63°: f ≈ w * 0.84
+    val f = rawFrames[0].width * 0.84
+    Log.i("Stitcher", "Estimated focal length: ${"%.0f".format(f)} (from width ${rawFrames[0].width})")
+
+    // Step 3: Warp each frame to cylindrical projection
+    // This removes perspective distortion so horizontal lines stay horizontal
+    val warpedFrames = rawFrames.mapIndexed { i, frame ->
+        val warped = cylindricalWarp(frame, f)
+        Log.i("Stitcher", "Cylindrical warp frame $i: ${frame.width}x${frame.height} → ${warped.width}x${warped.height}")
+        frame.recycle()
+        warped
     }
 
-    // Compute total canvas width
-    var totalW = frames[0].width
-    for (i in 1 until frames.size) { totalW += frames[i].width - overlaps[i - 1] }
-    val canvasH = frames[0].height
-    Log.i("Stitcher", "Canvas: ${totalW}x${canvasH}")
+    // Step 4: Find overlap between consecutive warped frames
+    val overlaps = mutableListOf<Int>()
+    for (i in 0 until warpedFrames.size - 1) {
+        val overlap = findOverlap(warpedFrames[i], warpedFrames[i + 1])
+        overlaps.add(overlap)
+        Log.i("Stitcher", "Pair $i→${i+1}: overlap = ${overlap}px")
+    }
 
-    if (totalW > 12000 || totalW * canvasH > 50_000_000) { Log.e("Stitcher", "Too large"); frames.forEach { it.recycle() }; return null }
+    // Step 5: Compute intermediate canvas width from overlaps
+    var intermediateW = warpedFrames[0].width
+    for (i in 1 until warpedFrames.size) { intermediateW += warpedFrames[i].width - overlaps[i - 1] }
+    val intermediateH = warpedFrames[0].height
+    Log.i("Stitcher", "Intermediate canvas: ${intermediateW}x${intermediateH}")
 
-    // Build panorama by compositing with overlap blending
-    val canvas = Bitmap.createBitmap(totalW, canvasH, Bitmap.Config.ARGB_8888)
-    val g = Canvas(canvas)
-    var xOffset = 0
-
-    for (i in frames.indices) {
-        val f = frames[i]
+    // Step 6: Composite warped frames onto intermediate canvas
+    val intermediate = Bitmap.createBitmap(intermediateW, intermediateH, Bitmap.Config.ARGB_8888)
+    val g = Canvas(intermediate)
+    var xOff = 0
+    for (i in warpedFrames.indices) {
+        val f = warpedFrames[i]
         val overlap = if (i > 0) overlaps[i - 1] else 0
         if (i == 0) {
             g.drawBitmap(f, 0f, 0f, null)
-            xOffset = f.width
+            xOff = f.width
         } else {
             val srcX = overlap
-            val srcRect = android.graphics.Rect(srcX, 0, f.width, f.height)
-            val dstRect = RectF(xOffset.toFloat(), 0f, (xOffset + f.width - srcX).toFloat(), canvasH.toFloat())
-            g.drawBitmap(f, srcRect, dstRect, null)
-            xOffset += f.width - srcX
+            g.drawBitmap(f, android.graphics.Rect(srcX, 0, f.width, f.height), RectF(xOff.toFloat(), 0f, (xOff + f.width - srcX).toFloat(), intermediateH.toFloat()), null)
+            xOff += f.width - srcX
+        }
+    }
+    warpedFrames.forEach { it.recycle() }
+
+    // Step 7: Crop black borders from intermediate
+    val cropped = cropBlackBorders(intermediate)
+    intermediate.recycle()
+    Log.i("Stitcher", "Cropped intermediate: ${cropped.width}x${cropped.height}, ratio: ${"%.2f".format(cropped.width.toFloat() / cropped.height)}")
+
+    // Step 8: Resize to fixed 2:1 equirectangular (2048x1024)
+    val finalW = 2048
+    val finalH = 1024
+    val panorama = Bitmap.createScaledBitmap(cropped, finalW, finalH, true)
+    cropped.recycle()
+    Log.i("Stitcher", "Final panorama: ${panorama.width}x${panorama.height} (ratio: ${"%.2f".format(panorama.width.toFloat() / panorama.height)})")
+
+    // Step 9: Save
+    try {
+        val out = File(ctx.cacheDir, "panorama_${System.currentTimeMillis()}.jpg")
+        FileOutputStream(out).use { panorama.compress(Bitmap.CompressFormat.JPEG, 90, it) }
+        panorama.recycle()
+        Log.i("Stitcher", "Saved: ${out.absolutePath}")
+        Log.i("Stitcher", "=== STITCHING COMPLETE ===")
+        return out.absolutePath
+    } catch (e: Exception) { Log.e("Stitcher", "Save failed", e); panorama.recycle(); return null }
+}
+
+/** Warp a perspective image to cylindrical coordinates.
+ *  This removes the perspective distortion that causes vertical
+ *  lines to converge. After warping, horizontal pixel position
+ *  maps linearly to longitude. */
+private fun cylindricalWarp(src: Bitmap, focalLength: Double): Bitmap {
+    val w = src.width
+    val h = src.height
+    val cx = w / 2.0
+    val cy = h / 2.0
+
+    // Source pixel array
+    val srcPixels = IntArray(w * h)
+    src.getPixels(srcPixels, 0, w, 0, 0, w, h)
+
+    // Output bitmap — slightly narrower due to cylindrical compression at edges
+    val outW = (2.0 * focalLength * kotlin.math.atan(cx / focalLength)).toInt()
+    val outH = h
+    val result = Bitmap.createBitmap(outW, outH, Bitmap.Config.ARGB_8888)
+    val dstPixels = IntArray(outW * outH)
+
+    // For each destination pixel, find the corresponding source pixel
+    for (dstY in 0 until outH) {
+        for (dstX in 0 until outW) {
+            // Map destination back to perspective coordinates
+            val theta = (dstX - outW / 2.0) / focalLength // longitude angle
+            val repX = focalLength * kotlin.math.tan(theta) + cx // perspective x
+            val repY = (dstY - cy) * focalLength / kotlin.math.sqrt(focalLength * focalLength + (repX - cx) * (repX - cx)) + cy // perspective y
+
+            val srcX = repX.toInt()
+            val srcY = repY.toInt()
+
+            if (srcX in 0 until w && srcY in 0 until h) {
+                dstPixels[dstY * outW + dstX] = srcPixels[srcY * w + srcX]
+            }
+            // else: black (default 0)
         }
     }
 
-    val cropped = cropBlackBorders(canvas)
-    canvas.recycle()
-    frames.forEach { it.recycle() }
-    Log.i("Stitcher", "Cropped: ${cropped.width}x${cropped.height}, ratio: ${"%.2f".format(cropped.width.toFloat() / cropped.height)}")
-
-    try {
-        val out = File(ctx.cacheDir, "panorama_${System.currentTimeMillis()}.jpg")
-        FileOutputStream(out).use { cropped.compress(Bitmap.CompressFormat.JPEG, 90, it) }
-        cropped.recycle()
-        Log.i("Stitcher", "Saved: ${out.absolutePath}\n=== DONE ===")
-        return out.absolutePath
-    } catch (e: Exception) { Log.e("Stitcher", "Save failed", e); cropped.recycle(); return null }
+    result.setPixels(dstPixels, 0, outW, 0, 0, outW, outH)
+    return result
 }
 
 /** Find overlap: how many pixels from right of A match left of B via SAD */
