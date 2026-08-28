@@ -202,7 +202,7 @@ fun RoomScannerScreen(
                 hasCamera = hasCamera,
                 roomName = selectedRoom?.displayName ?: "Room",
                 gyroOn = gyroOn,
-                onToggleGyro = { gyroOn = !it },
+                onToggleGyro = { gyroOn = !gyroOn },
                 onStart = { phase = Phase.CAPTURING },
                 onBack = { phase = Phase.SELECT },
                 lifecycleOwner = lifecycleOwner
@@ -217,7 +217,7 @@ fun RoomScannerScreen(
                 totalShots = TOTAL_SHOTS,
                 capturedCount = capturedPaths.size,
                 gyroOn = gyroOn,
-                onToggleGyro = { gyroOn = !it },
+                onToggleGyro = { gyroOn = !gyroOn },
                 onCapture = {
                     // Take a photo right now
                     val ic = imageCapture ?: return@CapturingPhase
