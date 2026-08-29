@@ -322,9 +322,13 @@ private fun CapturingPhase(imageCapture: ImageCapture?, onCaptureReady: (ImageCa
             Text("TARGET: ${targetAngle}°  •  ${capturedCount}/$totalShots CAPTURED", color = Accent, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, fontSize = 11.sp, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
         }
         Box(Modifier.fillMaxWidth().height(140.dp).background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.7f)))).align(Alignment.BottomCenter))
-        Row(Modifier.fillMaxWidth().align(Alignment.BottomCenter).padding(bottom = 120.dp, start = 16.dp, end = 16.dp), horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-            repeat(totalShots) { i -> Box(Modifier.weight(1f).height(5.dp).clip(RoundedCornerShape(3.dp)).background(when { i < capturedCount -> Green; i == targetIndex -> Accent; else -> Color.Gray.copy(alpha = 0.4f) })) }
-        }
+        // Elevation chart — shows ideal phone height for each shot
+        ElevationChart(
+            totalShots = totalShots,
+            currentShot = targetIndex,
+            capturedCount = capturedCount,
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 120.dp, start = 24.dp, end = 24.dp).fillMaxWidth()
+        )
         Row(Modifier.fillMaxWidth().align(Alignment.BottomCenter).padding(bottom = 20.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(64.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.15f)).border(3.dp, Color.White, CircleShape).clickable { onCapture() }, contentAlignment = Alignment.Center) { Box(Modifier.size(48.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.9f))) }
             Spacer(Modifier.width(16.dp))
@@ -530,6 +534,118 @@ private fun TiltIndicator(direction: Float, label: String, modifier: Modifier = 
                 fontFamily = FontFamily.Monospace,
                 fontWeight = FontWeight.Bold
             )
+        }
+    }
+}
+
+/**
+ * Mini elevation chart showing ideal phone height across all shots.
+ *
+ * Each shot has an elevation level:
+ *   0 = center (level)
+ *  +1 = up
+ *  -1 = down
+ *
+ * The chart draws dots at different vertical positions connected by a
+ * polyline, with the current shot pulsing and captured shots solid.
+ */
+@Composable
+private fun ElevationChart(
+    totalShots: Int,
+    currentShot: Int,
+    capturedCount: Int,
+    modifier: Modifier = Modifier
+) {
+    // Elevation pattern: alternates level/up/level/down to ensure vertical coverage
+    val elevations = remember(totalShots) {
+        List(totalShots) { i ->
+            when (i % 6) {
+                0 -> 0f   // level
+                1 -> 1f   // up
+                2 -> 0f   // level
+                3 -> -1f  // down
+                4 -> 0f   // level
+                else -> 1f // up
+            }
+        }
+    }
+
+    val infiniteTransition = rememberInfiniteTransition(label = "elevationPulse")
+    val pulse by infiniteTransition.animateFloat(
+        initialValue = 0.7f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(600, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulse"
+    )
+
+    Canvas(modifier) {
+        val w = size.width
+        val h = size.height
+        val cy = h / 2f          // center baseline
+        val maxLift = h * 0.35f  // max vertical displacement
+        val dotR = 5.dp.toPx()
+        val spacing = w / (totalShots - 1).coerceAtLeast(1)
+
+        // Compute dot positions
+        val points = elevations.mapIndexed { i, elev ->
+            Offset(
+                x = i * spacing,
+                y = cy - elev * maxLift
+            )
+        }
+
+        // Draw connecting polyline (thin, behind dots)
+        for (i in 0 until points.size - 1) {
+            val color = when {
+                i < capturedCount - 1 -> Green.copy(alpha = 0.5f)
+                i == currentShot - 1 && currentShot <= capturedCount -> Accent.copy(alpha = 0.5f)
+                else -> Color.White.copy(alpha = 0.15f)
+            }
+            drawLine(color, points[i], points[i + 1], 1.5.dp.toPx())
+        }
+
+        // Draw center baseline (faint)
+        drawLine(Color.White.copy(alpha = 0.1f), Offset(0f, cy), Offset(w, cy), 0.5.dp.toPx())
+
+        // Draw elevation labels (tiny text not possible in Canvas, use dots only)
+        // Draw dots
+        points.forEachIndexed { i, pt ->
+            val isCaptured = i < capturedCount
+            val isCurrent = i == currentShot
+
+            when {
+                isCurrent -> {
+                    // Pulsing current dot — larger and brighter
+                    val r = dotR * pulse * 1.4f
+                    drawCircle(Accent.copy(alpha = 0.25f), r * 2f, pt) // glow
+                    drawCircle(Accent, r, pt)
+                }
+                isCaptured -> {
+                    drawCircle(Green, dotR * 0.9f, pt)
+                }
+                else -> {
+                    drawCircle(Color.White.copy(alpha = 0.3f), dotR * 0.7f, pt)
+                }
+            }
+        }
+
+        // Draw elevation direction labels beside first & last dots
+        // (tiny up/down arrows at the edges)
+        val arrowSize = 4.dp.toPx()
+        // Up arrow at first elevated shot
+        val upIdx = elevations.indexOfFirst { it > 0f }
+        if (upIdx >= 0) {
+            val p = points[upIdx]
+            drawLine(Accent, Offset(p.x, p.y - dotR - 2.dp.toPx()), Offset(p.x, p.y - dotR - 2.dp.toPx() - arrowSize), 1.dp.toPx())
+        }
+        // Down arrow at first down shot
+        val downIdx = elevations.indexOfFirst { it < 0f }
+        if (downIdx >= 0) {
+            val p = points[downIdx]
+            drawLine(Color(0xFF2196F3), Offset(p.x, p.y + dotR + 2.dp.toPx()), Offset(p.x, p.y + dotR + 2.dp.toPx() + arrowSize), 1.dp.toPx())
         }
     }
 }
