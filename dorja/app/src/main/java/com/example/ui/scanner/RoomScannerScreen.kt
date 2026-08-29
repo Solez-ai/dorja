@@ -505,7 +505,8 @@ private fun TiltIndicator(direction: Float, label: String, modifier: Modifier = 
                 val cy = size.height / 2f
 
                 // Draw tilted phone rectangle
-                rotate(phoneRotation)
+                drawContext.canvas.save()
+                drawContext.canvas.rotate(phoneRotation, cx, cy)
                 drawRoundRect(
                     color = labelColor,
                     topLeft = Offset(cx - w / 2, cy - h / 2),
@@ -519,6 +520,7 @@ private fun TiltIndicator(direction: Float, label: String, modifier: Modifier = 
                     size = androidx.compose.ui.geometry.Size(w * 0.7f, h * 0.6f),
                     cornerRadius = androidx.compose.ui.geometry.CornerRadius(2.dp.toPx())
                 )
+                drawContext.canvas.restore()
             }
 
             // Directional arrows
