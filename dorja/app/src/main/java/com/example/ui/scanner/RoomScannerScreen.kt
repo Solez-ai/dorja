@@ -174,6 +174,20 @@ fun RoomScannerScreen(
 
     LaunchedEffect(Unit) { if (!hasCamera) permLauncher.launch(Manifest.permission.CAMERA) }
 
+    // Haptic buzz when tilt direction changes between shots
+    var prevTiltDir by remember { mutableIntStateOf(0) }
+    LaunchedEffect(currentTarget) {
+        val newTiltDir = when (currentTarget % 6) {
+            1, 5 -> -1  // up
+            3 -> 1       // down
+            else -> 0    // level
+        }
+        if (newTiltDir != prevTiltDir && currentTarget > 0) {
+            vibrateTiltChange(ctx)
+        }
+        prevTiltDir = newTiltDir
+    }
+
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         when (phase) {
             Phase.SELECT -> SelectRoom(rooms = rooms, onSelect = { room ->
@@ -878,5 +892,21 @@ private fun vibrateShutter(ctx: android.content.Context) {
     try {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) { ctx.getSystemService(VibratorManager::class.java)?.defaultVibrator?.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 30, 60, 20), intArrayOf(0, 200, 0, 120), -1)) }
         else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) { @Suppress("DEPRECATION") (ctx.getSystemService(android.content.Context.VIBRATOR_SERVICE) as? Vibrator)?.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 30, 60, 20), intArrayOf(0, 200, 0, 120), -1)) }
+    } catch (_: Exception) {}
+}
+
+/** Short double-tap buzz when tilt direction changes between shots */
+private fun vibrateTiltChange(ctx: android.content.Context) {
+    try {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            ctx.getSystemService(VibratorManager::class.java)?.defaultVibrator?.vibrate(
+                VibrationEffect.createWaveform(longArrayOf(0, 40, 80, 40), intArrayOf(0, 100, 0, 100), -1)
+            )
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            @Suppress("DEPRECATION")
+            (ctx.getSystemService(android.content.Context.VIBRATOR_SERVICE) as? Vibrator)?.vibrate(
+                VibrationEffect.createWaveform(longArrayOf(0, 40, 80, 40), intArrayOf(0, 100, 0, 100), -1)
+            )
+        }
     } catch (_: Exception) {}
 }
