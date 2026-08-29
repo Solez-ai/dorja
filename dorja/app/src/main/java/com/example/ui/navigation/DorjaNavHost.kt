@@ -203,6 +203,9 @@ fun DorjaNavHost() {
                 onListingCreated = { newListingId ->
                     navController.popBackStack()
                     navController.navigate(Screen.PropertyDetail.createRoute(newListingId))
+                },
+                onScanRooms = { listingId ->
+                    navController.navigate(Screen.RoomScanner.createRoute(listingId))
                 }
             )
         }

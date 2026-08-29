@@ -144,23 +144,6 @@ Bangladesh's property market is plagued by **safety and fraud crises** that dema
 - The **Ministry of Commerce formed a two-member committee** to investigate allegations against bproperty, the biggest online real estate broker in Bangladesh, and proposed a Housing Fraud Reporting Platform.  
   Source: [Financial Express Bangladesh / Facebook](https://www.facebook.com/febdonline/posts/the-ministry-of-commerce-has-formed-a-two-member-committee-to-investigate-alga/1472239608265658/) (2026)
 
-### Physical Safety During Viewings
-
-- **Robbery incidents** rose to 424 cases in Dhaka in 2024 (up from 375 in 2023). March and April 2026 alone recorded 605 murders and 294 snatching incidents nationwide.  
-  Source: [Dhaka Tribune / Facebook -- Crime statistics](https://www.facebook.com/DhakaTribune/posts/march-and-april-alone-the-country-recorded-605-murders-294-snatching-incidents-s/1461457139356338/) (June 2026)
-
-- From August 2024 to February 2025, Bangladesh witnessed a "shocking surge" in rape, sexual assault, and armed robbery according to Ain o Salish Kendra data.  
-  Source: [Ain o Salish Kendra / Facebook](https://www.facebook.com/groups/awamileague.1949group/posts/1890722221495394/)
-
-- **186 out of 680 reported rape cases** occurred inside victims' homes, followed by 179 cases in other locations -- highlighting the danger of visiting unknown properties alone.  
-  Source: [The Daily Star / Instagram](https://www.instagram.com/p/DZUHJRjnz4Y/) (June 2026)
-
-- Violence against women and children rose even as theft and robbery fell, with police recording 328 robbery cases but increased murders, rioting, and attacks on police.  
-  Source: [TBS News -- "Theft, robbery fall, but killings, violence against women, children rise"](https://www.tbsnews.net/bangladesh/crime/theft-robbery-fall-killings-violence-against-women-children-rise-1522211)
-
-- Deep-rooted criminal cooperation between dishonest real estate traders and corrupt officials has been documented.  
-  Source: [TBS News / Facebook -- Flat buyers' decade-long battles](https://www.facebook.com/tbsnews.net/posts/%F0%9D%90%85%F0%9D%90%AB%F0%9D%90%A8%F0%9D%90%A6-%F0%9D%90%9D%F0%9D%90%AB%F0%9D%90%9E%F0%9D%90%9A%F0%9D%90%A6-%F0%9D%90%A1%F0%9D%90%A8%F0%9D%90%A6%F0%9D%90%9E%F0%9D%90%AC-%F0%9D%90%AD%F0%9D%90%A8-%F0%9D%90%A5%F0%9D%90%9E%F0%9D%90%A0%F0%9D%90%9A%F0%9D%90%A5-%F0%9D%90%A6%F0%9D%90%9A%F0%9D%90%B3%F0%9D%90%9E-%F0%9D%90%85%F0%9D%90%A5%F0%9D%90%9A%F0%9D%90%AD-%F0%9D%90%9B%F0%9D%90%AE%F0%9D%90%B2%F0%9D%90%9E%F0%9D%90%AB%F0%9D%90%AC-%F0%9D%90%9D%F0%9D%90%9E%F0%9D%90%9C%F0%9D%90%9A%F0%9D%90%9D%F0%9D%90%9E-%F0%9D%90%A5%F0%9D%90%A8%F0%9D%90%A7%F0%9D%90%A0-%F0%9D%90%9B%F0%9D%90%9A%F0%9D%90%AD%F0%9D%90%AD%F0%9D%90%A5%F0%9D%90%9E%F0%9D%90%AC-%F0%9D%90%9F%F0%9D%90%A8%F0%9D%90%AB-%F0%9D%90%A8%F0%9D%90%B0%F0%9D%90%A7%F0%9D%90%9E%F0%9D%90%AB%F0%9D%90%AC%F0%9D%90%A1%F0%9D%90%A2%F0%9D%90%A9for-/1292339296274135/) (2025)
-
 - Real estate investment in Dhaka remains the most targeted asset class, with 75% of land records digitized by 2026 to reduce fraud.  
   Source: [Concord Real Estate -- "Why Real Estate Investment in Dhaka is the Safest Asset"](https://concordrealestatebd.com/why-real-estate-investment-in-dhaka-remains-the-safest-asset/)
 
@@ -213,7 +196,7 @@ A: Dorja's multi-layer verification (government records + seller background chec
 
 ---
 
-## 8. How is Dorja Better Than the Competition?
+## 8. How is Dorja Better Than the Global Competition?
 
 ### vs. LIFULL HOME (Japan)
 LIFULL HOME is one of Japan's largest property databases with train-line and commute-time filtering. However:

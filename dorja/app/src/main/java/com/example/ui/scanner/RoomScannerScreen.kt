@@ -325,7 +325,30 @@ private fun CapturingPhase(imageCapture: ImageCapture?, onCaptureReady: (ImageCa
             Box(Modifier.size(48.dp).clip(CircleShape).background(Color(0xFFE53935)).border(2.dp, Color.White, CircleShape).clickable { onStop() }, contentAlignment = Alignment.Center) { Box(Modifier.size(16.dp).clip(RoundedCornerShape(3.dp)).background(Color.White)) }
         }
         Box(Modifier.align(Alignment.BottomStart).padding(start = 16.dp, bottom = 130.dp)) { GyroChip(gyroOn, onToggleGyro) }
-        Text("Point at ${targetAngle}° and tap shutter", color = Color.White.copy(alpha = 0.6f), fontSize = 10.sp, fontFamily = FontFamily.Monospace, modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 90.dp))
+        Text("Point at ${targetAngle}° and tap shutter", color = Color.White.copy(alpha = 0.6f), fontSize = 10.sp, fontFamily = FontFamily.Monospace, modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 110.dp))
+        // Vertical tilt guidance — alternates to ensure good vertical coverage
+        val tiltHint = when (targetIndex % 6) {
+            0 -> "Hold level"
+            1 -> "Tilt slightly UP"
+            2 -> "Hold level"
+            3 -> "Tilt slightly DOWN"
+            4 -> "Hold level"
+            else -> "Tilt slightly UP"
+        }
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = Color.Black.copy(alpha = 0.55f),
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 85.dp)
+        ) {
+            Text(
+                tiltHint,
+                color = Accent,
+                fontSize = 10.sp,
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 5.dp)
+            )
+        }
     }
 }
 

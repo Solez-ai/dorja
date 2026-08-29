@@ -168,7 +168,8 @@ data class PhotoAssignmentItem(
 @Composable
 fun CreateListingScreen(
     onBack: () -> Unit,
-    onListingCreated: (String) -> Unit
+    onListingCreated: (String) -> Unit,
+    onScanRooms: ((String) -> Unit)? = null
 ) {
     val repository = DorjaApp.instance.repository
     val scope = rememberCoroutineScope()
@@ -195,6 +196,8 @@ fun CreateListingScreen(
     val customRooms = remember {
         mutableStateListOf<RoomItem>()
     }
+
+    var createdListingId by remember { mutableStateOf<String?>(null) }
 
     var showAddRoomDialog by remember { mutableStateOf(false) }
     var newRoomType by remember { mutableStateOf("BEDROOM") }
@@ -1603,7 +1606,12 @@ fun CreateListingScreen(
 
                         DorjaButton(
                             text = "Scan Rooms",
-                            onClick = { /* Scanner launched from listing detail after creation */ },
+                            onClick = {
+                                val lid = createdListingId
+                                if (lid != null && onScanRooms != null) {
+                                    onScanRooms(lid)
+                                }
+                            },
                             icon = Icons.Default.ViewInAr,
                             modifier = Modifier.height(36.dp),
                             testTag = "scan_rooms_button"
@@ -2159,6 +2167,7 @@ fun CreateListingScreen(
                                 evidenceNote = promise.evidenceNote
                             )
                         }
+                        createdListingId = newId
                         onListingCreated(newId)
                     }
                 },

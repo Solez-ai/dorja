@@ -71,6 +71,9 @@ import kotlin.math.abs
 import kotlin.math.atan
 import kotlin.math.roundToInt
 
+import android.content.pm.ActivityInfo
+import androidx.activity.ComponentActivity
+
 private val Accent = Color(0xFF00BCD4)
 
 /**
@@ -175,6 +178,14 @@ fun PanoramaViewerScreen(
         val yawRad = Math.toRadians(gyroYaw.toDouble()).toFloat()
         val f = bitmap.width.toFloat() / (2f * PI.toFloat())
         panX = yawRad * f
+    }
+
+    // Force landscape orientation while viewing panorama
+    DisposableEffect(Unit) {
+        val activity = ctx as? ComponentActivity
+        val original = activity?.requestedOrientation
+        activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+        onDispose { activity?.requestedOrientation = original ?: ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED }
     }
 
     Box(Modifier.fillMaxSize().background(Color.Black)) {
