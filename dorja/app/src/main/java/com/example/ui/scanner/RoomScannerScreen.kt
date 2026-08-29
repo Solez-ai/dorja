@@ -17,6 +17,12 @@ import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
 import android.util.Log
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.AspectRatio
@@ -326,29 +332,21 @@ private fun CapturingPhase(imageCapture: ImageCapture?, onCaptureReady: (ImageCa
         }
         Box(Modifier.align(Alignment.BottomStart).padding(start = 16.dp, bottom = 130.dp)) { GyroChip(gyroOn, onToggleGyro) }
         Text("Point at ${targetAngle}° and tap shutter", color = Color.White.copy(alpha = 0.6f), fontSize = 10.sp, fontFamily = FontFamily.Monospace, modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 110.dp))
-        // Vertical tilt guidance — alternates to ensure good vertical coverage
-        val tiltHint = when (targetIndex % 6) {
-            0 -> "Hold level"
-            1 -> "Tilt slightly UP"
-            2 -> "Hold level"
-            3 -> "Tilt slightly DOWN"
-            4 -> "Hold level"
-            else -> "Tilt slightly UP"
+        // Vertical tilt guidance with visual indicator
+        val tiltDirection = when (targetIndex % 6) {
+            0 -> 0f   // level
+            1 -> -1f  // up
+            2 -> 0f   // level
+            3 -> 1f   // down
+            4 -> 0f   // level
+            else -> -1f // up
         }
-        Surface(
-            shape = RoundedCornerShape(16.dp),
-            color = Color.Black.copy(alpha = 0.55f),
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 85.dp)
-        ) {
-            Text(
-                tiltHint,
-                color = Accent,
-                fontSize = 10.sp,
-                fontFamily = FontFamily.Monospace,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(horizontal = 14.dp, vertical = 5.dp)
-            )
+        val tiltLabel = when (tiltDirection.toInt()) {
+            -1 -> "TILT UP"
+            1 -> "TILT DOWN"
+            else -> "LEVEL"
         }
+        TiltIndicator(tiltDirection, tiltLabel, Modifier.align(Alignment.BottomCenter).padding(bottom = 82.dp))
     }
 }
 
@@ -445,6 +443,94 @@ private fun GyroChip(on: Boolean, toggle: () -> Unit) {
 private fun StatTile(label: String, value: String, modifier: Modifier = Modifier) {
     Surface(modifier, shape = RoundedCornerShape(10.dp), color = DorjaColors.Gray700) {
         Column(Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) { Text(value, color = Accent, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.headlineMedium); Spacer(Modifier.height(2.dp)); Text(label, color = DorjaColors.Sand300, fontSize = 9.sp, fontFamily = FontFamily.Monospace) }
+    }
+}
+
+@Composable
+private fun TiltIndicator(direction: Float, label: String, modifier: Modifier = Modifier) {
+    // direction: -1 = UP, 0 = LEVEL, +1 = DOWN
+    // Animate the phone rotation smoothly
+    val infiniteTransition = rememberInfiniteTransition(label = "tilt")
+    val animatedTilt by infiniteTransition.animateFloat(
+        initialValue = direction * 8f - 2f,
+        targetValue = direction * 8f + 2f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(900, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "tiltAngle"
+    )
+    val phoneRotation = if (direction == 0f) 0f else animatedTilt
+
+    val labelColor = when (direction.toInt()) {
+        -1 -> Color(0xFFFF9800) // orange for up
+        1 -> Color(0xFF2196F3)  // blue for down
+        else -> Green           // green for level
+    }
+
+    Surface(
+        shape = RoundedCornerShape(20.dp),
+        color = Color.Black.copy(alpha = 0.6f),
+        border = androidx.compose.foundation.BorderStroke(1.dp, labelColor.copy(alpha = 0.4f)),
+        modifier = modifier
+    ) {
+        Row(
+            Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            // Visual phone icon with tilt rotation
+            Canvas(Modifier.size(24.dp)) {
+                val w = size.width * 0.5f
+                val h = size.height * 0.85f
+                val cx = size.width / 2f
+                val cy = size.height / 2f
+
+                // Draw tilted phone rectangle
+                rotate(phoneRotation)
+                drawRoundRect(
+                    color = labelColor,
+                    topLeft = Offset(cx - w / 2, cy - h / 2),
+                    size = androidx.compose.ui.geometry.Size(w, h),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(w * 0.2f)
+                )
+                // Screen area
+                drawRoundRect(
+                    color = Color.Black.copy(alpha = 0.4f),
+                    topLeft = Offset(cx - w * 0.35f, cy - h * 0.3f),
+                    size = androidx.compose.ui.geometry.Size(w * 0.7f, h * 0.6f),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(2.dp.toPx())
+                )
+            }
+
+            // Directional arrows
+            if (direction != 0f) {
+                Canvas(Modifier.size(10.dp, 16.dp)) {
+                    val arrowColor = labelColor
+                    val arrowLen = size.width * 0.4f
+                    val cx = size.width / 2f
+                    if (direction < 0) {
+                        // Up arrow
+                        drawLine(arrowColor, Offset(cx, 2.dp.toPx()), Offset(cx, size.height - 2.dp.toPx()), 2.dp.toPx())
+                        drawLine(arrowColor, Offset(cx, 2.dp.toPx()), Offset(cx - arrowLen, 6.dp.toPx()), 2.dp.toPx())
+                        drawLine(arrowColor, Offset(cx, 2.dp.toPx()), Offset(cx + arrowLen, 6.dp.toPx()), 2.dp.toPx())
+                    } else {
+                        // Down arrow
+                        drawLine(arrowColor, Offset(cx, 2.dp.toPx()), Offset(cx, size.height - 2.dp.toPx()), 2.dp.toPx())
+                        drawLine(arrowColor, Offset(cx, size.height - 2.dp.toPx()), Offset(cx - arrowLen, size.height - 6.dp.toPx()), 2.dp.toPx())
+                        drawLine(arrowColor, Offset(cx, size.height - 2.dp.toPx()), Offset(cx + arrowLen, size.height - 6.dp.toPx()), 2.dp.toPx())
+                    }
+                }
+            }
+
+            Text(
+                label,
+                color = labelColor,
+                fontSize = 10.sp,
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Bold
+            )
+        }
     }
 }
 
