@@ -504,9 +504,11 @@ private fun TiltIndicator(direction: Float, label: String, modifier: Modifier = 
                 val cx = size.width / 2f
                 val cy = size.height / 2f
 
-                // Draw tilted phone rectangle
+                // Draw tilted phone rectangle — rotate around center
                 drawContext.canvas.save()
-                drawContext.canvas.rotate(phoneRotation, cx, cy)
+                drawContext.canvas.translate(cx, cy)
+                drawContext.canvas.rotate(phoneRotation)
+                drawContext.canvas.translate(-cx, -cy)
                 drawRoundRect(
                     color = labelColor,
                     topLeft = Offset(cx - w / 2, cy - h / 2),
