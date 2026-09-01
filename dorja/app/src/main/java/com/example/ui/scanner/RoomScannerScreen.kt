@@ -145,6 +145,7 @@ fun RoomScannerScreen(
     val permLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted -> hasCamera = granted }
 
     var heading by remember { mutableFloatStateOf(0f) }
+    var pitch by remember { mutableFloatStateOf(0f) } // phone tilt: negative = tilted back (up), positive = tilted forward (down)
     var gyroOn by remember { mutableStateOf(true) }
     val capturedFrames = remember { mutableStateListOf<FrameData>() }
     var currentTarget by remember { mutableIntStateOf(0) }
@@ -163,6 +164,7 @@ fun RoomScannerScreen(
                         SensorManager.getRotationMatrixFromVector(rotMatrix, e.values)
                         SensorManager.getOrientation(rotMatrix, orientAngles)
                         heading = ((Math.toDegrees(orientAngles[0].toDouble()) % 360.0) + 360.0).toFloat() % 360f
+                        pitch = Math.toDegrees(orientAngles[1].toDouble()).toFloat() // pitch: tilt angle
                     }
                 }
                 override fun onAccuracyChanged(s: Sensor?, a: Int) {}
@@ -174,13 +176,20 @@ fun RoomScannerScreen(
 
     LaunchedEffect(Unit) { if (!hasCamera) permLauncher.launch(Manifest.permission.CAMERA) }
 
-    // Haptic buzz when tilt direction changes between shots
+    // Compute target tilt for current shot based on elevation profile
+    val targetTiltForShot = when (currentTarget % 6) {
+        1, 5 -> -15f  // phone should be tilted back (up)
+        3 -> 15f      // phone should be tilted forward (down)
+        else -> 0f    // phone should be level
+    }
+
+    // Haptic buzz when the user needs to change tilt direction
     var prevTiltDir by remember { mutableIntStateOf(0) }
     LaunchedEffect(currentTarget) {
-        val newTiltDir = when (currentTarget % 6) {
-            1, 5 -> -1  // up
-            3 -> 1       // down
-            else -> 0    // level
+        val newTiltDir = when {
+            targetTiltForShot > 8f -> 1   // needs down tilt
+            targetTiltForShot < -8f -> -1  // needs up tilt
+            else -> 0                      // level
         }
         if (newTiltDir != prevTiltDir && currentTarget > 0) {
             vibrateTiltChange(ctx)
@@ -196,7 +205,7 @@ fun RoomScannerScreen(
 
             Phase.PREVIEW -> PreviewPhase(imageCapture, { imageCapture = it }, hasCamera, selectedRoom?.displayName ?: "Room", gyroOn, { gyroOn = !gyroOn }, { phase = Phase.CAPTURING }, { phase = Phase.SELECT }, lifecycleOwner)
 
-            Phase.CAPTURING -> CapturingPhase(imageCapture, { imageCapture = it }, hasCamera, heading, currentTarget, TOTAL_SHOTS, capturedFrames.size, gyroOn, { gyroOn = !gyroOn }, onCapture = {
+            Phase.CAPTURING -> CapturingPhase(imageCapture, { imageCapture = it }, hasCamera, heading, pitch, currentTarget, TOTAL_SHOTS, capturedFrames.size, gyroOn, { gyroOn = !gyroOn }, onCapture = {
                 val ic = imageCapture ?: return@CapturingPhase
                 val angle = currentTarget * (360 / TOTAL_SHOTS)
                 val file = File(ctx.cacheDir, "frame_${angle}_${System.currentTimeMillis()}.jpg")
@@ -326,7 +335,7 @@ private fun PreviewPhase(imageCapture: ImageCapture?, onCaptureReady: (ImageCapt
 //  PHASE 3 — CAPTURING
 // ═════════════════════════════════════════════════════════════
 @Composable
-private fun CapturingPhase(imageCapture: ImageCapture?, onCaptureReady: (ImageCapture) -> Unit, hasCamera: Boolean, heading: Float, targetIndex: Int, totalShots: Int, capturedCount: Int, gyroOn: Boolean, onToggleGyro: () -> Unit, onCapture: () -> Unit, onStop: () -> Unit, onBack: () -> Unit, lifecycleOwner: androidx.lifecycle.LifecycleOwner) {
+private fun CapturingPhase(imageCapture: ImageCapture?, onCaptureReady: (ImageCapture) -> Unit, hasCamera: Boolean, heading: Float, currentPitch: Float, targetIndex: Int, totalShots: Int, capturedCount: Int, gyroOn: Boolean, onToggleGyro: () -> Unit, onCapture: () -> Unit, onStop: () -> Unit, onBack: () -> Unit, lifecycleOwner: androidx.lifecycle.LifecycleOwner) {
     val targetAngle = targetIndex * (360 / totalShots)
     Box(Modifier.fillMaxSize()) {
         CameraPreview(imageCapture, onCaptureReady, hasCamera, lifecycleOwner)
@@ -350,21 +359,29 @@ private fun CapturingPhase(imageCapture: ImageCapture?, onCaptureReady: (ImageCa
         }
         Box(Modifier.align(Alignment.BottomStart).padding(start = 16.dp, bottom = 130.dp)) { GyroChip(gyroOn, onToggleGyro) }
         Text("Point at ${targetAngle}° and tap shutter", color = Color.White.copy(alpha = 0.6f), fontSize = 10.sp, fontFamily = FontFamily.Monospace, modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 110.dp))
-        // Vertical tilt guidance with visual indicator
-        val tiltDirection = when (targetIndex % 6) {
-            0 -> 0f   // level
-            1 -> -1f  // up
-            2 -> 0f   // level
-            3 -> 1f   // down
-            4 -> 0f   // level
-            else -> -1f // up
+        // Vertical tilt guidance — derived from real gyroscope pitch, not hardcoded
+        // Each shot has an ideal tilt angle:
+        //   level shots: idealPitch = 0
+        //   up shots: idealPitch = -15 (tilted back)
+        //   down shots: idealPitch = +15 (tilted forward)
+        val idealPitch = when (targetIndex % 6) {
+            1, 5 -> -15f  // tilt up (phone tilted back)
+            3 -> 15f      // tilt down (phone tilted forward)
+            else -> 0f    // level
+        }
+        // Tilt guidance state derived from real pitch vs ideal pitch
+        val pitchError = currentPitch - idealPitch
+        val tiltDirection = when {
+            pitchError < -10f -> -1f  // phone is too far forward, need to tilt up
+            pitchError > 10f -> 1f    // phone is too far back, need to tilt down
+            else -> 0f                // within tolerance
         }
         val tiltLabel = when (tiltDirection.toInt()) {
             -1 -> "TILT UP"
             1 -> "TILT DOWN"
             else -> "LEVEL"
         }
-        TiltIndicator(tiltDirection, tiltLabel, Modifier.align(Alignment.BottomCenter).padding(bottom = 82.dp))
+        TiltIndicator(tiltDirection, tiltLabel, currentPitch, idealPitch, Modifier.align(Alignment.BottomCenter).padding(bottom = 82.dp))
     }
 }
 
@@ -465,25 +482,21 @@ private fun StatTile(label: String, value: String, modifier: Modifier = Modifier
 }
 
 @Composable
-private fun TiltIndicator(direction: Float, label: String, modifier: Modifier = Modifier) {
+private fun TiltIndicator(direction: Float, label: String, actualPitch: Float = 0f, idealPitch: Float = 0f, modifier: Modifier = Modifier) {
     // direction: -1 = UP, 0 = LEVEL, +1 = DOWN
-    // Animate the phone rotation smoothly
-    val infiniteTransition = rememberInfiniteTransition(label = "tilt")
-    val animatedTilt by infiniteTransition.animateFloat(
-        initialValue = direction * 8f - 2f,
-        targetValue = direction * 8f + 2f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(900, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "tiltAngle"
-    )
-    val phoneRotation = if (direction == 0f) 0f else animatedTilt
+    // actualPitch: real gyroscope pitch in degrees (negative = tilted back)
+    // idealPitch: target tilt angle for this shot
 
-    val labelColor = when (direction.toInt()) {
-        -1 -> Color(0xFFFF9800) // orange for up
-        1 -> Color(0xFF2196F3)  // blue for down
-        else -> Green           // green for level
+    // Map real pitch to phone icon rotation (clamped to reasonable range)
+    val phoneRotation = actualPitch.coerceIn(-30f, 30f)
+
+    // Color based on whether user is on-target
+    val onTarget = abs(actualPitch - idealPitch) < 10f
+    val labelColor = when {
+        !onTarget && direction < 0 -> Color(0xFFFF9800) // orange: needs up
+        !onTarget && direction > 0 -> Color(0xFF2196F3)  // blue: needs down
+        onTarget -> Green                                 // green: on target
+        else -> Color.White.copy(alpha = 0.5f)            // waiting for pitch data
     }
 
     Surface(
