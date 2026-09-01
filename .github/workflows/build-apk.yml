@@ -67,6 +67,13 @@ jobs:
       - name: Decode keystore from GitHub secret
         run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > dorja/release.keystore
 
+      - name: Generate debug keystore
+        working-directory: dorja
+        run: |
+          keytool -genkey -v -keystore debug.keystore -keyalgorithm RSA -keysize 2048 \
+            -validity 10000 -alias androiddebugkey -keypass android -storepass android \
+            -dname "CN=Android Debug,O=Android,C=US"
+
       - name: Build debug APK
         working-directory: dorja
         run: gradle assembleDebug --no-daemon --stacktrace
