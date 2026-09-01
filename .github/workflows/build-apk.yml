@@ -70,9 +70,9 @@ jobs:
       - name: Generate debug keystore
         working-directory: dorja
         run: |
-          keytool -genkey -v -keystore debug.keystore -keyalgorithm RSA -keysize 2048 \
+          keytool -genkeypair -v -keystore debug.keystore -keyalg RSA -keysize 2048 \
             -validity 10000 -alias androiddebugkey -keypass android -storepass android \
-            -dname "CN=Android Debug,O=Android,C=US"
+            -dname "CN=Android Debug,O=Android,C=US" -noprompt
 
       - name: Build debug APK
         working-directory: dorja
