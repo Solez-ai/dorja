@@ -371,14 +371,16 @@ private fun CapturingPhase(imageCapture: ImageCapture?, onCaptureReady: (ImageCa
         }
         // Tilt guidance state derived from real pitch vs ideal pitch
         val pitchError = currentPitch - idealPitch
+        // pitchError > 0: actual pitch is higher (more forward/down) than ideal → tilt backward/up
+        // pitchError < 0: actual pitch is lower (more back/up) than ideal → tilt forward/down
         val tiltDirection = when {
-            pitchError < -10f -> -1f  // phone is too far forward, need to tilt up
-            pitchError > 10f -> 1f    // phone is too far back, need to tilt down
+            pitchError < -10f -> -1f  // phone tilted too far back, tilt forward (down)
+            pitchError > 10f -> 1f    // phone tilted too far forward, tilt backward (up)
             else -> 0f                // within tolerance
         }
         val tiltLabel = when (tiltDirection.toInt()) {
-            -1 -> "TILT UP"
-            1 -> "TILT DOWN"
+            -1 -> "TILT DOWN"
+            1 -> "TILT UP"
             else -> "LEVEL"
         }
         TiltIndicator(tiltDirection, tiltLabel, currentPitch, idealPitch, Modifier.align(Alignment.BottomCenter).padding(bottom = 82.dp))

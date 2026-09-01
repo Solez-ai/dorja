@@ -19,3 +19,6 @@ debug.keystore
 dorja-release.keystore
 dorja-release.keystore.base64
 release.keystore
+doc/DORJA.pptx
+docs/
+.gitattributes

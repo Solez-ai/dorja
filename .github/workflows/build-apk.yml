@@ -5,6 +5,9 @@ on:
     branches: [main]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -64,8 +67,13 @@ jobs:
       - name: Decode keystore from GitHub secret
         run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > dorja/release.keystore
 
+      - name: Build debug APK
+        working-directory: dorja
+        run: gradle assembleDebug --no-daemon --stacktrace
+
       - name: Build signed release APK
         working-directory: dorja
+        continue-on-error: true
         env:
           KEYSTORE_PATH: ${{ github.workspace }}/dorja/release.keystore
           STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
@@ -73,10 +81,33 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: gradle assembleRelease --no-daemon --stacktrace
 
-      - name: Upload APK artifact
+      - name: Upload debug APK artifact
         uses: actions/upload-artifact@v4
+        with:
+          name: dorja-debug-apk
+          path: dorja/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 14
+          if-no-files-found: error
+
+      - name: Upload release APK artifact
+        uses: actions/upload-artifact@v4
+        continue-on-error: true
         with:
           name: dorja-release-apk
           path: dorja/app/build/outputs/apk/release/*.apk
           retention-days: 14
-          if-no-files-found: error
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Latest Build
+          make_latest: true
+          files: |
+            dorja/app/build/outputs/apk/debug/app-debug.apk
+            dorja/app/build/outputs/apk/release/*.apk
+          body: |
+            Latest development build from main.
+
+            Install on any Android device running Android 7.0+.
+            The debug APK works without signing keys.

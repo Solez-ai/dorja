@@ -22,9 +22,48 @@ jobs:
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "9.3.1"
+
+      - name: Generate gradle wrapper
+        run: gradle wrapper
+
+      - name: Create google-services.json placeholder
+        run: |
+          cat > app/google-services.json << 'GSEOF'
+          {
+            "project_info": {
+              "project_number": "000000000000",
+              "project_id": "dorja-placeholder",
+              "storage_bucket": "dorja-placeholder.appspot.com"
+            },
+            "client": [
+              {
+                "client_info": {
+                  "mobilesdk_app_id": "1:000000000000:android:0000000000000000",
+                  "android_client_info": {
+                    "package_name": "com.dorja.app"
+                  }
+                },
+                "api_key": [{ "current_key": "placeholder" }],
+                "services": {}
+              }
+            ],
+            "configuration_version": "1"
+          }
+          GSEOF
+
+      - name: Create .env from example
+        run: cp .env.example .env || true
 
       - name: Build debug APK
         run: ./gradlew assembleDebug
+
+      - name: Upload APK as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dorja-debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
 
       - name: Create release
         uses: softprops/action-gh-release@v2
