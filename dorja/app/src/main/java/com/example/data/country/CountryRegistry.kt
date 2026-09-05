@@ -22,6 +22,21 @@ enum class AtlasConfidence(val label: String) {
     NO_LAUNCH("No launch")
 }
 
+/**
+ * Liveability/energy evidence fields (PLAN.md Phase 3). Which fields exist is
+ * a per-country data decision: Europe renders energy classes and running
+ * costs; Bangladesh/South Asia renders power backup, water, flood risk.
+ */
+enum class LiveabilityField(val label: String) {
+    ENERGY_CLASS("Energy performance class"),
+    ENERGY_ISSUER("Certificate issuer"),
+    HEATING_COST("Annual heating cost"),
+    RENOVATION_YEAR("Last major renovation"),
+    POWER_BACKUP("Power backup"),
+    WATER_SUPPLY("Water supply"),
+    FLOOD_RISK("Flood / waterlogging risk")
+}
+
 data class DocumentTypeSpec(
     val code: String,
     val label: String,
@@ -46,6 +61,13 @@ data class CountryProfile(
     val govtVerifyUrl: String? = null,
     /** Human label for that portal, e.g. "RERA portal (rera.mohua.gov.in)". */
     val govtVerifyLabel: String? = null,
+    /**
+     * Liveability/energy fields this market expects (Phase 3 machinery).
+     * Code renders only what the profile lists — adding a market is data.
+     */
+    val liveabilityFields: List<LiveabilityField> = emptyList(),
+    /** What identity proof this market expects, so UI can be honest about what DORJA does/does not check. */
+    val identityVerificationNote: String = "",
     val confidence: AtlasConfidence = AtlasConfidence.DISCOVERY_REQUIRED,
     val launchStage: Int = 99            // Atlas staged rollout: 1=launched, 2..5=planned, 99=not planned
 ) {
@@ -64,6 +86,12 @@ object CountryRegistry {
             currencySymbol = "\u09F3",
             formatLocaleTag = "bn-BD",
             primaryLanguages = listOf("bn-BD", "en"),
+            liveabilityFields = listOf(
+                LiveabilityField.POWER_BACKUP,
+                LiveabilityField.WATER_SUPPLY,
+                LiveabilityField.FLOOD_RISK
+            ),
+            identityVerificationNote = "Bangladesh transactions commonly rely on NID verification at the sub-registry office; DORJA records the upload but does not certify identity.",
             documentTypes = listOf(
                 DocumentTypeSpec("KHATIAN_PORCHA", "Khatian / Porcha"),
                 DocumentTypeSpec("MUTATION_NAMZARI", "Mutation / Namzari"),
@@ -180,12 +208,26 @@ object CountryRegistry {
             iso2 = "FR", displayName = "France",
             currencyCode = "EUR", currencySymbol = "€", formatLocaleTag = "fr-FR",
             primaryLanguages = listOf("fr-FR", "en"),
+            liveabilityFields = listOf(
+                LiveabilityField.ENERGY_CLASS,
+                LiveabilityField.ENERGY_ISSUER,
+                LiveabilityField.HEATING_COST,
+                LiveabilityField.RENOVATION_YEAR
+            ),
+            identityVerificationNote = "French rentals commonly expect a dossier with payslips and a guarantor; DORJA stores your evidence but does not run credit checks.",
             confidence = AtlasConfidence.REGIONAL_EVIDENCE, launchStage = 3
         ),
         CountryProfile(
             iso2 = "DE", displayName = "Germany",
             currencyCode = "EUR", currencySymbol = "€", formatLocaleTag = "de-DE",
             primaryLanguages = listOf("de-DE", "en"),
+            liveabilityFields = listOf(
+                LiveabilityField.ENERGY_CLASS,
+                LiveabilityField.ENERGY_ISSUER,
+                LiveabilityField.HEATING_COST,
+                LiveabilityField.RENOVATION_YEAR
+            ),
+            identityVerificationNote = "German landlords commonly request SCHUFA and income proof; DORJA stores your evidence but does not run credit checks.",
             confidence = AtlasConfidence.REGIONAL_EVIDENCE, launchStage = 3
         ),
         CountryProfile(

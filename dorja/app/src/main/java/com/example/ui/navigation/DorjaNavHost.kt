@@ -42,6 +42,7 @@ import com.example.ui.explore.ExploreScreen
 import com.example.ui.handover.HandoverPassportScreen
 import com.example.ui.listing.CreateListingScreen
 import com.example.ui.pass.ViewingPassScreen
+import com.example.ui.relocation.RelocationModeScreen
 import com.example.ui.seller.HostListingsScreen
 import com.example.ui.splash.SplashScreen
 import com.example.ui.theme.DorjaColors
@@ -75,7 +76,9 @@ sealed class Screen(val route: String) {
     object RoomScanner : Screen("room_scanner/{listingId}") {
         fun createRoute(listingId: String) = "room_scanner/$listingId"
     }
-
+    object RelocationMode : Screen("relocation_mode?origin={origin}&dest={dest}") {
+        fun createRoute(origin: String, destination: String) = "relocation_mode?origin=$origin&dest=$destination"
+    }
 }
 
 enum class HostTab(val title: String, val icon: ImageVector, val tag: String) {
@@ -145,6 +148,9 @@ fun DorjaNavHost() {
                 },
                 onNavigateToHandover = { listingId ->
                     navController.navigate(Screen.HandoverPassport.createRoute(listingId))
+                },
+                onNavigateToRelocation = { origin, dest ->
+                    navController.navigate(Screen.RelocationMode.createRoute(origin, dest))
                 }
             )
         }
@@ -243,6 +249,22 @@ fun DorjaNavHost() {
                 onBack = { navController.popBackStack() }
             )
         }
+
+        composable(
+            route = Screen.RelocationMode.route,
+            arguments = listOf(
+                navArgument("origin") { type = NavType.StringType; defaultValue = "BD" },
+                navArgument("dest") { type = NavType.StringType; defaultValue = "BD" }
+            )
+        ) { backStackEntry ->
+            val origin = backStackEntry.arguments?.getString("origin") ?: "BD"
+            val dest = backStackEntry.arguments?.getString("dest") ?: "BD"
+            RelocationModeScreen(
+                initialOrigin = origin,
+                initialDestination = dest,
+                onBack = { navController.popBackStack() }
+            )
+        }
     }
 }
 
@@ -254,7 +276,8 @@ fun MainContainer(
     onNavigateToScanner: (String) -> Unit,
     onNavigateToChatThread: (String) -> Unit,
     onNavigateToPass: (String) -> Unit,
-    onNavigateToHandover: (String) -> Unit
+    onNavigateToHandover: (String) -> Unit,
+    onNavigateToRelocation: (String, String) -> Unit = { _, _ -> }
 ) {
     val repository = DorjaApp.instance.repository
     val currentUser by repository.currentUser.collectAsState()
@@ -344,7 +367,8 @@ fun MainContainer(
                     HostTab.VISITS -> VisitsScreen(onOpenPass = onNavigateToPass)
                     HostTab.INBOX -> InboxScreen(onOpenConversation = onNavigateToChatThread)
                     HostTab.ACCOUNT -> AccountScreen(
-                        onNavigateToSellerSuite = onNavigateToCreateListing
+                        onNavigateToSellerSuite = onNavigateToCreateListing,
+                        onNavigateToRelocation = onNavigateToRelocation
                     )
                 }
             } else {
@@ -353,7 +377,8 @@ fun MainContainer(
                     BuyerTab.VISITS -> VisitsScreen(onOpenPass = onNavigateToPass)
                     BuyerTab.INBOX -> InboxScreen(onOpenConversation = onNavigateToChatThread)
                     BuyerTab.ACCOUNT -> AccountScreen(
-                        onNavigateToSellerSuite = onNavigateToCreateListing
+                        onNavigateToSellerSuite = onNavigateToCreateListing,
+                        onNavigateToRelocation = onNavigateToRelocation
                     )
                 }
             }

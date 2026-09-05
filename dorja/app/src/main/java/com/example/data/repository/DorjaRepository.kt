@@ -116,7 +116,14 @@ class DorjaRepository(private val database: DorjaDatabase) {
         description: String,
         customRooms: List<RoomItem>,
         legalDocs: List<LegalDocument> = emptyList(),
-        countryCode: String = "BD"
+        countryCode: String = "BD",
+        energyCertificateClass: String? = null,
+        energyCertificateIssuer: String? = null,
+        annualHeatingCost: Long? = null,
+        renovationYear: Int? = null,
+        powerBackup: String? = null,
+        waterSupply: String? = null,
+        floodRisk: String? = null
     ): String {
         val ownerId = _currentUser.value?.id ?: "u1"
         val id = "l_" + UUID.randomUUID().toString().take(8)
@@ -147,6 +154,13 @@ class DorjaRepository(private val database: DorjaDatabase) {
             coverPhotoUrl = coverPhotoUrl,
             description = description,
             hasScan = has3D,
+            energyCertificateClass = energyCertificateClass,
+            energyCertificateIssuer = energyCertificateIssuer,
+            annualHeatingCost = annualHeatingCost,
+            renovationYear = renovationYear,
+            powerBackup = powerBackup,
+            waterSupply = waterSupply,
+            floodRisk = floodRisk,
             createdAt = System.currentTimeMillis()
         )
         listingDao.insertListing(listing)

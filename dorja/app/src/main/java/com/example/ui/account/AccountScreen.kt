@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.FactCheck
+import androidx.compose.material.icons.filled.FlightTakeoff
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
@@ -89,7 +90,8 @@ import androidx.compose.ui.res.painterResource
 
 @Composable
 fun AccountScreen(
-    onNavigateToSellerSuite: () -> Unit = {}
+    onNavigateToSellerSuite: () -> Unit = {},
+    onNavigateToRelocation: (origin: String, destination: String) -> Unit = { _, _ -> }
 ) {
     val repository = DorjaApp.instance.repository
     val scope = rememberCoroutineScope()
@@ -733,6 +735,55 @@ fun AccountScreen(
                             text = "Re-confirming refreshes your own attestation and evidence-check dates. It never raises an evidence level and is never shown as independent verification.",
                             style = MaterialTheme.typography.labelSmall,
                             color = DorjaColors.Gray500
+                        )
+                    }
+                }
+            }
+
+            // Cross-border Relocation Mode (atlas §8)
+            item {
+                BentoCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = {
+                        onNavigateToRelocation(user.countryCode, if (user.countryCode == "BD") "IN" else "BD")
+                    }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(DorjaColors.BentoBlueBg),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.FlightTakeoff,
+                                contentDescription = null,
+                                tint = DorjaColors.BentoBlueIcon,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Relocation Mode",
+                                style = MaterialTheme.typography.titleSmall,
+                                color = DorjaColors.Ink950,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "Moving abroad? Get the destination checklist, official records, language notes and the professionals you may need.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = DorjaColors.Gray700
+                            )
+                        }
+                        Icon(
+                            imageVector = Icons.Default.ChevronRight,
+                            contentDescription = null,
+                            tint = DorjaColors.Gray500
                         )
                     }
                 }

@@ -43,6 +43,15 @@ data class Listing(
     val coverPhotoUrl: String? = null,
     val description: String = "",
     val hasScan: Boolean = false,
+    // Phase 3 liveability/energy evidence — rendered only when the listing's
+    // CountryProfile.liveabilityFields includes the matching field.
+    val energyCertificateClass: String? = null,
+    val energyCertificateIssuer: String? = null,
+    val annualHeatingCost: Long? = null,
+    val renovationYear: Int? = null,
+    val powerBackup: String? = null,
+    val waterSupply: String? = null,
+    val floodRisk: String? = null,
     val createdAt: Long = System.currentTimeMillis()
 )
 

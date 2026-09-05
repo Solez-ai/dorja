@@ -143,6 +143,7 @@ import com.example.DorjaApp
 import com.example.R
 import com.example.data.country.AuthorityLinks
 import com.example.data.country.CountryRegistry
+import com.example.data.country.LiveabilityField
 import com.example.data.model.DEFAULT_SELF_DECLARED_NOTE
 import com.example.data.model.EvidenceLevel
 import com.example.data.model.LegalDocument
@@ -168,6 +169,14 @@ import android.graphics.Bitmap
 import android.net.Uri
 import kotlin.math.min
 import kotlin.math.max
+
+@Composable
+private fun energyFieldColors() = OutlinedTextFieldDefaults.colors(
+    focusedContainerColor = DorjaColors.White,
+    unfocusedContainerColor = DorjaColors.White,
+    focusedBorderColor = DorjaColors.Jol600,
+    unfocusedBorderColor = DorjaColors.BentoCardBorder
+)
 
 data class PhotoAssignmentItem(
     val id: String = UUID.randomUUID().toString(),
@@ -199,6 +208,15 @@ fun CreateListingScreen(
     var sqftText by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
     var countryCode by remember { mutableStateOf(repository.currentUser.value?.countryCode ?: "BD") }
+
+    // Phase 3 liveability/energy evidence — shown only for profiles that expect it
+    var energyClassText by remember { mutableStateOf("") }
+    var energyIssuerText by remember { mutableStateOf("") }
+    var heatingCostText by remember { mutableStateOf("") }
+    var renovationYearText by remember { mutableStateOf("") }
+    var powerBackupText by remember { mutableStateOf("") }
+    var waterSupplyText by remember { mutableStateOf("") }
+    var floodRiskText by remember { mutableStateOf("") }
 
     val selectedTags = remember {
         mutableStateListOf<String>()
@@ -2036,6 +2054,90 @@ fun CreateListingScreen(
                 }
             }
 
+            // Liveability & Energy Card (Phase 3) — fields come from the selected
+            // country's profile; a market gets only the fields it expects.
+            if (activeProfile.liveabilityFields.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                BentoCard(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Text(
+                            text = "LIVEABILITY & ENERGY (${activeProfile.displayName.uppercase()})",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = DorjaColors.Gray500,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        activeProfile.liveabilityFields.forEach { field ->
+                            when (field) {
+                                LiveabilityField.ENERGY_CLASS -> OutlinedTextField(
+                                    value = energyClassText,
+                                    onValueChange = { energyClassText = it },
+                                    label = { Text(field.label + " (e.g. DPE: C)") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    singleLine = true,
+                                    colors = energyFieldColors()
+                                )
+                                LiveabilityField.ENERGY_ISSUER -> OutlinedTextField(
+                                    value = energyIssuerText,
+                                    onValueChange = { energyIssuerText = it },
+                                    label = { Text(field.label) },
+                                    placeholder = { Text("e.g. Certifier name / diagnostics body") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    singleLine = true,
+                                    colors = energyFieldColors()
+                                )
+                                LiveabilityField.HEATING_COST -> OutlinedTextField(
+                                    value = heatingCostText,
+                                    onValueChange = { heatingCostText = it.filter { c -> c.isDigit() } },
+                                    label = { Text("${field.label} (${activeProfile.currencySymbol}/year)") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    singleLine = true,
+                                    colors = energyFieldColors()
+                                )
+                                LiveabilityField.RENOVATION_YEAR -> OutlinedTextField(
+                                    value = renovationYearText,
+                                    onValueChange = { renovationYearText = it.filter { c -> c.isDigit() }.take(4) },
+                                    label = { Text(field.label) },
+                                    placeholder = { Text("e.g. 2019") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    singleLine = true,
+                                    colors = energyFieldColors()
+                                )
+                                LiveabilityField.POWER_BACKUP -> OutlinedTextField(
+                                    value = powerBackupText,
+                                    onValueChange = { powerBackupText = it },
+                                    label = { Text(field.label) },
+                                    placeholder = { Text("e.g. IPS/UPS, generator for lift & common areas") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    singleLine = true,
+                                    colors = energyFieldColors()
+                                )
+                                LiveabilityField.WATER_SUPPLY -> OutlinedTextField(
+                                    value = waterSupplyText,
+                                    onValueChange = { waterSupplyText = it },
+                                    label = { Text(field.label) },
+                                    placeholder = { Text("e.g. WASA line + rooftop reservoir") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    singleLine = true,
+                                    colors = energyFieldColors()
+                                )
+                                LiveabilityField.FLOOD_RISK -> OutlinedTextField(
+                                    value = floodRiskText,
+                                    onValueChange = { floodRiskText = it },
+                                    label = { Text(field.label) },
+                                    placeholder = { Text("e.g. area waterlogs in monsoon; ground floor affected") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    singleLine = true,
+                                    colors = energyFieldColors()
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                        }
+                    }
+                }
+            }
+
             // Promises Section
             var showAddPromiseDialog by remember { mutableStateOf(false) }
             var newPromiseCategory by remember { mutableStateOf("HANDOVER_DATE") }
@@ -2302,7 +2404,14 @@ fun CreateListingScreen(
                             description = description,
                             customRooms = finalRooms,
                             legalDocs = customLegalDocs,
-                            countryCode = countryCode
+                            countryCode = countryCode,
+                            energyCertificateClass = energyClassText.trim().ifBlank { null },
+                            energyCertificateIssuer = energyIssuerText.trim().ifBlank { null },
+                            annualHeatingCost = heatingCostText.toLongOrNull(),
+                            renovationYear = renovationYearText.toIntOrNull(),
+                            powerBackup = powerBackupText.trim().ifBlank { null },
+                            waterSupply = waterSupplyText.trim().ifBlank { null },
+                            floodRisk = floodRiskText.trim().ifBlank { null }
                         )
                         // Save promises for this listing
                         customPromises.forEach { promise ->

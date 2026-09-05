@@ -23,19 +23,25 @@ object Formatters {
         else -> Locale.US
     }
 
-    private fun formatAmount(amount: Int, currencyCode: String): String {
+    private fun formatAmount(amount: Int, currencyCode: String): String =
+        formatAmount(amount.toLong(), currencyCode)
+
+    private fun formatAmount(amount: Long, currencyCode: String): String {
         val locale = localeFor(currencyCode)
         return try {
             val fmt = NumberFormat.getCurrencyInstance(locale)
             val symbolCurrency = Currency.getInstance(locale).currencyCode
-            val formatted = fmt.format(amount.toLong())
+            val formatted = fmt.format(amount)
             // If the locale's default currency differs from the requested one,
             // keep the ISO code visible so the amount is never ambiguous.
             if (symbolCurrency == currencyCode) formatted else "$currencyCode $formatted"
         } catch (e: Exception) {
-            "$currencyCode ${NumberFormat.getNumberInstance(locale).format(amount.toLong())}"
+            "$currencyCode ${NumberFormat.getNumberInstance(locale).format(amount)}"
         }
     }
+
+    /** Currency-aware amount formatting for Long values (e.g. annual heating costs). */
+    fun formatAmountLong(amount: Long, currencyCode: String): String = formatAmount(amount, currencyCode)
 
     fun formatPrice(amount: Int, currencyCode: String, intent: String): String {
         val suffix = if (intent.equals("RENT", ignoreCase = true)) " / month" else ""

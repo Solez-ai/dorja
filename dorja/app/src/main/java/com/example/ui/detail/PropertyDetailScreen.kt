@@ -42,6 +42,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.EnergySavingsLeaf
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Link
@@ -86,6 +87,7 @@ import coil.compose.AsyncImage
 import com.example.DorjaApp
 import com.example.R
 import com.example.data.country.CountryRegistry
+import com.example.data.country.LiveabilityField
 import com.example.ui.util.DisclosurePackExporter
 import androidx.compose.ui.res.stringResource
 import com.example.data.model.RoomItem
@@ -763,6 +765,75 @@ fun PropertyDetailScreen(
                     SpecPill(icon = Icons.Default.Bathtub, label = "${safeListing.bathrooms} Baths", modifier = Modifier.weight(1f))
                     SpecPill(icon = Icons.Default.Balcony, label = "${safeListing.balconies} Balconies", modifier = Modifier.weight(1f))
                     SpecPill(icon = Icons.Default.SquareFoot, label = "${safeListing.sqft} Sqft", modifier = Modifier.weight(1f))
+                }
+
+                // Liveability & Energy (Phase 3) — only for profiles that expect these fields
+                val liveabilityProfile = CountryRegistry.profile(safeListing.countryCode)
+                val energyRows = listOfNotNull(
+                    if (liveabilityProfile.liveabilityFields.contains(LiveabilityField.ENERGY_CLASS) && !safeListing.energyCertificateClass.isNullOrBlank())
+                        LiveabilityField.ENERGY_CLASS.label to safeListing.energyCertificateClass!! else null,
+                    if (liveabilityProfile.liveabilityFields.contains(LiveabilityField.ENERGY_ISSUER) && !safeListing.energyCertificateIssuer.isNullOrBlank())
+                        LiveabilityField.ENERGY_ISSUER.label to safeListing.energyCertificateIssuer!! else null,
+                    if (liveabilityProfile.liveabilityFields.contains(LiveabilityField.HEATING_COST) && safeListing.annualHeatingCost != null)
+                        LiveabilityField.HEATING_COST.label to
+                            "${Formatters.formatAmountLong(safeListing.annualHeatingCost!!, safeListing.currency)} / year" else null,
+                    if (liveabilityProfile.liveabilityFields.contains(LiveabilityField.RENOVATION_YEAR) && safeListing.renovationYear != null)
+                        LiveabilityField.RENOVATION_YEAR.label to safeListing.renovationYear!!.toString() else null,
+                    if (liveabilityProfile.liveabilityFields.contains(LiveabilityField.POWER_BACKUP) && !safeListing.powerBackup.isNullOrBlank())
+                        LiveabilityField.POWER_BACKUP.label to safeListing.powerBackup!! else null,
+                    if (liveabilityProfile.liveabilityFields.contains(LiveabilityField.WATER_SUPPLY) && !safeListing.waterSupply.isNullOrBlank())
+                        LiveabilityField.WATER_SUPPLY.label to safeListing.waterSupply!! else null,
+                    if (liveabilityProfile.liveabilityFields.contains(LiveabilityField.FLOOD_RISK) && !safeListing.floodRisk.isNullOrBlank())
+                        LiveabilityField.FLOOD_RISK.label to safeListing.floodRisk!! else null
+                )
+                if (energyRows.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    BentoCard(modifier = Modifier.fillMaxWidth()) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(
+                                text = "LIVEABILITY & ENERGY",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = DorjaColors.Gray500,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            energyRows.forEach { (label, value) ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 3.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        Icons.Default.EnergySavingsLeaf,
+                                        contentDescription = null,
+                                        tint = DorjaColors.BentoGreenIcon,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "$label: ",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = DorjaColors.Gray500,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                    Text(
+                                        text = value,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = DorjaColors.Ink950,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                            Text(
+                                text = "Source-labelled claims from the host; verify certificates independently.",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = DorjaColors.Gray500,
+                                modifier = Modifier.padding(top = 4.dp)
+                            )
+                        }
+                    }
                 }
 
                 // BUYER REQUIREMENT: If 3D scans exist, the FIRST thing in the buyer menu is "SEE 3D SCANS"

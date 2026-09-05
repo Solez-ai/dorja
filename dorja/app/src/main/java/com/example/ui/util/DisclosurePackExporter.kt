@@ -35,6 +35,7 @@ object DisclosurePackExporter {
     private const val BRAND = Color.rgb(0x00, 0x61, 0xA4)
     private const val MUTED = Color.rgb(0x74, 0x77, 0x7F)
     private const val AMBER = Color.rgb(0x82, 0x55, 0x00)
+    private const val LINK = Color.rgb(0x00, 0x4A, 0x82)
 
     suspend fun generate(context: Context, listingId: String): File? {
         val repo = DorjaApp.instance.repository
@@ -58,6 +59,7 @@ object DisclosurePackExporter {
         val bodyBold = Paint().apply { color = Color.BLACK; textSize = 9.5f; typeface = Typeface.DEFAULT_BOLD }
         val smallPaint = Paint().apply { color = MUTED; textSize = 8f; typeface = Typeface.ITALIC }
         val amberPaint = Paint().apply { color = AMBER; textSize = 8.5f; typeface = Typeface.ITALIC }
+        val linkPaint = Paint().apply { color = LINK; textSize = 9.5f; typeface = Typeface.DEFAULT_BOLD }
 
         fun newPageIfNeeded(needed: Float) {
             if (y + needed > PAGE_H - BOTTOM) {
@@ -154,12 +156,27 @@ object DisclosurePackExporter {
                 )
                 val level = EvidenceLevel.fromCode(doc.evidenceLevel)
                 drawWrapped("Evidence: ${level.label.uppercase(Locale.getDefault())}", bodyBold)
-                val note = when {
-                    doc.limitationNote.isNotBlank() -> doc.limitationNote
+
+                // Official source gets its own labelled line, not buried in notes
+                // (atlas §4: an official-source claim must be independently checkable).
+                val officialSource = doc.notes.lineSequence()
+                    .firstOrNull { it.startsWith("Official source: ") }
+                    ?.removePrefix("Official source: ")
+                    ?.takeIf { it.isNotBlank() }
+                if (officialSource != null) {
+                    drawWrapped("Official source: $officialSource", linkPaint)
+                }
+
+                val note = doc.notes.lineSequence()
+                    .filterNot { it.startsWith("Official source: ") }
+                    .joinToString(" ")
+                    .ifBlank { doc.limitationNote }
+                val fallbackNote = when {
+                    note.isNotBlank() -> note
                     !EvidenceLevel.isConfirmed(level) -> "Not independently verified by DORJA."
                     else -> ""
                 }
-                if (note.isNotBlank()) drawWrapped("Note: $note", amberPaint)
+                if (fallbackNote.isNotBlank()) drawWrapped("Note: $fallbackNote", amberPaint)
                 y += LINE_H * 0.6f
             }
         }

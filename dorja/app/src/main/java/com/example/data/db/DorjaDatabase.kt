@@ -32,7 +32,7 @@ import kotlinx.coroutines.launch
         LegalDocument::class,
         PropertyPassport::class
     ],
-    version = 7,
+    version = 8,
     exportSchema = false
 )
 abstract class DorjaDatabase : RoomDatabase() {

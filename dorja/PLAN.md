@@ -166,7 +166,13 @@ Bangladesh already has the fullest profile: SafeView, promises, handover, 3D sca
 
 ### Phase 3 — One European pilot (atlas Stage 3)
 
-Choose after partner validation; build the machinery country-agnostic so any EU country is a data entry, not a code change:
+Choose after partner validation; build the machinery country-agnostic so any EU country is a data entry, not a code change.
+
+**Status (shipped):** the country-agnostic machinery is live.
+- `LiveabilityField` enum + `CountryProfile.liveabilityFields` — energy class/issuer, heating cost, renovation year (FR/DE seeded) and power backup/water/flood risk (BD seeded). Create-listing renders only what the profile lists; Property Detail shows a LIVEABILITY & ENERGY card when data exists.
+- `Listing` gained the seven liveability columns (Room v8, destructive migration as before).
+- `CountryProfile.identityVerificationNote` — honest per-market identity expectations (no credit-check claims).
+- `ui/relocation/RelocationModeScreen.kt` — origin/destination pickers, destination market status, disclosure checklist, official records, language & units, professional roles; entry point on Account screen; wired in `DorjaNavHost`.
 
 1. **Energy evidence layer** — `Listing` gains `energyCertificateClass: String?`, `energyCertificateIssuer: String?`, `annualHeatingCost: Long?`, `renovationYear: Int?` — all rendered only when the profile's `liveabilityFields` includes them (France DPE, Germany Energieausweis, Netherlands energielabel, etc.).
 2. **GDPR-style data controls** — the atlas requires minimization + deletion:
