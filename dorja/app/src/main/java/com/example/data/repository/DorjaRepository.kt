@@ -3,6 +3,9 @@ package com.example.data.repository
 import com.example.data.country.CountryRegistry
 import com.example.data.db.DorjaDatabase
 import com.example.data.model.Conversation
+import com.example.data.model.EVIDENCE_STALENESS_MS
+import com.example.data.model.EvidenceExpiry
+import com.example.data.model.EvidenceSummary
 import com.example.data.model.LegalDocument
 import com.example.data.model.Listing
 import com.example.data.model.Message
@@ -92,6 +95,7 @@ class DorjaRepository(private val database: DorjaDatabase) {
     // Listings
     fun getAllListings(): Flow<List<Listing>> = listingDao.getAllListings()
     fun getListingsByOwner(ownerId: String): Flow<List<Listing>> = listingDao.getListingsByOwner(ownerId)
+    suspend fun getListingsByOwnerSync(ownerId: String): List<Listing> = listingDao.getListingsByOwnerSync(ownerId)
     suspend fun getListingById(id: String): Listing? = listingDao.getListingById(id)
     fun observeListingById(id: String): Flow<Listing?> = listingDao.observeListingById(id)
 
@@ -179,7 +183,101 @@ class DorjaRepository(private val database: DorjaDatabase) {
         listingDao.deleteListingById(listingId)
         propertyPassportDao.deleteByListing(listingId)
         roomDao.deleteRoomsByListing(listingId)
+        scanDao.deleteScansByListing(listingId)
+        promiseDao.deletePromisesByListing(listingId)
         legalDocumentDao.deleteLegalDocumentsByListing(listingId)
+    }
+
+    /**
+     * Aggregate evidence-health snapshot across every legal document the user
+     * can see (all local listings). Counts confirmed uploads, self-declared
+     * uploads, stale checks (older than [EVIDENCE_STALENESS_MS]) and docs
+     * explicitly marked EXPIRED (atlas §3 vocabulary).
+     */
+    suspend fun getEvidenceSummary(): EvidenceSummary {
+        val docs = legalDocumentDao.getAllLegalDocuments()
+        val now = System.currentTimeMillis()
+        var confirmed = 0
+        var selfDeclared = 0
+        var stale = 0
+        var expired = 0
+        for (doc in docs) {
+            val level = com.example.data.model.EvidenceLevel.fromCode(doc.evidenceLevel)
+            if (com.example.data.model.EvidenceLevel.isConfirmed(level)) confirmed++
+            if (level == com.example.data.model.EvidenceLevel.SELF_DECLARED) selfDeclared++
+            if (doc.expiryState == EvidenceExpiry.EXPIRED.code || level == com.example.data.model.EvidenceLevel.EXPIRED) expired++
+            val checked = doc.checkedAt
+            if (checked != null && now - checked > EVIDENCE_STALENESS_MS) stale++
+        }
+        return EvidenceSummary(
+            totalDocs = docs.size,
+            confirmedDocs = confirmed,
+            selfDeclaredDocs = selfDeclared,
+            staleDocs = stale,
+            expiredDocs = expired
+        )
+    }
+
+    /**
+     * Re-confirm every self-declared or stale document across the user's
+     * listings: refreshes `checkedAt` to now and downgrades EXPIRED state back
+     * to VALID. This is a *user re-attestation*, not an independent
+     * verification — the evidence level itself is never raised here.
+     */
+    suspend fun reconfirmEvidence(): Int {
+        val docs = legalDocumentDao.getAllLegalDocuments()
+        val now = System.currentTimeMillis()
+        var updated = 0
+        for (doc in docs) {
+            val level = com.example.data.model.EvidenceLevel.fromCode(doc.evidenceLevel)
+            val isStale = doc.checkedAt != null && now - doc.checkedAt > EVIDENCE_STALENESS_MS
+            val needsTouch = level == com.example.data.model.EvidenceLevel.SELF_DECLARED || isStale ||
+                doc.expiryState == EvidenceExpiry.EXPIRED.code || doc.expiryState == EvidenceExpiry.UNKNOWN.code
+            if (!needsTouch) continue
+            legalDocumentDao.insertLegalDocument(
+                doc.copy(
+                    checkedAt = now,
+                    expiryState = EvidenceExpiry.VALID.code
+                )
+            )
+            updated++
+        }
+        return updated
+    }
+
+    /**
+     * GDPR Art. 17 "right to erasure" — content scope: removes every listing
+     * the user owns plus all conversations, messages, viewings, scans,
+     * promises and legal documents. User profile rows are kept.
+     */
+    suspend fun deleteAllMyContent() {
+        val userId = _currentUser.value?.id ?: return
+        val myListings = listingDao.getListingsByOwnerSync(userId)
+        for (listing in myListings) {
+            listingDao.deleteListingById(listing.id)
+            propertyPassportDao.deleteByListing(listing.id)
+            roomDao.deleteRoomsByListing(listing.id)
+            scanDao.deleteScansByListing(listing.id)
+            promiseDao.deletePromisesByListing(listing.id)
+        }
+        legalDocumentDao.deleteAllLegalDocuments()
+        messageDao.deleteAllMessages()
+        conversationDao.deleteAllConversations()
+        viewingDao.deleteAllViewings()
+    }
+
+    /**
+     * GDPR Art. 17 "right to erasure" — full scope: everything in
+     * [deleteAllMyContent] plus the user profile rows themselves. The local
+     * database is re-initialized with clean seed accounts afterwards so the
+     * app remains usable.
+     */
+    suspend fun eraseAllMyData() {
+        deleteAllMyContent()
+        userDao.deleteAllUsers()
+        database.clearAllTables()
+        DorjaDatabase.populateInitialData(database)
+        _currentUser.value = userDao.getUserById("u1")
     }
 
     // Rooms

@@ -36,6 +36,9 @@ interface UserDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(users: List<User>)
+
+    @Query("DELETE FROM users")
+    suspend fun deleteAllUsers()
 }
 
 @Dao
@@ -45,6 +48,9 @@ interface ListingDao {
 
     @Query("SELECT * FROM listings WHERE ownerId = :ownerId ORDER BY createdAt DESC")
     fun getListingsByOwner(ownerId: String): Flow<List<Listing>>
+
+    @Query("SELECT * FROM listings WHERE ownerId = :ownerId ORDER BY createdAt DESC")
+    suspend fun getListingsByOwnerSync(ownerId: String): List<Listing>
 
     @Query("SELECT * FROM listings WHERE id = :id LIMIT 1")
     suspend fun getListingById(id: String): Listing?
@@ -108,6 +114,12 @@ interface ScanDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(scans: List<Scan>)
+
+    @Query("DELETE FROM scans WHERE listingId = :listingId")
+    suspend fun deleteScansByListing(listingId: String)
+
+    @Query("DELETE FROM scans")
+    suspend fun deleteAllScans()
 }
 
 @Dao
@@ -129,6 +141,9 @@ interface ConversationDao {
 
     @Update
     suspend fun updateConversation(conversation: Conversation)
+
+    @Query("DELETE FROM conversations")
+    suspend fun deleteAllConversations()
 }
 
 @Dao
@@ -141,6 +156,9 @@ interface MessageDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(messages: List<Message>)
+
+    @Query("DELETE FROM messages")
+    suspend fun deleteAllMessages()
 }
 
 @Dao
@@ -195,6 +213,12 @@ interface ViewingDao {
 
     @Query("DELETE FROM viewings WHERE id = :id")
     suspend fun deleteViewingById(id: String)
+
+    @Query("DELETE FROM viewings WHERE seekerId = :userId OR hostId = :userId")
+    suspend fun deleteViewingsForUser(userId: String)
+
+    @Query("DELETE FROM viewings")
+    suspend fun deleteAllViewings()
 }
 
 @Dao
@@ -210,6 +234,12 @@ interface PromiseDao {
 
     @Update
     suspend fun updatePromise(promise: Promise)
+
+    @Query("DELETE FROM promises WHERE listingId = :listingId")
+    suspend fun deletePromisesByListing(listingId: String)
+
+    @Query("DELETE FROM promises")
+    suspend fun deleteAllPromises()
 }
 
 @Dao
@@ -234,4 +264,10 @@ interface LegalDocumentDao {
 
     @Query("DELETE FROM legal_documents WHERE listingId = :listingId")
     suspend fun deleteLegalDocumentsByListing(listingId: String)
+
+    @Query("SELECT * FROM legal_documents")
+    suspend fun getAllLegalDocuments(): List<com.example.data.model.LegalDocument>
+
+    @Query("DELETE FROM legal_documents")
+    suspend fun deleteAllLegalDocuments()
 }

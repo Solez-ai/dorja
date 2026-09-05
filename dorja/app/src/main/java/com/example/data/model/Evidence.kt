@@ -40,3 +40,19 @@ enum class EvidenceExpiry(val code: String, val label: String) {
     EXPIRED("EXPIRED", "Expired"),
     UNKNOWN("UNKNOWN", "Unknown")
 }
+
+/**
+ * How long an evidence check is considered fresh before the atlas honesty
+ * rules require it to be surfaced as stale (24 months, mirroring how EPC /
+ * energy-certificate validity is commonly bounded in European markets).
+ */
+const val EVIDENCE_STALENESS_MS: Long = 24L * 30L * 24L * 60L * 60L * 1000L
+
+/** Aggregated evidence-health snapshot for the current user's uploads. */
+data class EvidenceSummary(
+    val totalDocs: Int = 0,
+    val confirmedDocs: Int = 0,
+    val selfDeclaredDocs: Int = 0,
+    val staleDocs: Int = 0,
+    val expiredDocs: Int = 0
+)

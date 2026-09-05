@@ -21,21 +21,28 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Apartment
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.DataUsage
+import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.FactCheck
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.PrivacyTip
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.VerifiedUser
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -63,6 +70,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.DorjaApp
 import com.example.data.country.CountryRegistry
+import com.example.data.model.EvidenceSummary
 import com.example.ui.components.BentoCard
 import com.example.ui.components.BentoMetricTile
 import com.example.ui.components.CountryPicker
@@ -73,6 +81,7 @@ import com.example.ui.components.DorjaChip
 import com.example.ui.components.DorjaOutlinedButton
 import com.example.ui.theme.DorjaColors
 import kotlinx.coroutines.launch
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.material3.CircularProgressIndicator
 import com.example.R
 import androidx.compose.foundation.Image
@@ -96,6 +105,22 @@ fun AccountScreen(
     var editCountryCode by remember { mutableStateOf("BD") }
 
     var showResetDialog by remember { mutableStateOf(false) }
+
+    // Evidence health + privacy controls state
+    var evidenceSummary by remember { mutableStateOf<EvidenceSummary?>(null) }
+    var isReconfirming by remember { mutableStateOf(false) }
+    var reconfirmedCount by remember { mutableStateOf(0) }
+    var showReconfirmDone by remember { mutableStateOf(false) }
+    var showDeleteContentDialog by remember { mutableStateOf(false) }
+    var showEraseAccountDialog by remember { mutableStateOf(false) }
+    var isPrivacyWorking by remember { mutableStateOf(false) }
+    var showContentDeletedDone by remember { mutableStateOf(false) }
+    var showEraseDone by remember { mutableStateOf(false) }
+
+    // Load the evidence-health snapshot for this account
+    LaunchedEffect(Unit) {
+        evidenceSummary = repository.getEvidenceSummary()
+    }
 
     // Edit Profile Modal
     if (showEditProfileDialog) {
@@ -242,6 +267,133 @@ fun AccountScreen(
             dismissButton = {
                 TextButton(onClick = { showResetDialog = false }) {
                     Text("Cancel", color = DorjaColors.Gray700)
+                }
+            }
+        )
+    }
+
+    if (showDeleteContentDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteContentDialog = false },
+            icon = { Icon(Icons.Default.DeleteForever, contentDescription = null, tint = DorjaColors.Error) },
+            title = { Text("Delete My Content", fontWeight = FontWeight.Bold) },
+            text = {
+                Text(
+                    "This permanently deletes your listings, rooms, 3D scans, legal documents, " +
+                        "property passports, chats, messages, and viewing passes from this device. " +
+                        "Your profile rows are kept. This cannot be undone."
+                )
+            },
+            confirmButton = {
+                DorjaButton(
+                    text = "Delete Everything",
+                    onClick = {
+                        scope.launch {
+                            isPrivacyWorking = true
+                            repository.deleteAllMyContent()
+                            evidenceSummary = repository.getEvidenceSummary()
+                            isPrivacyWorking = false
+                            showDeleteContentDialog = false
+                            showContentDeletedDone = true
+                        }
+                    },
+                    modifier = Modifier.width(160.dp),
+                    enabled = !isPrivacyWorking,
+                    containerColor = DorjaColors.Error
+                )
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showDeleteContentDialog = false },
+                    enabled = !isPrivacyWorking
+                ) {
+                    Text("Cancel", color = DorjaColors.Gray700)
+                }
+            }
+        )
+    }
+
+    if (showEraseAccountDialog) {
+        AlertDialog(
+            onDismissRequest = { showEraseAccountDialog = false },
+            icon = { Icon(Icons.Default.DeleteForever, contentDescription = null, tint = DorjaColors.Error) },
+            title = { Text("Erase My Account Data", fontWeight = FontWeight.Bold) },
+            text = {
+                Text(
+                    "This erases EVERYTHING stored about you on this device: all content plus your " +
+                        "profile rows. The app then re-initializes with clean demo accounts. " +
+                        "This cannot be undone."
+                )
+            },
+            confirmButton = {
+                DorjaButton(
+                    text = "Erase Everything",
+                    onClick = {
+                        scope.launch {
+                            isPrivacyWorking = true
+                            repository.eraseAllMyData()
+                            evidenceSummary = repository.getEvidenceSummary()
+                            isPrivacyWorking = false
+                            showEraseAccountDialog = false
+                            showEraseDone = true
+                        }
+                    },
+                    modifier = Modifier.width(160.dp),
+                    enabled = !isPrivacyWorking,
+                    containerColor = DorjaColors.Error
+                )
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showEraseAccountDialog = false },
+                    enabled = !isPrivacyWorking
+                ) {
+                    Text("Cancel", color = DorjaColors.Gray700)
+                }
+            }
+        )
+    }
+
+    if (showReconfirmDone) {
+        AlertDialog(
+            onDismissRequest = { showReconfirmDone = false },
+            title = { Text("Evidence Re-confirmed", fontWeight = FontWeight.Bold) },
+            text = {
+                Text(
+                    "$reconfirmedCount document(s) re-confirmed. This is your own re-attestation — " +
+                        "the evidence level of each document is unchanged and DORJA has not independently " +
+                        "verified anything new."
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { showReconfirmDone = false }) {
+                    Text("OK", color = DorjaColors.Jol600)
+                }
+            }
+        )
+    }
+
+    if (showContentDeletedDone) {
+        AlertDialog(
+            onDismissRequest = { showContentDeletedDone = false },
+            title = { Text("Content Deleted", fontWeight = FontWeight.Bold) },
+            text = { Text("All of your listings, evidence, chats, and viewing passes have been removed from this device.") },
+            confirmButton = {
+                TextButton(onClick = { showContentDeletedDone = false }) {
+                    Text("OK", color = DorjaColors.Jol600)
+                }
+            }
+        )
+    }
+
+    if (showEraseDone) {
+        AlertDialog(
+            onDismissRequest = { showEraseDone = false },
+            title = { Text("Account Data Erased", fontWeight = FontWeight.Bold) },
+            text = { Text("All personal data stored on this device has been erased and the app has been reset to clean demo accounts.") },
+            confirmButton = {
+                TextButton(onClick = { showEraseDone = false }) {
+                    Text("OK", color = DorjaColors.Jol600)
                 }
             }
         )
@@ -502,7 +654,216 @@ fun AccountScreen(
                     }
                 }
             }
+
+            // Evidence Health Bento Card (atlas §3 honesty vocabulary, expiry & staleness)
+            item {
+                val summary = evidenceSummary
+                BentoCard(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = "EVIDENCE HEALTH",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = DorjaColors.Gray500,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        if (summary == null) {
+                            Text(
+                                text = "Checking your document evidence…",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = DorjaColors.Gray500
+                            )
+                        } else if (summary.totalDocs == 0) {
+                            Text(
+                                text = "No legal documents attached to any listing yet. Evidence levels appear here once you add documents in Host Suite.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = DorjaColors.Gray500
+                            )
+                        } else {
+                            EvidenceStatRow(
+                                icon = Icons.Default.FactCheck,
+                                label = "Documents on record",
+                                value = summary.totalDocs.toString(),
+                                tone = EvidenceTone.NEUTRAL
+                            )
+                            EvidenceStatRow(
+                                icon = Icons.Default.VerifiedUser,
+                                label = "Issuer / government confirmed",
+                                value = summary.confirmedDocs.toString(),
+                                tone = EvidenceTone.GOOD
+                            )
+                            EvidenceStatRow(
+                                icon = Icons.Default.Info,
+                                label = "Self-declared (not verified)",
+                                value = summary.selfDeclaredDocs.toString(),
+                                tone = EvidenceTone.WARN
+                            )
+                            EvidenceStatRow(
+                                icon = Icons.Default.History,
+                                label = "Checks older than 24 months",
+                                value = summary.staleDocs.toString(),
+                                tone = if (summary.staleDocs > 0) EvidenceTone.WARN else EvidenceTone.GOOD
+                            )
+                            EvidenceStatRow(
+                                icon = Icons.Default.Warning,
+                                label = "Marked expired",
+                                value = summary.expiredDocs.toString(),
+                                tone = if (summary.expiredDocs > 0) EvidenceTone.BAD else EvidenceTone.GOOD
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(12.dp))
+                        DorjaOutlinedButton(
+                            text = if (isReconfirming) "Re-confirming…" else "Re-confirm My Evidence",
+                            onClick = {
+                                scope.launch {
+                                    isReconfirming = true
+                                    reconfirmedCount = repository.reconfirmEvidence()
+                                    evidenceSummary = repository.getEvidenceSummary()
+                                    isReconfirming = false
+                                    showReconfirmDone = true
+                                }
+                            },
+                            enabled = !isReconfirming && (evidenceSummary?.totalDocs ?: 0) > 0,
+                            icon = Icons.Default.FactCheck,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "Re-confirming refreshes your own attestation and evidence-check dates. It never raises an evidence level and is never shown as independent verification.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = DorjaColors.Gray500
+                        )
+                    }
+                }
+            }
+
+            // Privacy & Data Bento Card (GDPR-style right to erasure)
+            item {
+                BentoCard(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = "PRIVACY & DATA",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = DorjaColors.Gray500,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "Your evidence, chats, and viewing history live on this device. You control deletion — no support ticket required.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = DorjaColors.Gray700
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        PrivacyActionRow(
+                            icon = Icons.Default.PrivacyTip,
+                            title = "Delete My Content",
+                            subtitle = "Removes your listings, evidence, scans, chats, and viewing passes. Keeps your profile.",
+                            onClick = { showDeleteContentDialog = true }
+                        )
+                        PrivacyActionRow(
+                            icon = Icons.Default.DeleteForever,
+                            title = "Erase My Account Data",
+                            subtitle = "Erases everything above plus your profile rows, then resets the app to clean demo accounts.",
+                            destructive = true,
+                            onClick = { showEraseAccountDialog = true }
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                Icons.Default.DataUsage,
+                                contentDescription = null,
+                                tint = DorjaColors.Gray500,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "Consent records and access logs stay with the data they describe — when the data goes, they go too.",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = DorjaColors.Gray500
+                            )
+                        }
+                    }
+                }
+            }
         }
+    }
+}
+
+private enum class EvidenceTone { GOOD, WARN, BAD, NEUTRAL }
+
+@Composable
+private fun EvidenceStatRow(
+    icon: ImageVector,
+    label: String,
+    value: String,
+    tone: EvidenceTone
+) {
+    val (bg, fg) = when (tone) {
+        EvidenceTone.GOOD -> DorjaColors.BentoGreenBg to DorjaColors.BentoGreenText
+        EvidenceTone.WARN -> DorjaColors.BentoAmberBg to DorjaColors.BentoAmberText
+        EvidenceTone.BAD -> DorjaColors.ErrorContainer to DorjaColors.Error
+        EvidenceTone.NEUTRAL -> DorjaColors.Sand100 to DorjaColors.Ink950
+    }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 5.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(icon, contentDescription = null, tint = fg, modifier = Modifier.size(16.dp))
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(label, style = MaterialTheme.typography.bodyMedium, color = DorjaColors.Ink950)
+        }
+        DorjaBadge(text = value, backgroundColor = bg, textColor = fg)
+    }
+}
+
+@Composable
+private fun PrivacyActionRow(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    onClick: () -> Unit,
+    destructive: Boolean = false
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(if (destructive) DorjaColors.ErrorContainer.copy(alpha = 0.45f) else DorjaColors.Sand100)
+            .clickable(onClick = onClick)
+            .padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            icon,
+            contentDescription = null,
+            tint = if (destructive) DorjaColors.Error else DorjaColors.BentoBlueIcon,
+            modifier = Modifier.size(20.dp)
+        )
+        Spacer(modifier = Modifier.width(10.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleSmall,
+                color = if (destructive) DorjaColors.Error else DorjaColors.Ink950,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = DorjaColors.Gray700
+            )
+        }
+        Icon(
+            Icons.Default.ChevronRight,
+            contentDescription = null,
+            tint = DorjaColors.Gray500
+        )
     }
 }
 
