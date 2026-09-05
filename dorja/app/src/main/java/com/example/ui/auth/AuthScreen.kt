@@ -40,6 +40,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -48,6 +49,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.DorjaApp
 import com.example.R
+import com.example.ui.components.CountryPicker
 import com.example.ui.components.DorjaButton
 import com.example.ui.components.DorjaCard
 import com.example.ui.theme.DorjaColors
@@ -58,10 +60,11 @@ fun AuthScreen(
 ) {
     val repository = DorjaApp.instance.repository
 
-    var phone by remember { mutableStateOf("+880 1712-345678") }
-    var password by remember { mutableStateOf("12345678") }
+    var phone by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
     var isSignUpMode by remember { mutableStateOf(false) }
-    var displayName by remember { mutableStateOf("Rahim Ahmed") }
+    var displayName by remember { mutableStateOf("") }
+    var countryCode by remember { mutableStateOf(repository.currentUser.value?.countryCode ?: "BD") }
 
     Box(
         modifier = Modifier
@@ -168,6 +171,16 @@ fun AuthScreen(
                                 unfocusedBorderColor = DorjaColors.Sand300
                             )
                         )
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        CountryPicker(
+                            selected = countryCode,
+                            onSelect = { code ->
+                                countryCode = code
+                                repository.setUserCountryCode(code)
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        )
                         Spacer(modifier = Modifier.height(20.dp))
 
                         DorjaButton(
@@ -255,7 +268,7 @@ fun AuthScreen(
                 )
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
-                    text = "DORJA • Verified Bangladeshi Real Estate",
+                    text = stringResource(id = R.string.auth_footer),
                     style = MaterialTheme.typography.labelSmall,
                     color = DorjaColors.Gray500
                 )

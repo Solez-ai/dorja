@@ -372,7 +372,7 @@ private fun HostListingCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = Formatters.formatPrice(listing.priceAmount, listing.intent),
+                    text = Formatters.formatPrice(listing.priceAmount, listing.currency, listing.intent),
                     style = MaterialTheme.typography.titleMedium,
                     color = DorjaColors.Jol600,
                     fontWeight = FontWeight.Bold

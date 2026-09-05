@@ -75,6 +75,7 @@ import com.example.R
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -138,7 +139,7 @@ fun ExploreScreen(
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = "Verified Bangladeshi Homes • SafeView Access",
+                                text = stringResource(id = R.string.explore_subtitle),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = DorjaColors.Sand300
                             )
@@ -184,7 +185,7 @@ fun ExploreScreen(
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
-                placeholder = { Text("Search location (Dhanmondi, Gulshan, Uttara...)") },
+                placeholder = { Text("Search city or area") },
                 leadingIcon = {
                     Icon(
                         imageVector = Icons.Default.Search,
@@ -422,7 +423,7 @@ private fun ExploreListingCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = Formatters.formatPrice(listing.priceAmount, listing.intent),
+                    text = Formatters.formatPrice(listing.priceAmount, listing.currency, listing.intent),
                     style = MaterialTheme.typography.titleMedium,
                     color = DorjaColors.Jol600,
                     fontWeight = FontWeight.Bold

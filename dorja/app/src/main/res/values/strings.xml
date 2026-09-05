@@ -2,4 +2,15 @@
     <string name="app_name">DORJA</string>
     <string name="app_tagline">Property Trust Platform</string>
     <string name="scam_prevention_desc">Addresses unlocked only with verified SafeView passes.</string>
+    <string name="auth_footer">DORJA • Property Trust Platform</string>
+    <string name="explore_subtitle">Verified Homes • SafeView Access</string>
+    <string name="host_suite_subtitle">Host Suite</string>
+    <string name="handover_passport_subtitle">View documents, approvals &amp; chain of title</string>
+    <string name="rent_label">Monthly Rent (%1$s)</string>
+    <string name="price_label">Asking Price (%1$s)</string>
+    <string name="country_of_transaction">Country of Transaction</string>
+    <string name="document_title_placeholder">e.g. Registered document reference</string>
+    <string name="authority_placeholder">e.g. Issuing office / authority</string>
+    <string name="verified_listing_docs_label">Official documents &amp; title records</string>
+    <string name="no_docs_yet">No legal documents attached yet. Add registered documents to earn Verified Listing status.</string>
 </resources>

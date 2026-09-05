@@ -121,6 +121,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -136,10 +137,13 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import coil.compose.AsyncImage
 import com.example.DorjaApp
+import com.example.R
+import com.example.data.country.CountryRegistry
 import com.example.data.model.LegalDocument
 import com.example.data.model.Promise
 import com.example.data.model.RoomItem
 import com.example.ui.components.BentoCard
+import com.example.ui.components.CountryPicker
 import com.example.ui.components.DorjaBadge
 import com.example.ui.components.DorjaButton
 import com.example.ui.components.DorjaChip
@@ -186,6 +190,7 @@ fun CreateListingScreen(
     var balconies by remember { mutableIntStateOf(0) }
     var sqftText by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
+    var countryCode by remember { mutableStateOf(repository.currentUser.value?.countryCode ?: "BD") }
 
     val selectedTags = remember {
         mutableStateListOf<String>()
@@ -231,7 +236,10 @@ fun CreateListingScreen(
     }
 
     var showAddDocDialog by remember { mutableStateOf(false) }
-    var newDocType by remember { mutableStateOf("KHATIAN_PORCHA") }
+    var newDocType by remember {
+        mutableStateOf(CountryRegistry.profile(repository.currentUser.value?.countryCode ?: "BD")
+            .documentTypes.firstOrNull()?.code ?: "OTHER")
+    }
     var newDocTitle by remember { mutableStateOf("") }
     var newDocNumber by remember { mutableStateOf("") }
     var newDocAuthority by remember { mutableStateOf("") }
@@ -251,15 +259,9 @@ fun CreateListingScreen(
         Pair("LAND", "Plot / Land")
     )
 
-    val docTypeOptions = listOf(
-        Pair("KHATIAN_PORCHA", "Khatian / Porcha"),
-        Pair("MUTATION_NAMZARI", "Mutation / Namzari"),
-        Pair("RAJUK_APPROVAL", "RAJUK / CDA Plan"),
-        Pair("TAX_DAKHILA", "Municipal Tax Dakhila"),
-        Pair("NEC_CERTIFICATE", "NEC Certificate"),
-        Pair("SALE_DEED", "Registered Sale Deed"),
-        Pair("OTHER", "Other Document")
-    )
+    // Document types come from the selected country's profile (Phase 0: global adapters)
+    val activeProfile = CountryRegistry.profile(countryCode)
+    val docTypeOptions = activeProfile.documentTypes.map { Pair(it.code, it.label) }
 
     val commonAmenities = listOf(
         "Lift", "24/7 Generator", "Gas Connection", "Dedicated Parking",
@@ -734,7 +736,7 @@ fun CreateListingScreen(
                         value = newDocTitle,
                         onValueChange = { newDocTitle = it },
                         label = { Text("Document Title") },
-                        placeholder = { Text("e.g. CS / RS Khatian Record") },
+                        placeholder = { Text(stringResource(id = R.string.document_title_placeholder)) },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                         colors = OutlinedTextFieldDefaults.colors(
@@ -764,7 +766,7 @@ fun CreateListingScreen(
                         value = newDocAuthority,
                         onValueChange = { newDocAuthority = it },
                         label = { Text("Issuing Authority / Office") },
-                        placeholder = { Text("e.g. AC Land Dhanmondi, RAJUK") },
+                        placeholder = { Text(stringResource(id = R.string.authority_placeholder)) },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                         colors = OutlinedTextFieldDefaults.colors(
@@ -811,7 +813,7 @@ fun CreateListingScreen(
                     text = "Add Document",
                     onClick = {
                         val titleToAdd = if (newDocTitle.isNotBlank()) newDocTitle else "Legal Document ${customLegalDocs.size + 1}"
-                        val numberToAdd = if (newDocNumber.isNotBlank()) newDocNumber else "DOC-BD-${(1000..9999).random()}"
+                        val numberToAdd = if (newDocNumber.isNotBlank()) newDocNumber else "DOC-${(1000..9999).random()}"
                         val authorityToAdd = if (newDocAuthority.isNotBlank()) newDocAuthority else "Authorized Sub-Registry Office"
 
                         customLegalDocs.add(
@@ -884,7 +886,7 @@ fun CreateListingScreen(
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "Host Suite • Dorja Bangladesh",
+                            text = stringResource(id = R.string.host_suite_subtitle),
                             style = MaterialTheme.typography.bodySmall,
                             color = DorjaColors.Gray700
                         )
@@ -927,6 +929,19 @@ fun CreateListingScreen(
 
                     Spacer(modifier = Modifier.height(10.dp))
 
+                    CountryPicker(
+                        selected = countryCode,
+                        onSelect = { code ->
+                            countryCode = code
+                            if (newDocType !in CountryRegistry.profile(code).documentTypes.map { it.code }) {
+                                newDocType = CountryRegistry.profile(code).documentTypes.firstOrNull()?.code ?: "OTHER"
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
                     Text(
                         text = "PROPERTY TYPE",
                         style = MaterialTheme.typography.labelSmall,
@@ -952,7 +967,7 @@ fun CreateListingScreen(
                         value = title,
                         onValueChange = { title = it },
                         label = "Property Title",
-                        placeholder = "e.g. 3-Bed Luxury Apartment, Dhanmondi 8/A",
+                        placeholder = "e.g. 3-Bed Luxury Apartment",
                         leadingIcon = Icons.Default.Home,
                         testTag = "input_listing_title"
                     )
@@ -963,7 +978,11 @@ fun CreateListingScreen(
                     DorjaInput(
                         value = priceText,
                         onValueChange = { priceText = it },
-                        label = if (intent == "RENT") "Monthly Rent (BDT)" else "Asking Price (BDT)",
+                        label = if (intent == "RENT") {
+                            stringResource(id = R.string.rent_label, activeProfile.currencyCode)
+                        } else {
+                            stringResource(id = R.string.price_label, activeProfile.currencyCode)
+                        },
                         placeholder = "e.g. 35000",
                         leadingIcon = Icons.Default.Payments,
                         keyboardType = KeyboardType.Number,
@@ -977,7 +996,7 @@ fun CreateListingScreen(
                         value = publicArea,
                         onValueChange = { publicArea = it },
                         label = "Public Area / Neighborhood",
-                        placeholder = "e.g. Dhanmondi 8/A, Dhaka",
+                        placeholder = "e.g. Area / Neighborhood",
                         leadingIcon = Icons.Default.LocationOn,
                         testTag = "input_listing_public_area"
                     )
@@ -1714,7 +1733,7 @@ fun CreateListingScreen(
                                 )
                             }
                             Text(
-                                text = "Khatian, Mutation, RAJUK & Tax Records",
+                                text = stringResource(id = R.string.verified_listing_docs_label),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = DorjaColors.Gray700
                             )
@@ -1745,7 +1764,7 @@ fun CreateListingScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                "No legal documents attached yet. Add Khatian, Mutation or RAJUK plan to earn Verified Listing status.",
+                                stringResource(id = R.string.no_docs_yet),
                                 color = DorjaColors.Gray500,
                                 fontSize = 12.sp
                             )
@@ -2155,7 +2174,8 @@ fun CreateListingScreen(
                             coverPhotoUrl = coverPhoto,
                             description = description,
                             customRooms = finalRooms,
-                            legalDocs = customLegalDocs
+                            legalDocs = customLegalDocs,
+                            countryCode = countryCode
                         )
                         // Save promises for this listing
                         customPromises.forEach { promise ->

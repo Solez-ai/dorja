@@ -1,5 +1,6 @@
 package com.example.data.repository
 
+import com.example.data.country.CountryRegistry
 import com.example.data.db.DorjaDatabase
 import com.example.data.model.Conversation
 import com.example.data.model.LegalDocument
@@ -59,7 +60,8 @@ class DorjaRepository(private val database: DorjaDatabase) {
         email: String,
         location: String,
         bio: String,
-        role: String
+        role: String,
+        countryCode: String = "BD"
     ) {
         val current = _currentUser.value ?: return
         val updated = current.copy(
@@ -68,10 +70,21 @@ class DorjaRepository(private val database: DorjaDatabase) {
             email = email,
             location = location,
             bio = bio,
-            role = role
+            role = role,
+            countryCode = countryCode
         )
         userDao.updateUser(updated)
         _currentUser.value = updated
+    }
+
+    /** Set the active user's transaction country without touching other profile fields. */
+    fun setUserCountryCode(countryCode: String) {
+        CoroutineScope(Dispatchers.IO).launch {
+            val current = _currentUser.value ?: return@launch
+            val updated = current.copy(countryCode = countryCode)
+            userDao.updateUser(updated)
+            _currentUser.value = updated
+        }
     }
 
     // Listings
@@ -96,7 +109,8 @@ class DorjaRepository(private val database: DorjaDatabase) {
         coverPhotoUrl: String? = null,
         description: String,
         customRooms: List<RoomItem>,
-        legalDocs: List<LegalDocument> = emptyList()
+        legalDocs: List<LegalDocument> = emptyList(),
+        countryCode: String = "BD"
     ): String {
         val ownerId = _currentUser.value?.id ?: "u1"
         val id = "l_" + UUID.randomUUID().toString().take(8)
@@ -116,6 +130,8 @@ class DorjaRepository(private val database: DorjaDatabase) {
             approximateLat = 23.8041,
             approximateLng = 90.3468,
             priceAmount = priceAmount,
+            currency = CountryRegistry.profile(countryCode).currencyCode,
+            countryCode = countryCode,
             bedrooms = bedrooms,
             bathrooms = bathrooms,
             balconies = balconies,

@@ -80,6 +80,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.DorjaApp
+import com.example.R
+import androidx.compose.ui.res.stringResource
 import com.example.data.model.RoomItem
 import com.example.ui.components.BentoCard
 import com.example.ui.components.DorjaBadge
@@ -679,7 +681,7 @@ fun PropertyDetailScreen(
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = Formatters.formatPrice(safeListing.priceAmount, safeListing.intent),
+                            text = Formatters.formatPrice(safeListing.priceAmount, safeListing.currency, safeListing.intent),
                             style = MaterialTheme.typography.titleMedium,
                             color = DorjaColors.Jol600,
                             fontWeight = FontWeight.Bold
@@ -1106,7 +1108,7 @@ fun PropertyDetailScreen(
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = "View land records, RAJUK approvals & chain of title",
+                                text = stringResource(id = R.string.handover_passport_subtitle),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = DorjaColors.Gray700,
                                 fontSize = 11.sp

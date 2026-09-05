@@ -24,13 +24,18 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Place
+import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.ViewInAr
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -40,6 +45,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -54,6 +62,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.data.country.CountryRegistry
 import com.example.data.model.Listing
 import com.example.ui.theme.DorjaColors
 import com.example.ui.util.Formatters
@@ -779,7 +788,7 @@ fun PropertyCard(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = Formatters.formatPriceShort(listing.priceAmount),
+                        text = Formatters.formatPriceShort(listing.priceAmount, listing.currency),
                         style = MaterialTheme.typography.labelMedium,
                         color = DorjaColors.Jol600,
                         fontWeight = FontWeight.Bold
@@ -790,6 +799,94 @@ fun PropertyCard(
                         color = DorjaColors.Gray500
                     )
                 }
+            }
+        }
+    }
+}
+
+/**
+ * Country-of-transaction picker built on the [CountryRegistry].
+ * Only launchable markets (atlas stage <= 1) are selectable; every other
+ * profile is shown with its confidence label and disabled.
+ */
+@Composable
+fun CountryPicker(
+    selected: String,
+    onSelect: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val current = CountryRegistry.profile(selected)
+
+    Box(modifier = modifier) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(14.dp))
+                .clickable { expanded = true },
+            shape = RoundedCornerShape(14.dp),
+            color = DorjaColors.White,
+            border = BorderStroke(1.dp, DorjaColors.BentoCardBorder)
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Public,
+                    contentDescription = null,
+                    tint = DorjaColors.Jol600,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Country of Transaction",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = DorjaColors.Gray500
+                    )
+                    Text(
+                        text = current.displayName,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = DorjaColors.Ink950,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                Icon(
+                    imageVector = Icons.Default.ArrowDropDown,
+                    contentDescription = null,
+                    tint = DorjaColors.Gray500
+                )
+            }
+        }
+
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            CountryRegistry.profiles.forEach { profile ->
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            if (profile.selectable) profile.displayName
+                            else "${profile.displayName} — ${profile.confidenceLabel}"
+                        )
+                    },
+                    onClick = {
+                        if (profile.selectable) {
+                            onSelect(profile.iso2)
+                            expanded = false
+                        }
+                    },
+                    enabled = profile.selectable,
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Default.Place,
+                            contentDescription = null,
+                            tint = if (profile.selectable) DorjaColors.Jol600 else DorjaColors.Gray500
+                        )
+                    }
+                )
             }
         }
     }

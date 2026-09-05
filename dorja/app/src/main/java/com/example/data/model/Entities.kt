@@ -12,7 +12,8 @@ data class User(
     val phone: String,
     val email: String = "",
     val bio: String = "",
-    val location: String = "Dhaka, Bangladesh",
+    val location: String = "",
+    val countryCode: String = "BD",
     val avatarUrl: String? = null,
     val createdAt: Long = System.currentTimeMillis()
 )
@@ -31,7 +32,8 @@ data class Listing(
     val approximateLat: Double? = null,
     val approximateLng: Double? = null,
     val priceAmount: Int,
-    val currency: String = "BDT",
+    val currency: String,
+    val countryCode: String = "BD",
     val bedrooms: Int = 3,
     val bathrooms: Int = 2,
     val balconies: Int = 1,
@@ -63,7 +65,7 @@ data class RoomItem(
 data class LegalDocument(
     @PrimaryKey val id: String,
     val listingId: String,
-    val documentType: String, // KHATIAN_PORCHA, MUTATION_NAMZARI, TAX_DAKHILA, RAJUK_APPROVAL, NEC_CERTIFICATE, SALE_DEED, OTHER
+    val documentType: String, // Codes come from CountryRegistry profiles (per country)
     val documentTitle: String,
     val documentNumber: String,
     val issuingAuthority: String,
