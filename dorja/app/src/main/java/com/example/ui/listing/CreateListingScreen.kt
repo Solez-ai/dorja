@@ -66,6 +66,7 @@ import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.HelpOutline
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.KeyboardArrowUp
@@ -125,6 +126,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -139,6 +141,8 @@ import coil.compose.AsyncImage
 import com.example.DorjaApp
 import com.example.R
 import com.example.data.country.CountryRegistry
+import com.example.data.model.DEFAULT_SELF_DECLARED_NOTE
+import com.example.data.model.EvidenceLevel
 import com.example.data.model.LegalDocument
 import com.example.data.model.Promise
 import com.example.data.model.RoomItem
@@ -149,6 +153,7 @@ import com.example.ui.components.DorjaButton
 import com.example.ui.components.DorjaChip
 import com.example.ui.components.DorjaInput
 import com.example.ui.components.DorjaOutlinedButton
+import com.example.ui.components.EvidenceBadge
 import com.example.ui.theme.DorjaColors
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -245,6 +250,7 @@ fun CreateListingScreen(
     var newDocAuthority by remember { mutableStateOf("") }
     var newDocYear by remember { mutableStateOf("2024") }
     var newDocNotes by remember { mutableStateOf("") }
+    var newDocEvidenceLevel by remember { mutableStateOf(EvidenceLevel.SELF_DECLARED.code) }
 
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
@@ -732,6 +738,31 @@ fun CreateListingScreen(
                         }
                     }
 
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    Text("Evidence Level (honest status)", style = MaterialTheme.typography.labelSmall, color = DorjaColors.Gray700, fontWeight = FontWeight.Bold)
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        items(EvidenceLevel.entries.filter { it != EvidenceLevel.NOT_PROVIDED }) { level ->
+                            DorjaChip(
+                                selected = newDocEvidenceLevel == level.code,
+                                label = level.label,
+                                onClick = { newDocEvidenceLevel = level.code }
+                            )
+                        }
+                    }
+                    if (newDocEvidenceLevel == EvidenceLevel.SELF_DECLARED.code) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Info, contentDescription = null, tint = DorjaColors.BentoAmberIcon, modifier = Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                "Upload only — DORJA has not independently verified this document.",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = DorjaColors.BentoAmberIcon
+                            )
+                        }
+                    }
+
                     OutlinedTextField(
                         value = newDocTitle,
                         onValueChange = { newDocTitle = it },
@@ -816,6 +847,7 @@ fun CreateListingScreen(
                         val numberToAdd = if (newDocNumber.isNotBlank()) newDocNumber else "DOC-${(1000..9999).random()}"
                         val authorityToAdd = if (newDocAuthority.isNotBlank()) newDocAuthority else "Authorized Sub-Registry Office"
 
+                        val level = EvidenceLevel.fromCode(newDocEvidenceLevel)
                         customLegalDocs.add(
                             LegalDocument(
                                 id = "doc_" + UUID.randomUUID().toString().take(6),
@@ -825,14 +857,18 @@ fun CreateListingScreen(
                                 documentNumber = numberToAdd,
                                 issuingAuthority = authorityToAdd,
                                 issueDate = newDocYear,
-                                verificationStatus = "VERIFIED",
-                                notes = newDocNotes
+                                verificationStatus = if (EvidenceLevel.isConfirmed(level)) "VERIFIED" else "PENDING_REVIEW",
+                                notes = newDocNotes,
+                                evidenceLevel = level.code,
+                                checkedAt = if (level != EvidenceLevel.SELF_DECLARED) System.currentTimeMillis() else null,
+                                limitationNote = if (level == EvidenceLevel.SELF_DECLARED) DEFAULT_SELF_DECLARED_NOTE else ""
                             )
                         )
                         newDocTitle = ""
                         newDocNumber = ""
                         newDocAuthority = ""
                         newDocNotes = ""
+                        newDocEvidenceLevel = EvidenceLevel.SELF_DECLARED.code
                         showAddDocDialog = false
                     },
                     modifier = Modifier.width(140.dp)
@@ -1744,10 +1780,10 @@ fun CreateListingScreen(
                             onClick = {
                                 newDocTitle = ""
                                 newDocNumber = ""
-                                newDocAuthority = ""
-                                newDocNotes = ""
-                                showAddDocDialog = true
-                            },
+                                newDocAuthority = ""                            newDocNotes = ""
+                            newDocEvidenceLevel = EvidenceLevel.SELF_DECLARED.code
+                            showAddDocDialog = true
+                        },
                             icon = Icons.Default.Add,
                             modifier = Modifier.height(36.dp),
                             testTag = "add_legal_doc_button"
@@ -1807,12 +1843,14 @@ fun CreateListingScreen(
                                                     text = doc.documentTitle,
                                                     style = MaterialTheme.typography.titleSmall,
                                                     color = DorjaColors.Ink950,
-                                                    fontWeight = FontWeight.Bold
+                                                    fontWeight = FontWeight.Bold,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis,
+                                                    modifier = Modifier.weight(1f, fill = false)
                                                 )
-                                                DorjaBadge(
-                                                    text = doc.verificationStatus,
-                                                    backgroundColor = DorjaColors.Success.copy(alpha = 0.15f),
-                                                    textColor = DorjaColors.Success
+                                                Spacer(modifier = Modifier.width(8.dp))
+                                                EvidenceBadge(
+                                                    level = EvidenceLevel.fromCode(doc.evidenceLevel)
                                                 )
                                             }
                                             Text(
@@ -1821,6 +1859,14 @@ fun CreateListingScreen(
                                                 color = DorjaColors.Gray500,
                                                 fontSize = 11.sp
                                             )
+                                            if (doc.limitationNote.isNotBlank()) {
+                                                Text(
+                                                    text = doc.limitationNote,
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = DorjaColors.BentoAmberIcon,
+                                                    fontSize = 10.sp
+                                                )
+                                            }
                                         }
                                         IconButton(
                                             onClick = { customLegalDocs.removeAt(index) },

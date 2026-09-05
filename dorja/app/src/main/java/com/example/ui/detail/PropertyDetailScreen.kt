@@ -81,6 +81,7 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.DorjaApp
 import com.example.R
+import com.example.data.country.CountryRegistry
 import androidx.compose.ui.res.stringResource
 import com.example.data.model.RoomItem
 import com.example.ui.components.BentoCard
@@ -115,6 +116,7 @@ fun PropertyDetailScreen(
 
     val listing by repository.observeListingById(listingId).collectAsState(initial = null)
     val rooms by repository.getRoomsByListing(listingId).collectAsState(initial = emptyList())
+    val passport by repository.observePassportForListing(listingId).collectAsState(initial = null)
     val currentUser by repository.currentUser.collectAsState()
 
     var showVisitRequestDialog by remember { mutableStateOf(false) }
@@ -1113,6 +1115,14 @@ fun PropertyDetailScreen(
                                 color = DorjaColors.Gray700,
                                 fontSize = 11.sp
                             )
+                            if (passport != null) {
+                                Text(
+                                    text = "Property Passport ${passport!!.id.uppercase()} • ${CountryRegistry.profile(passport!!.countryCode).displayName}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = DorjaColors.BentoGreenIcon,
+                                    fontSize = 10.sp
+                                )
+                            }
                         }
                         Icon(
                             imageVector = Icons.Default.OpenInNew,

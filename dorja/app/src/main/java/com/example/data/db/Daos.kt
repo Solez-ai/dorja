@@ -10,6 +10,7 @@ import com.example.data.model.Conversation
 import com.example.data.model.Listing
 import com.example.data.model.Message
 import com.example.data.model.Promise
+import com.example.data.model.PropertyPassport
 import com.example.data.model.RoomItem
 import com.example.data.model.Scan
 import com.example.data.model.User
@@ -140,6 +141,24 @@ interface MessageDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(messages: List<Message>)
+}
+
+@Dao
+interface PropertyPassportDao {
+    @Query("SELECT * FROM property_passports WHERE listingId = :listingId LIMIT 1")
+    fun observeByListing(listingId: String): Flow<PropertyPassport?>
+
+    @Query("SELECT * FROM property_passports WHERE listingId = :listingId LIMIT 1")
+    suspend fun getByListing(listingId: String): PropertyPassport?
+
+    @Query("SELECT * FROM property_passports WHERE id = :id LIMIT 1")
+    suspend fun getById(id: String): PropertyPassport?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(passport: PropertyPassport)
+
+    @Query("DELETE FROM property_passports WHERE listingId = :listingId")
+    suspend fun deleteByListing(listingId: String)
 }
 
 @Dao

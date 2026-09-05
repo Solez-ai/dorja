@@ -7,6 +7,7 @@ import com.example.data.model.LegalDocument
 import com.example.data.model.Listing
 import com.example.data.model.Message
 import com.example.data.model.Promise
+import com.example.data.model.PropertyPassport
 import com.example.data.model.RoomItem
 import com.example.data.model.Scan
 import com.example.data.model.User
@@ -30,6 +31,7 @@ class DorjaRepository(private val database: DorjaDatabase) {
     private val viewingDao = database.viewingDao()
     private val promiseDao = database.promiseDao()
     private val legalDocumentDao = database.legalDocumentDao()
+    private val propertyPassportDao = database.propertyPassportDao()
 
     private val _currentUser = MutableStateFlow<User?>(null)
     val currentUser: StateFlow<User?> = _currentUser.asStateFlow()
@@ -145,6 +147,10 @@ class DorjaRepository(private val database: DorjaDatabase) {
         )
         listingDao.insertListing(listing)
 
+        // Every listing gets a stable Property Passport (atlas §2): the identity
+        // that survives re-posting and carries evidence across borders.
+        ensurePropertyPassport(listing.id, listing)
+
         if (customRooms.isNotEmpty()) {
             val roomsToInsert = customRooms.mapIndexed { index, room ->
                 room.copy(
@@ -171,6 +177,7 @@ class DorjaRepository(private val database: DorjaDatabase) {
 
     suspend fun deleteListing(listingId: String) {
         listingDao.deleteListingById(listingId)
+        propertyPassportDao.deleteByListing(listingId)
         roomDao.deleteRoomsByListing(listingId)
         legalDocumentDao.deleteLegalDocumentsByListing(listingId)
     }
@@ -211,6 +218,30 @@ class DorjaRepository(private val database: DorjaDatabase) {
 
     // Legal Documents
     fun getLegalDocumentsByListing(listingId: String): Flow<List<LegalDocument>> = legalDocumentDao.getLegalDocumentsByListing(listingId)
+
+    // Property Passport
+    fun observePassportForListing(listingId: String): Flow<PropertyPassport?> =
+        propertyPassportDao.observeByListing(listingId)
+
+    suspend fun getPassportForListing(listingId: String): PropertyPassport? =
+        propertyPassportDao.getByListing(listingId)
+
+    /** Create a passport for a listing if none exists yet (backfill-safe). */
+    private suspend fun ensurePropertyPassport(listingId: String, listing: Listing) {
+        if (propertyPassportDao.getByListing(listingId) == null) {
+            propertyPassportDao.insert(
+                PropertyPassport(
+                    id = "pp_" + UUID.randomUUID().toString().take(8),
+                    listingId = listingId,
+                    countryCode = listing.countryCode,
+                    addressFreeform = listing.exactAddress.ifBlank { listing.publicArea },
+                    approximateLat = listing.approximateLat,
+                    approximateLng = listing.approximateLng,
+                    createdByUserId = listing.ownerId
+                )
+            )
+        }
+    }
     suspend fun getLegalDocumentsByListingSync(listingId: String): List<LegalDocument> = legalDocumentDao.getLegalDocumentsByListingSync(listingId)
     suspend fun addLegalDocument(doc: LegalDocument) {
         legalDocumentDao.insertLegalDocument(doc)

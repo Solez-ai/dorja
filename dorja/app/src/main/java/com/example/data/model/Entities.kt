@@ -70,8 +70,26 @@ data class LegalDocument(
     val documentNumber: String,
     val issuingAuthority: String,
     val issueDate: String = "2024",
-    val verificationStatus: String = "VERIFIED", // VERIFIED, PENDING_REVIEW, UNDER_SCRUTINY
+    val verificationStatus: String = "VERIFIED", // Legacy binary field (kept for compat)
     val notes: String = "",
+    // Atlas §3 evidence vocabulary — the honest status for every upload
+    val evidenceLevel: String = EvidenceLevel.SELF_DECLARED.code,
+    val checkedAt: Long? = null,
+    val expiryState: String = EvidenceExpiry.UNKNOWN.code,
+    val limitationNote: String = DEFAULT_SELF_DECLARED_NOTE,
+    val createdAt: Long = System.currentTimeMillis()
+)
+
+@Entity(tableName = "property_passports")
+data class PropertyPassport(
+    @PrimaryKey val id: String,
+    val listingId: String,
+    val countryCode: String = "BD",
+    val addressFreeform: String = "",
+    val approximateLat: Double? = null,
+    val approximateLng: Double? = null,
+    val createdByUserId: String = "",
+    val expiryState: String = EvidenceExpiry.UNKNOWN.code,
     val createdAt: Long = System.currentTimeMillis()
 )
 
