@@ -2,6 +2,8 @@ package com.example.ui.detail
 
 import android.content.Intent
 import android.net.Uri
+import android.widget.Toast
+import androidx.core.content.FileProvider
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -47,11 +49,13 @@ import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MeetingRoom
 import androidx.compose.material.icons.filled.OpenInNew
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.SquareFoot
 import androidx.compose.material.icons.filled.ViewInAr
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -82,6 +86,7 @@ import coil.compose.AsyncImage
 import com.example.DorjaApp
 import com.example.R
 import com.example.data.country.CountryRegistry
+import com.example.ui.util.DisclosurePackExporter
 import androidx.compose.ui.res.stringResource
 import com.example.data.model.RoomItem
 import com.example.ui.components.BentoCard
@@ -125,6 +130,7 @@ fun PropertyDetailScreen(
     var selectedRoomForDetail by remember { mutableStateOf<RoomItem?>(null) }
     var show3DTourDialog by remember { mutableStateOf(false) }
     var fullScreenPhotoUrl by remember { mutableStateOf<String?>(null) }
+    var exportingPack by remember { mutableStateOf(false) }
 
     if (listing == null) {
         Box(
@@ -1128,6 +1134,88 @@ fun PropertyDetailScreen(
                             imageVector = Icons.Default.OpenInNew,
                             contentDescription = "View",
                             tint = DorjaColors.BentoGreenIcon
+                        )
+                    }
+                }
+            }
+
+            // Export Decision Pack (country-specific evidence summary)
+            item {
+                BentoCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = {
+                        if (!exportingPack) {
+                            scope.launch {
+                                exportingPack = true
+                                val file = DisclosurePackExporter.generate(context, safeListing.id)
+                                exportingPack = false
+                                if (file != null) {
+                                    val uri = FileProvider.getUriForFile(
+                                        context,
+                                        "${context.packageName}.fileprovider",
+                                        file
+                                    )
+                                    val share = Intent(Intent.ACTION_SEND).apply {
+                                        type = "application/pdf"
+                                        putExtra(Intent.EXTRA_STREAM, uri)
+                                        putExtra(Intent.EXTRA_SUBJECT, "DORJA Decision Pack — ${safeListing.title}")
+                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                    }
+                                    context.startActivity(Intent.createChooser(share, "Share Decision Pack"))
+                                } else {
+                                    Toast.makeText(context, "Could not generate decision pack", Toast.LENGTH_LONG).show()
+                                }
+                            }
+                        }
+                    }
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(38.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(DorjaColors.BentoBlueBg),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (exportingPack) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(18.dp),
+                                    color = DorjaColors.BentoBlueIcon,
+                                    strokeWidth = 2.dp
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Default.Share,
+                                    contentDescription = null,
+                                    tint = DorjaColors.BentoBlueIcon,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Export Decision Pack (PDF)",
+                                style = MaterialTheme.typography.titleSmall,
+                                color = DorjaColors.Ink950,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "Country-specific checklist, evidence-labelled documents & promises",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = DorjaColors.Gray700,
+                                fontSize = 11.sp
+                            )
+                        }
+                        Icon(
+                            imageVector = Icons.Default.OpenInNew,
+                            contentDescription = "Export",
+                            tint = DorjaColors.BentoBlueIcon
                         )
                     }
                 }

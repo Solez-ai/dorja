@@ -172,6 +172,9 @@ interface ViewingDao {
     @Query("SELECT * FROM viewings WHERE hostId = :hostId ORDER BY startsAt ASC")
     fun getViewingsForHost(hostId: String): Flow<List<Viewing>>
 
+    @Query("SELECT * FROM viewings WHERE listingId = :listingId ORDER BY startsAt ASC")
+    fun getViewingsByListing(listingId: String): Flow<List<Viewing>>
+
     @Query("SELECT * FROM viewings WHERE seekerId = :seekerId ORDER BY startsAt ASC")
     fun getViewingsForSeeker(seekerId: String): Flow<List<Viewing>>
 

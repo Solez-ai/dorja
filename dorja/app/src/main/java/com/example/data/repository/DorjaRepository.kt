@@ -345,6 +345,7 @@ class DorjaRepository(private val database: DorjaDatabase) {
 
     // Promises
     fun getPromisesByListing(listingId: String): Flow<List<Promise>> = promiseDao.getPromisesByListing(listingId)
+    fun getViewingsByListing(listingId: String): Flow<List<Viewing>> = viewingDao.getViewingsByListing(listingId)
     suspend fun addPromise(listingId: String, category: String, title: String, originalText: String, evidenceNote: String) {
         val promise = Promise(
             id = "p_" + UUID.randomUUID().toString().take(8),

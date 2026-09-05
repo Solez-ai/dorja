@@ -71,6 +71,16 @@ object CountryRegistry {
             ),
             professionalRoles = listOf("Licensed Land Broker", "Advocate (Title)", "Sub-Registry Office"),
             authorityRails = listOf("RAJUK / CDA approval lookup", "Sub-registry office records"),
+            disclosureChecklist = listOf(
+                "Registered sale deed (kabala) with the sub-registry office",
+                "Mutation (namzari) updated in AC land / municipal records",
+                "RAJUK / CDA approval or building completion certificate",
+                "Municipal tax dakhila (current year)",
+                "Electricity, gas and water connection papers",
+                "NEC clearance where mortgage is involved",
+                "Approved floor map / layout plan",
+                "Owner NID copy and holding number verification"
+            ),
             confidence = AtlasConfidence.VERIFIED,
             launchStage = 1
         ),
@@ -94,6 +104,14 @@ object CountryRegistry {
             ),
             professionalRoles = listOf("RERA Registered Agent", "Advocate (Title)", "Sub-Registrar"),
             authorityRails = listOf("RERA portal link-out (rera.mohua.gov.in)"),
+            disclosureChecklist = listOf(
+                "RERA project registration number (state portal)",
+                "Encumbrance certificate from the sub-registrar",
+                "Occupancy / completion certificate",
+                "Property tax receipt (current year)",
+                "Approved building plan sanction",
+                "Registered sale deed / agreement for sale"
+            ),
             confidence = AtlasConfidence.REGIONAL_EVIDENCE,
             launchStage = 2
         ),
@@ -112,6 +130,13 @@ object CountryRegistry {
             ),
             professionalRoles = listOf("Licensed Land Broker", "Advocate"),
             authorityRails = listOf("MeroKitta link-out (merokitta.dos.gov.np)"),
+            disclosureChecklist = listOf(
+                "Lalpurja (land ownership certificate)",
+                "Land revenue receipt (current year)",
+                "Registered sale deed at the district registrar",
+                "MeroKitta land-record reference",
+                "Apartment / maison evidence where applicable"
+            ),
             confidence = AtlasConfidence.VERIFIED,
             launchStage = 2
         ),
@@ -130,6 +155,12 @@ object CountryRegistry {
             ),
             professionalRoles = listOf("Licensed Agent", "Advocate"),
             authorityRails = listOf("NLCS / eSakor link-out (web.nlcs.gov.bt)"),
+            disclosureChecklist = listOf(
+                "Land transaction certificate (thram-based)",
+                "NLCS / eSakor transaction status",
+                "Registered deed with the relevant authority",
+                "Plot approval / national land commission clearance"
+            ),
             confidence = AtlasConfidence.VERIFIED,
             launchStage = 2
         ),
