@@ -208,6 +208,8 @@ fun CreateListingScreen(
     var sqftText by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
     var countryCode by remember { mutableStateOf(repository.currentUser.value?.countryCode ?: "BD") }
+    // Phase 4: emirate/state subdivision (drives document types via documentTypesFor)
+    var subnationalCode by remember { mutableStateOf<String?>(null) }
 
     // Phase 3 liveability/energy evidence — shown only for profiles that expect it
     var energyClassText by remember { mutableStateOf("") }
@@ -290,9 +292,10 @@ fun CreateListingScreen(
         Pair("LAND", "Plot / Land")
     )
 
-    // Document types come from the selected country's profile (Phase 0: global adapters)
+    // Document types come from the selected country's profile (Phase 0: global adapters),
+    // merged with the selected emirate/state's extra types (Phase 4: documentTypesFor).
     val activeProfile = CountryRegistry.profile(countryCode)
-    val docTypeOptions = activeProfile.documentTypes.map { Pair(it.code, it.label) }
+    val docTypeOptions = activeProfile.documentTypesFor(subnationalCode).map { Pair(it.code, it.label) }
 
     val commonAmenities = listOf(
         "Lift", "24/7 Generator", "Gas Connection", "Dedicated Parking",
@@ -788,8 +791,11 @@ fun CreateListingScreen(
                         }
                     }
 
-                    // ── Government-source verification (Phase 2 authority rails) ──
-                    val activeRail = AuthorityLinks.railFor(countryCode, newDocType)
+                    // ── Government-source verification (Phase 2/4 authority rails) ──
+                    // Subdivision-specific rail first (e.g. Dubai DLD), then country rail.
+                    val activeRail = activeProfile.subnational(subnationalCode)?.let { sub ->
+                        AuthorityLinks.railFor(sub.code, newDocType) ?: AuthorityLinks.railFor(countryCode, newDocType)
+                    } ?: AuthorityLinks.railFor(countryCode, newDocType)
                     if (newDocEvidenceLevel == EvidenceLevel.GOVERNMENT_SOURCE_LINKED.code) {
                         if (activeRail != null) {
                             GovernmentSourceCard(
@@ -1058,12 +1064,53 @@ fun CreateListingScreen(
                         selected = countryCode,
                         onSelect = { code ->
                             countryCode = code
-                            if (newDocType !in CountryRegistry.profile(code).documentTypes.map { it.code }) {
-                                newDocType = CountryRegistry.profile(code).documentTypes.firstOrNull()?.code ?: "OTHER"
+                            // Reset the subdivision when the country changes
+                            val prof = CountryRegistry.profile(code)
+                            subnationalCode = prof.subnationalProfiles.firstOrNull()?.code
+                            if (newDocType !in prof.documentTypesFor(subnationalCode).map { it.code }) {
+                                newDocType = prof.documentTypesFor(subnationalCode).firstOrNull()?.code ?: "OTHER"
                             }
                         },
                         modifier = Modifier.fillMaxWidth()
                     )
+
+                    // Emirate / state picker — only for countries where transaction
+                    // rules differ by subdivision (e.g. UAE emirates).
+                    val activeSubnationalProfiles = activeProfile.subnationalProfiles
+                    if (activeSubnationalProfiles.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Text(
+                            text = "${activeProfile.displayName.uppercase()} EMIRATE / STATE",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = DorjaColors.Gray500,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            items(activeSubnationalProfiles) { sub ->
+                                DorjaChip(
+                                    selected = subnationalCode == sub.code,
+                                    label = sub.displayName,
+                                    onClick = {
+                                        subnationalCode = sub.code
+                                        if (newDocType !in activeProfile.documentTypesFor(sub.code).map { it.code }) {
+                                            newDocType = activeProfile.documentTypesFor(sub.code).firstOrNull()?.code ?: "OTHER"
+                                        }
+                                    }
+                                )
+                            }
+                        }
+                        val subNotes = activeProfile.subnational(subnationalCode)?.notes
+                        if (!subNotes.isNullOrBlank()) {
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = subNotes,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = DorjaColors.Gray700
+                            )
+                        }
+                    }
 
                     Spacer(modifier = Modifier.height(10.dp))
 
@@ -2434,6 +2481,7 @@ fun CreateListingScreen(
                             customRooms = finalRooms,
                             legalDocs = customLegalDocs,
                             countryCode = countryCode,
+                            subnationalCode = subnationalCode,
                             energyCertificateClass = energyClassText.trim().ifBlank { null },
                             energyCertificateIssuer = energyIssuerText.trim().ifBlank { null },
                             annualHeatingCost = heatingCostText.toLongOrNull(),

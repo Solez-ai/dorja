@@ -28,6 +28,10 @@ object AuthorityLinks {
     private const val NEPAL_MEROKITTA_LABEL = "MeroKitta land records (merokitta.dos.gov.np)"
     private const val BHUTAN_NLCS = "https://www.nlcs.gov.bt/"
     private const val BHUTAN_NLCS_LABEL = "NLCS / eSakor (web.nlcs.gov.bt)"
+    private const val UAE_DLD = "https://dubailand.gov.ae"
+    private const val UAE_DLD_LABEL = "Dubai Land Department (dubailand.gov.ae)"
+    private const val UAE_ADREC = "https://www.adrec.gov.ae"
+    private const val UAE_ADREC_LABEL = "ADREC / Tawtheq (adrec.gov.ae)"
 
     /** Per-country, per-document-type rails. Falls back to the country rail. */
     private val rails: Map<String, Map<String, Rail>> = mapOf(
@@ -44,6 +48,18 @@ object AuthorityLinks {
             "LAND_TRANSACTION_CERTIFICATE" to Rail(BHUTAN_NLCS, BHUTAN_NLCS_LABEL),
             "THRAM_NUMBER" to Rail(BHUTAN_NLCS, BHUTAN_NLCS_LABEL),
             "SALE_DEED" to Rail(BHUTAN_NLCS, BHUTAN_NLCS_LABEL)
+        ),
+        // Sub-national rails (Phase 4) — keyed by emirate code, take precedence
+        // over the country rail when present.
+        "AE-DXB" to mapOf(
+            "EJARI_REGISTRATION" to Rail(UAE_DLD, UAE_DLD_LABEL),
+            "DLD_TITLE_DEED" to Rail(UAE_DLD, UAE_DLD_LABEL),
+            "OQOOD_OFFPLAN" to Rail(UAE_DLD, UAE_DLD_LABEL),
+            "TITLE_DEED" to Rail(UAE_DLD, UAE_DLD_LABEL)
+        ),
+        "AE-AUH" to mapOf(
+            "TAWTHEQ_REGISTRATION" to Rail(UAE_ADREC, UAE_ADREC_LABEL),
+            "TITLE_DEED" to Rail(UAE_ADREC, UAE_ADREC_LABEL)
         )
     )
 

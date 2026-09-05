@@ -34,6 +34,8 @@ data class Listing(
     val priceAmount: Int,
     val currency: String,
     val countryCode: String = "BD",
+    /** Sub-national subdivision code (e.g. "AE-DXB") — rules differ within countries. */
+    val subnationalCode: String? = null,
     val bedrooms: Int = 3,
     val bathrooms: Int = 2,
     val balconies: Int = 1,
