@@ -1,6 +1,6 @@
 # DORJA -- Verified Real Estate Platform for Bangladesh
 
-> **A secure, AI-powered property marketplace that eliminates real estate fraud and unsafe house viewings in Bangladesh through 3D room scanning, background verification, and digital handover passports.**
+> **A secure property marketplace that eliminates real estate fraud and unsafe house viewings in Bangladesh through 3D room scanning, background verification, and digital handover passports. Now expanding into a country-aware trust layer for property decisions across Europe and Asia (see PLAN.md).**
 
 **Team:** Solez-ai  
 **Competition:** FIRSO Bangladesh National Round 2026  
@@ -257,6 +257,42 @@ The most direct competitor in Bangladesh. Key differences:
 
 ---
 
+## Global Expansion: The Eurasia Roadmap
+
+DORJA is being rebuilt from a Bangladesh-only app into a **country-aware trust layer for property decisions across Europe and Asia**. The full architecture, country-by-country evidence audit, and staged rollout are specified in [PLAN.md](PLAN.md).
+
+The strategy in one line: one global evidence-and-trust engine, with country-specific property, identity, disclosure, language, privacy, and professional-role adapters. Bangladesh is the proving ground; every new market is added only when official or reputable evidence supports the local gap, and DORJA always complements established portals rather than replacing them.
+
+### Staged rollout
+
+| Stage | Markets | What gets built |
+|-------|---------|-----------------|
+| 1 | Bangladesh | Bangla/English core: Property Passport, SafeView, evidence, promises, handover (current app) |
+| 2 | India, Nepal, Bhutan | RERA, MeroKitta and eSakor source adapters, document-completeness packs |
+| 3 | One European pilot | Energy certificate evidence, GDPR-style data minimization, moderation and appeals, relocation mode |
+| 4 | Japan + one Gulf market | Professional handoff, important-matters preparation, condition evidence, expatriate relocation |
+| 5 | Further Europe and Asia | Country profiles added only with local evidence source, language review, and market partner |
+
+### Reference links used by the country atlas
+
+These are the official and research sources behind the global plan. Each claim in the country atlas is graded: verified, regional evidence, or discovery required — and only well-evidenced entries are ever used in marketing.
+
+| # | Source | What it supports |
+|---|--------|------------------|
+| 1 | [Eurostat — Housing in Europe, 2025 edition](https://ec.europa.eu/eurostat/web/interactive-publications/housing-2025) | Housing-quality pressure data for Romania, Bulgaria, Greece, Latvia, Lithuania (overcrowding, inability to keep warm) |
+| 2 | [European Commission — European Digital Identity](https://commission.europa.eu/topics/digital-economy-and-society/european-digital-identity_en) | EU identity-wallet context for the European pilot's identity adapter |
+| 3 | [European Commission — Digital Services Act](https://digital-strategy.ec.europa.eu/en/policies/digital-services-act) | Moderation, appeals, and platform-obligation requirements for EU operation |
+| 4 | [European Commission — Energy Performance of Buildings Directive](https://energy.ec.europa.eu/topics/energy-efficiency/energy-performance-buildings/energy-performance-buildings-directive_en) | Energy-certificate evidence layer (DPE, Energieausweis, energielabel) for Europe |
+| 5 | [Asian Development Bank — Adequate and Affordable Housing](https://www.adb.org/publications/adequate-affordable-housing) | Regional housing-affordability context across Asia |
+| 6 | [Government of India — RERA Key Features](https://rera.mohua.gov.in/key-features-of-RERA.html) | India RERA project/agent disclosure adapter |
+| 7 | [Government of India, MoHUA — RERA Act 2016](https://www.mohua.gov.in/documents/acts-and-policies/rera-YDM4EzMtQWa?pageTitle=Real-Estate-(Regulation-and-Development)-Act,-2016-%5BRERA%5D) | Legal basis for the India source rails |
+| 8 | [Government of Nepal — MeroKitta](https://www.merokitta.dos.gov.np/) | Nepal land-record link-out adapter |
+| 9 | [Bhutan National Land Commission — eSakor Land Transaction](https://web.nlcs.gov.bt/land-transaction-urban-rural/) | Bhutan transaction-status companion adapter |
+| 10 | [Japan MLIT — Existing-Home Transactions and Important Matters](https://www.mlit.go.jp/totikensangyo/const/sosei_const_tk3_000132.html) | Japan professional-handoff and important-matters preparation |
+| 11 | [China Law Translate — Personal Information Protection Law](https://www.chinalawtranslate.com/en/Personal-Information-Protection-Law/) | PIPL data-governance constraints for any China profile |
+
+---
+
 ## Tech Stack
 
 | Layer | Technology |
@@ -320,7 +356,7 @@ cd dorja
 
 ## License
 
-Proprietary -- DORJA Bangladesh | FIRSO 2026 Submission
+Proprietary -- DORJA | FIRSO 2026 Submission
 
 ---
 
