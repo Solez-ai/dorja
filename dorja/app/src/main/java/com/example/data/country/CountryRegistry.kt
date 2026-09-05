@@ -42,6 +42,10 @@ data class CountryProfile(
     val professionalRoles: List<String> = emptyList(),
     val authorityRails: List<String> = emptyList(),
     val disclosureChecklist: List<String> = emptyList(),
+    /** Official public portal where a user can independently check a government-issued document (link-out only). */
+    val govtVerifyUrl: String? = null,
+    /** Human label for that portal, e.g. "RERA portal (rera.mohua.gov.in)". */
+    val govtVerifyLabel: String? = null,
     val confidence: AtlasConfidence = AtlasConfidence.DISCOVERY_REQUIRED,
     val launchStage: Int = 99            // Atlas staged rollout: 1=launched, 2..5=planned, 99=not planned
 ) {
@@ -104,6 +108,8 @@ object CountryRegistry {
             ),
             professionalRoles = listOf("RERA Registered Agent", "Advocate (Title)", "Sub-Registrar"),
             authorityRails = listOf("RERA portal link-out (rera.mohua.gov.in)"),
+            govtVerifyUrl = "https://rera.mohua.gov.in",
+            govtVerifyLabel = "RERA portal (rera.mohua.gov.in)",
             disclosureChecklist = listOf(
                 "RERA project registration number (state portal)",
                 "Encumbrance certificate from the sub-registrar",
@@ -130,6 +136,8 @@ object CountryRegistry {
             ),
             professionalRoles = listOf("Licensed Land Broker", "Advocate"),
             authorityRails = listOf("MeroKitta link-out (merokitta.dos.gov.np)"),
+            govtVerifyUrl = "https://www.merokitta.dos.gov.np/",
+            govtVerifyLabel = "MeroKitta land records (merokitta.dos.gov.np)",
             disclosureChecklist = listOf(
                 "Lalpurja (land ownership certificate)",
                 "Land revenue receipt (current year)",
@@ -155,6 +163,8 @@ object CountryRegistry {
             ),
             professionalRoles = listOf("Licensed Agent", "Advocate"),
             authorityRails = listOf("NLCS / eSakor link-out (web.nlcs.gov.bt)"),
+            govtVerifyUrl = "https://www.nlcs.gov.bt/",
+            govtVerifyLabel = "NLCS / eSakor (web.nlcs.gov.bt)",
             disclosureChecklist = listOf(
                 "Land transaction certificate (thram-based)",
                 "NLCS / eSakor transaction status",

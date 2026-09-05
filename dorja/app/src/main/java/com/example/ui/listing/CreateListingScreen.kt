@@ -74,6 +74,7 @@ import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MeetingRoom
 import androidx.compose.material.icons.filled.Navigation
+import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Remove
@@ -140,6 +141,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import coil.compose.AsyncImage
 import com.example.DorjaApp
 import com.example.R
+import com.example.data.country.AuthorityLinks
 import com.example.data.country.CountryRegistry
 import com.example.data.model.DEFAULT_SELF_DECLARED_NOTE
 import com.example.data.model.EvidenceLevel
@@ -154,6 +156,7 @@ import com.example.ui.components.DorjaChip
 import com.example.ui.components.DorjaInput
 import com.example.ui.components.DorjaOutlinedButton
 import com.example.ui.components.EvidenceBadge
+import com.example.ui.components.GovernmentSourceCard
 import com.example.ui.theme.DorjaColors
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -251,6 +254,7 @@ fun CreateListingScreen(
     var newDocYear by remember { mutableStateOf("2024") }
     var newDocNotes by remember { mutableStateOf("") }
     var newDocEvidenceLevel by remember { mutableStateOf(EvidenceLevel.SELF_DECLARED.code) }
+    var newDocOfficialSourceUrl by remember { mutableStateOf("") }
 
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
@@ -763,6 +767,52 @@ fun CreateListingScreen(
                         }
                     }
 
+                    // ── Government-source verification (Phase 2 authority rails) ──
+                    val activeRail = AuthorityLinks.railFor(countryCode, newDocType)
+                    if (newDocEvidenceLevel == EvidenceLevel.GOVERNMENT_SOURCE_LINKED.code) {
+                        if (activeRail != null) {
+                            GovernmentSourceCard(
+                                url = activeRail.url,
+                                label = activeRail.label,
+                                title = "Verify on ${activeRail.label}"
+                            )
+                        }
+                        OutlinedTextField(
+                            value = newDocOfficialSourceUrl,
+                            onValueChange = { newDocOfficialSourceUrl = it },
+                            label = { Text("Official Source Link (required)") },
+                            placeholder = { Text("e.g. https://rera.mohua.gov.in/project/UPRERAPRJ12345") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedContainerColor = DorjaColors.White,
+                                unfocusedContainerColor = DorjaColors.White,
+                                focusedBorderColor = DorjaColors.Jol600,
+                                unfocusedBorderColor = DorjaColors.BentoCardBorder
+                            )
+                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Info, contentDescription = null, tint = DorjaColors.BentoAmberIcon, modifier = Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                "Green means you attached an official source reference — not that DORJA checked the registry itself.",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = DorjaColors.BentoAmberIcon
+                            )
+                        }
+                        if (newDocOfficialSourceUrl.isBlank()) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.Warning, contentDescription = null, tint = DorjaColors.BentoAmberIcon, modifier = Modifier.size(14.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    "Government-source-linked evidence requires the official link.",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = DorjaColors.BentoAmberIcon
+                                )
+                            }
+                        }
+                    }
+
                     OutlinedTextField(
                         value = newDocTitle,
                         onValueChange = { newDocTitle = it },
@@ -845,9 +895,26 @@ fun CreateListingScreen(
                     onClick = {
                         val titleToAdd = if (newDocTitle.isNotBlank()) newDocTitle else "Legal Document ${customLegalDocs.size + 1}"
                         val numberToAdd = if (newDocNumber.isNotBlank()) newDocNumber else "DOC-${(1000..9999).random()}"
-                        val authorityToAdd = if (newDocAuthority.isNotBlank()) newDocAuthority else "Authorized Sub-Registry Office"
+                        val authorityToAdd = if (newDocAuthority.isNotBlank()) newDocAuthority
+                        else activeProfile.professionalRoles.lastOrNull() ?: "Authorized Sub-Registry Office"
 
                         val level = EvidenceLevel.fromCode(newDocEvidenceLevel)
+
+                        // Atlas honesty rule: GOVERNMENT_SOURCE_LINKED requires an
+                        // explicit official source reference (Phase 2 authority rails).
+                        val govtUrl = newDocOfficialSourceUrl.trim()
+                        if (level == EvidenceLevel.GOVERNMENT_SOURCE_LINKED && govtUrl.isBlank()) {
+                            errorMessage = "Government-source-linked evidence requires the official source link."
+                            return@DorjaButton
+                        }
+
+                        // Attach the source link to notes so it is visible in the
+                        // doc list and in the exported Disclosure Pack.
+                        val notesWithSource = if (govtUrl.isNotBlank()) {
+                            if (newDocNotes.isNotBlank()) "${newDocNotes}\nOfficial source: $govtUrl"
+                            else "Official source: $govtUrl"
+                        } else newDocNotes
+
                         customLegalDocs.add(
                             LegalDocument(
                                 id = "doc_" + UUID.randomUUID().toString().take(6),
@@ -858,7 +925,7 @@ fun CreateListingScreen(
                                 issuingAuthority = authorityToAdd,
                                 issueDate = newDocYear,
                                 verificationStatus = if (EvidenceLevel.isConfirmed(level)) "VERIFIED" else "PENDING_REVIEW",
-                                notes = newDocNotes,
+                                notes = notesWithSource,
                                 evidenceLevel = level.code,
                                 checkedAt = if (level != EvidenceLevel.SELF_DECLARED) System.currentTimeMillis() else null,
                                 limitationNote = if (level == EvidenceLevel.SELF_DECLARED) DEFAULT_SELF_DECLARED_NOTE else ""
@@ -868,6 +935,7 @@ fun CreateListingScreen(
                         newDocNumber = ""
                         newDocAuthority = ""
                         newDocNotes = ""
+                        newDocOfficialSourceUrl = ""
                         newDocEvidenceLevel = EvidenceLevel.SELF_DECLARED.code
                         showAddDocDialog = false
                     },
@@ -1859,6 +1927,19 @@ fun CreateListingScreen(
                                                 color = DorjaColors.Gray500,
                                                 fontSize = 11.sp
                                             )
+                                            // Official source link (Phase 2 rails) — tap to open the portal
+                                            doc.notes.lineSequence()
+                                                .firstOrNull { it.startsWith("Official source: ") }
+                                                ?.removePrefix("Official source: ")
+                                                ?.takeIf { it.isNotBlank() }
+                                                ?.let { sourceUrl ->
+                                                    Spacer(modifier = Modifier.height(4.dp))
+                                                    GovernmentSourceCard(
+                                                        url = sourceUrl,
+                                                        label = "Official source",
+                                                        compact = true
+                                                    )
+                                                }
                                             if (doc.limitationNote.isNotBlank()) {
                                                 Text(
                                                     text = doc.limitationNote,

@@ -158,6 +158,12 @@ Bangladesh already has the fullest profile: SafeView, promises, handover, 3D sca
    - Document types: land transaction certificate, thram number reference.
 4. Add `dialectLabel` support: India state-level naming differences land in `documentTypes[].regionalNames: Map<String, String>`.
 
+**Status (shipped):** the adapter machinery is live and country-agnostic.
+- `CountryProfile.govtVerifyUrl` / `govtVerifyLabel` carry each country's official portal; `data/country/AuthorityLinks.kt` maps document types to rails (IN → RERA portal, NP → MeroKitta, BT → NLCS/eSakor) with a null rail meaning "no known public portal" (today: BD).
+- `ui/components/GovernmentSourceCard.kt` renders the link-out; `GOVERNMENT_SOURCE_LINKED` evidence is rejected at add-document time unless an official source link is attached (stored on the doc notes and surfaced as a tap-to-open chip in the doc list).
+- Dialect labels are already supported by `DocumentTypeSpec.regionalNames`; state-level IN entries are a data change, not a code change.
+- Next: per-state RERA URL table in `AuthorityLinks` as real state portals are onboarded.
+
 ### Phase 3 — One European pilot (atlas Stage 3)
 
 Choose after partner validation; build the machinery country-agnostic so any EU country is a data entry, not a code change:
