@@ -9,6 +9,7 @@ import android.graphics.pdf.PdfDocument
 import com.example.DorjaApp
 import com.example.data.country.CountryRegistry
 import com.example.data.model.EvidenceLevel
+import com.example.data.model.ProfessionalEndorsement
 import com.example.data.model.Viewing
 import kotlinx.coroutines.flow.first
 import java.io.File
@@ -243,7 +244,41 @@ object DisclosurePackExporter {
             }
         }
 
-        // ── Disclaimer ─────────────────────────────────────────────────────
+        // ── 7. Professional endorsements (Phase 4 handoff) ─────────────
+        val endorsements = repo.getEndorsementsForListingSync(listingId)
+        section("7. PROFESSIONAL ENDORSEMENTS")
+        if (endorsements.isEmpty()) {
+            drawWrapped("No licensed professional has taken responsibility for a section.", bodyPaint)
+        } else {
+            endorsements.forEach { end ->
+                newPageIfNeeded(LINE_H * 3.4f)
+                drawWrapped(
+                    "${end.section.replaceFirstChar { it.uppercase() }} — ${end.professionalName}",
+                    bodyBold
+                )
+                drawWrapped(
+                    buildString {
+                        append(end.roleLabel.ifBlank { "Licensed professional" })
+                        if (end.licenceId.isNotBlank()) append("  •  Licence: ${end.licenceId}")
+                        append("  •  Endorsed ")
+                        append(SimpleDateFormat("MMM d, yyyy", Locale.getDefault()).format(Date(end.endorsedAt)))
+                    },
+                    bodyPaint,
+                    indent = 12f
+                )
+                if (end.statement.isNotBlank()) {
+                    drawWrapped("Statement: ${end.statement}", smallPaint, indent = 12f)
+                }
+                y += LINE_H * 0.4f
+            }
+        }
+        drawWrapped(
+            "Endorsements record professional responsibility as supplied; DORJA does not verify licences. " +
+                "Check each licence with its issuing authority.",
+            smallPaint
+        )
+
+        // ── Disclaimer ───────────────────────────────────────────────
         section("DISCLAIMER")
         drawWrapped(
             "This pack records claims, uploads and events as supplied through DORJA. " +

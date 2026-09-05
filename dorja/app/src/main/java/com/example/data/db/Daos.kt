@@ -9,6 +9,7 @@ import androidx.room.Update
 import com.example.data.model.Conversation
 import com.example.data.model.Listing
 import com.example.data.model.Message
+import com.example.data.model.ProfessionalEndorsement
 import com.example.data.model.Promise
 import com.example.data.model.PropertyPassport
 import com.example.data.model.RoomItem
@@ -240,6 +241,27 @@ interface PromiseDao {
 
     @Query("DELETE FROM promises")
     suspend fun deleteAllPromises()
+}
+
+@Dao
+interface ProfessionalEndorsementDao {
+    @Query("SELECT * FROM professional_endorsements WHERE listingId = :listingId ORDER BY endorsedAt ASC")
+    fun observeByListing(listingId: String): Flow<List<ProfessionalEndorsement>>
+
+    @Query("SELECT * FROM professional_endorsements WHERE listingId = :listingId ORDER BY endorsedAt ASC")
+    suspend fun getByListingSync(listingId: String): List<ProfessionalEndorsement>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(endorsement: ProfessionalEndorsement)
+
+    @Query("DELETE FROM professional_endorsements WHERE id = :id")
+    suspend fun deleteById(id: String)
+
+    @Query("DELETE FROM professional_endorsements WHERE listingId = :listingId")
+    suspend fun deleteByListing(listingId: String)
+
+    @Query("DELETE FROM professional_endorsements")
+    suspend fun deleteAll()
 }
 
 @Dao

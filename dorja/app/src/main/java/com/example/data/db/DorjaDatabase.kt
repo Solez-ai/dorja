@@ -9,6 +9,7 @@ import com.example.data.model.Conversation
 import com.example.data.model.LegalDocument
 import com.example.data.model.Listing
 import com.example.data.model.Message
+import com.example.data.model.ProfessionalEndorsement
 import com.example.data.model.Promise
 import com.example.data.model.PropertyPassport
 import com.example.data.model.RoomItem
@@ -30,9 +31,10 @@ import kotlinx.coroutines.launch
         Viewing::class,
         Promise::class,
         LegalDocument::class,
-        PropertyPassport::class
+        PropertyPassport::class,
+        ProfessionalEndorsement::class
     ],
-    version = 8,
+    version = 9,
     exportSchema = false
 )
 abstract class DorjaDatabase : RoomDatabase() {
@@ -46,6 +48,7 @@ abstract class DorjaDatabase : RoomDatabase() {
     abstract fun promiseDao(): PromiseDao
     abstract fun legalDocumentDao(): LegalDocumentDao
     abstract fun propertyPassportDao(): PropertyPassportDao
+    abstract fun professionalEndorsementDao(): ProfessionalEndorsementDao
 
     companion object {
         @Volatile

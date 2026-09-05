@@ -184,6 +184,11 @@ Choose after partner validation; build the machinery country-agnostic so any EU 
 
 ### Phase 4 — Japan + one Gulf market (atlas Stage 4)
 
+**Status (shipped):**
+- **Japan profile built out**: takken/important-matters document types, licensed-professional roles, MLIT-style disclosure checklist, and condition/age/disaster-context liveability fields (Building condition, Building age, Disaster context added to `LiveabilityField` + `Listing`).
+- **Professional handoff**: `ProfessionalEndorsement` entity (section, professional, licence, role, statement, timestamp) with DAO + Room v9; owners record endorsements on the Property Detail screen; the Disclosure Pack PDF prints a "7. PROFESSIONAL ENDORSEMENTS" section with the honesty note that DORJA never verifies licences.
+- **Gulf emirate adapters**: `SubnationalProfile` on `CountryProfile` (atlas explicitly rejects one Gulf profile); UAE profile with Dubai (Ejari/DLD/Oqood + dubailand.gov.ae rail), Abu Dhabi (Tawtheq/ADREC), Sharjah (municipality attestation); `documentTypesFor(subnationalCode)` merges subdivision document types. `android:supportsRtl` already enabled for the Arabic path.
+
 1. **Japan**:
    - Professional handoff (atlas §8): generate a "handoff packet" that a licensed agent can fill, timestamp and sign for the section they own. Add `ProfessionalEndorsement` entity: `{section, professionalName, licenceId, endorsedAt, statement}`.
    - Important-matters prep checklist from the MLIT context (atlas ref [10]).

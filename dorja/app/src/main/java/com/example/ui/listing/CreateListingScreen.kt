@@ -217,6 +217,9 @@ fun CreateListingScreen(
     var powerBackupText by remember { mutableStateOf("") }
     var waterSupplyText by remember { mutableStateOf("") }
     var floodRiskText by remember { mutableStateOf("") }
+    var buildingConditionText by remember { mutableStateOf("") }
+    var buildingAgeText by remember { mutableStateOf("") }
+    var disasterContextText by remember { mutableStateOf("") }
 
     val selectedTags = remember {
         mutableStateListOf<String>()
@@ -2131,6 +2134,32 @@ fun CreateListingScreen(
                                     singleLine = true,
                                     colors = energyFieldColors()
                                 )
+                                LiveabilityField.BUILDING_CONDITION -> OutlinedTextField(
+                                    value = buildingConditionText,
+                                    onValueChange = { buildingConditionText = it },
+                                    label = { Text(field.label) },
+                                    placeholder = { Text("e.g. well-maintained 2015 reinforced-concrete building") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    singleLine = true,
+                                    colors = energyFieldColors()
+                                )
+                                LiveabilityField.BUILDING_AGE -> OutlinedTextField(
+                                    value = buildingAgeText,
+                                    onValueChange = { buildingAgeText = it.filter { c -> c.isDigit() }.take(3) },
+                                    label = { Text("${field.label} (years)") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    singleLine = true,
+                                    colors = energyFieldColors()
+                                )
+                                LiveabilityField.DISASTER_CONTEXT -> OutlinedTextField(
+                                    value = disasterContextText,
+                                    onValueChange = { disasterContextText = it },
+                                    label = { Text(field.label) },
+                                    placeholder = { Text("e.g. outside mapped flood zone; 1981 seismic code or newer") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    singleLine = true,
+                                    colors = energyFieldColors()
+                                )
                             }
                             Spacer(modifier = Modifier.height(8.dp))
                         }
@@ -2411,7 +2440,10 @@ fun CreateListingScreen(
                             renovationYear = renovationYearText.toIntOrNull(),
                             powerBackup = powerBackupText.trim().ifBlank { null },
                             waterSupply = waterSupplyText.trim().ifBlank { null },
-                            floodRisk = floodRiskText.trim().ifBlank { null }
+                            floodRisk = floodRiskText.trim().ifBlank { null },
+                            buildingCondition = buildingConditionText.trim().ifBlank { null },
+                            buildingAgeYears = buildingAgeText.toIntOrNull(),
+                            disasterContext = disasterContextText.trim().ifBlank { null }
                         )
                         // Save promises for this listing
                         customPromises.forEach { promise ->

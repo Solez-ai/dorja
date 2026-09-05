@@ -41,6 +41,8 @@ import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.VerifiedUser
+import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.EnergySavingsLeaf
 import androidx.compose.material.icons.filled.Home
@@ -61,6 +63,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -94,6 +97,7 @@ import com.example.data.model.RoomItem
 import com.example.ui.components.BentoCard
 import com.example.ui.components.DorjaBadge
 import com.example.ui.components.DorjaButton
+import com.example.ui.components.DorjaChip
 import com.example.ui.components.DorjaOutlinedButton
 import com.example.ui.components.SafeAddressShield
 import com.example.ui.theme.DorjaColors
@@ -124,6 +128,7 @@ fun PropertyDetailScreen(
     val listing by repository.observeListingById(listingId).collectAsState(initial = null)
     val rooms by repository.getRoomsByListing(listingId).collectAsState(initial = emptyList())
     val passport by repository.observePassportForListing(listingId).collectAsState(initial = null)
+    val endorsements by repository.observeEndorsementsForListing(listingId).collectAsState(initial = emptyList())
     val currentUser by repository.currentUser.collectAsState()
 
     var showVisitRequestDialog by remember { mutableStateOf(false) }
@@ -133,6 +138,13 @@ fun PropertyDetailScreen(
     var show3DTourDialog by remember { mutableStateOf(false) }
     var fullScreenPhotoUrl by remember { mutableStateOf<String?>(null) }
     var exportingPack by remember { mutableStateOf(false) }
+    var showEndorsementDialog by remember { mutableStateOf(false) }
+
+    // Professional handoff dialog state
+    var endSection by remember { mutableStateOf("OWNERSHIP") }
+    var endName by remember { mutableStateOf("") }
+    var endLicence by remember { mutableStateOf("") }
+    var endStatement by remember { mutableStateOf("") }
 
     if (listing == null) {
         Box(
@@ -202,6 +214,91 @@ fun PropertyDetailScreen(
                     onClick = { fullScreenPhotoUrl = null },
                     modifier = Modifier.fillMaxWidth()
                 )
+            }
+        )
+    }
+
+    // Professional Endorsement Dialog (Phase 4)
+    if (showEndorsementDialog) {
+        val sectionOptions = listOf(
+            "OWNERSHIP" to "Ownership & title",
+            "CONDITION" to "Building condition",
+            "MEASUREMENTS" to "Measurements & boundaries",
+            "DISCLOSURE" to "Disclosure completeness",
+            "ENERGY" to "Energy / running costs"
+        )
+        AlertDialog(
+            onDismissRequest = { showEndorsementDialog = false },
+            icon = { Icon(Icons.Default.WorkspacePremium, contentDescription = null, tint = DorjaColors.BentoPurpleIcon) },
+            title = { Text("Professional Endorsement", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        "The professional takes responsibility for one section. DORJA records who, when, and for what — it does not verify the licence.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = DorjaColors.Gray500
+                    )
+                    Text("Section", style = MaterialTheme.typography.labelSmall, color = DorjaColors.Gray700, fontWeight = FontWeight.Bold)
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        sectionOptions.forEach { (code, label) ->
+                            DorjaChip(
+                                selected = endSection == code,
+                                label = label,
+                                onClick = { endSection = code }
+                            )
+                        }
+                    }
+                    OutlinedTextField(
+                        value = endName,
+                        onValueChange = { endName = it },
+                        label = { Text("Professional Name") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+                    OutlinedTextField(
+                        value = endLicence,
+                        onValueChange = { endLicence = it },
+                        label = { Text("Licence / Registration ID") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+                    OutlinedTextField(
+                        value = endStatement,
+                        onValueChange = { endStatement = it },
+                        label = { Text("Statement of Responsibility") },
+                        placeholder = { Text("e.g. I have reviewed the ownership evidence and confirm it is complete for transfer.") },
+                        modifier = Modifier.fillMaxWidth(),
+                        maxLines = 3
+                    )
+                }
+            },
+            confirmButton = {
+                DorjaButton(
+                    text = "Record Endorsement",
+                    onClick = {
+                        if (endName.isNotBlank() && endLicence.isNotBlank()) {
+                            scope.launch {
+                                repository.addEndorsement(
+                                    listingId = safeListing.id,
+                                    section = endSection,
+                                    professionalName = endName.trim(),
+                                    licenceId = endLicence.trim(),
+                                    roleLabel = CountryRegistry.profile(safeListing.countryCode)
+                                        .professionalRoles.firstOrNull() ?: "Licensed professional",
+                                    statement = endStatement.trim()
+                                )
+                                endName = ""; endLicence = ""; endStatement = ""
+                                showEndorsementDialog = false
+                            }
+                        }
+                    },
+                    enabled = endName.isNotBlank() && endLicence.isNotBlank()
+                )
+            },
+            dismissButton = {
+                TextButton(onClick = { showEndorsementDialog = false }) {
+                    Text("Cancel", color = DorjaColors.Gray700)
+                }
             }
         )
     }
@@ -784,7 +881,13 @@ fun PropertyDetailScreen(
                     if (liveabilityProfile.liveabilityFields.contains(LiveabilityField.WATER_SUPPLY) && !safeListing.waterSupply.isNullOrBlank())
                         LiveabilityField.WATER_SUPPLY.label to safeListing.waterSupply!! else null,
                     if (liveabilityProfile.liveabilityFields.contains(LiveabilityField.FLOOD_RISK) && !safeListing.floodRisk.isNullOrBlank())
-                        LiveabilityField.FLOOD_RISK.label to safeListing.floodRisk!! else null
+                        LiveabilityField.FLOOD_RISK.label to safeListing.floodRisk!! else null,
+                    if (liveabilityProfile.liveabilityFields.contains(LiveabilityField.BUILDING_CONDITION) && !safeListing.buildingCondition.isNullOrBlank())
+                        LiveabilityField.BUILDING_CONDITION.label to safeListing.buildingCondition!! else null,
+                    if (liveabilityProfile.liveabilityFields.contains(LiveabilityField.BUILDING_AGE) && safeListing.buildingAgeYears != null)
+                        LiveabilityField.BUILDING_AGE.label to "${safeListing.buildingAgeYears} years" else null,
+                    if (liveabilityProfile.liveabilityFields.contains(LiveabilityField.DISASTER_CONTEXT) && !safeListing.disasterContext.isNullOrBlank())
+                        LiveabilityField.DISASTER_CONTEXT.label to safeListing.disasterContext!! else null
                 )
                 if (energyRows.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(10.dp))
@@ -1205,6 +1308,107 @@ fun PropertyDetailScreen(
                             imageVector = Icons.Default.OpenInNew,
                             contentDescription = "View",
                             tint = DorjaColors.BentoGreenIcon
+                        )
+                    }
+                }
+            }
+
+            // Professional Handoff (Phase 4, atlas §8) — a licensed professional
+            // signs for one section of the listing's evidence.
+            item {
+                BentoCard(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                Icons.Default.WorkspacePremium,
+                                contentDescription = null,
+                                tint = DorjaColors.BentoPurpleIcon,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "PROFESSIONAL HANDOFF",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = DorjaColors.Gray500,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        if (endorsements.isEmpty()) {
+                            Text(
+                                text = "No licensed professional has taken responsibility for a section yet.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = DorjaColors.Gray500
+                            )
+                        } else {
+                            endorsements.forEach { end ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        Icons.Default.VerifiedUser,
+                                        contentDescription = null,
+                                        tint = DorjaColors.BentoGreenIcon,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = "${end.section.replaceFirstChar { it.uppercase() }} — ${end.professionalName}",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = DorjaColors.Ink950,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Text(
+                                            text = buildString {
+                                                append(end.roleLabel.ifBlank { "Licensed professional" })
+                                                if (end.licenceId.isNotBlank()) append(" • Lic. ${end.licenceId}")
+                                                append(" • ${Formatters.formatDateOnly(end.endorsedAt)}")
+                                            },
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = DorjaColors.Gray500
+                                        )
+                                        if (end.statement.isNotBlank()) {
+                                            Text(
+                                                text = end.statement,
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = DorjaColors.Gray700
+                                            )
+                                        }
+                                    }
+                                    if (isOwner) {
+                                        IconButton(onClick = {
+                                            scope.launch { repository.deleteEndorsement(end.id) }
+                                        }) {
+                                            Icon(
+                                                Icons.Default.Delete,
+                                                contentDescription = "Remove endorsement",
+                                                tint = DorjaColors.Gray500,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        if (isOwner) {
+                            Spacer(modifier = Modifier.height(6.dp))
+                            DorjaOutlinedButton(
+                                text = "Add Professional Endorsement",
+                                onClick = { showEndorsementDialog = true },
+                                icon = Icons.Default.WorkspacePremium,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                        Text(
+                            text = "DORJA records the endorsement and never verifies the licence — check it with the issuing authority.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = DorjaColors.Gray500,
+                            modifier = Modifier.padding(top = 4.dp)
                         )
                     }
                 }

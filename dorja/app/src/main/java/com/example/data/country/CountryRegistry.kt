@@ -34,13 +34,32 @@ enum class LiveabilityField(val label: String) {
     RENOVATION_YEAR("Last major renovation"),
     POWER_BACKUP("Power backup"),
     WATER_SUPPLY("Water supply"),
-    FLOOD_RISK("Flood / waterlogging risk")
+    FLOOD_RISK("Flood / waterlogging risk"),
+    BUILDING_CONDITION("Building condition"),
+    BUILDING_AGE("Building age"),
+    DISASTER_CONTEXT("Disaster context")
 }
 
 data class DocumentTypeSpec(
     val code: String,
     val label: String,
     val regionalNames: Map<String, String> = emptyMap()
+)
+
+/**
+ * Sub-national profile (atlas: "Emirate-level adapter — a single Gulf profile
+ * is explicitly rejected"). Countries where transaction rules differ by state
+ * / emirate / canton declare their subdivisions here; UI and documents key
+ * off the subdivision code, not the country alone.
+ */
+data class SubnationalProfile(
+    val code: String,               // e.g. "AE-DXB"
+    val displayName: String,
+    val extraDocumentTypes: List<DocumentTypeSpec> = emptyList(),
+    val extraAuthorityRails: List<String> = emptyList(),
+    val govtVerifyUrl: String? = null,
+    val govtVerifyLabel: String? = null,
+    val notes: String = ""
 )
 
 data class CountryProfile(
@@ -68,11 +87,22 @@ data class CountryProfile(
     val liveabilityFields: List<LiveabilityField> = emptyList(),
     /** What identity proof this market expects, so UI can be honest about what DORJA does/does not check. */
     val identityVerificationNote: String = "",
+    /** Sub-national subdivisions (emirates, states, cantons) where rules differ. */
+    val subnationalProfiles: List<SubnationalProfile> = emptyList(),
     val confidence: AtlasConfidence = AtlasConfidence.DISCOVERY_REQUIRED,
     val launchStage: Int = 99            // Atlas staged rollout: 1=launched, 2..5=planned, 99=not planned
 ) {
     val selectable: Boolean get() = launchStage <= 1
     val confidenceLabel: String get() = confidence.label
+
+    /** Document types including sub-national additions, for a given subdivision code. */
+    fun documentTypesFor(subnationalCode: String? = null): List<DocumentTypeSpec> {
+        val sub = subnationalProfiles.firstOrNull { it.code.equals(subnationalCode ?: "", ignoreCase = true) }
+        return documentTypes + (sub?.extraDocumentTypes ?: emptyList())
+    }
+
+    fun subnational(code: String?): SubnationalProfile? =
+        subnationalProfiles.firstOrNull { it.code.equals(code ?: "", ignoreCase = true) }
 }
 
 object CountryRegistry {
@@ -234,12 +264,86 @@ object CountryRegistry {
             iso2 = "JP", displayName = "Japan",
             currencyCode = "JPY", currencySymbol = "¥", formatLocaleTag = "ja-JP",
             primaryLanguages = listOf("ja-JP", "en"),
+            documentTypes = listOf(
+                DocumentTypeSpec("TAKKEN_LICENSE", "Real Estate Brokerage License (Takken)") ,
+                DocumentTypeSpec("IMPORTANT_MATTERS_DOC", "Important Matters Explanation (Jūyō Jikō Setsumeisho)") ,
+                DocumentTypeSpec("SALE_DEED", "Registered Sale Deed"),
+                DocumentTypeSpec("BUILDING_CONFIRMATION", "Building Confirmation (Kenchiku Kakunin)") ,
+                DocumentTypeSpec("OTHER", "Other Document")
+            ),
+            professionalRoles = listOf("Licensed Takken Agent (宅建士)", "Land & House Investigator (土地家屋調査士)", "Administrative Scrivener (行政書士)"),
+            authorityRails = listOf("MLIT existing-home transaction guidance (link-out)"),
+            disclosureChecklist = listOf(
+                "Important Matters explanation (jūyō jikō setsumeisho) received and explained",
+                "Building confirmation / inspection certificate",
+                "Existing-home condition survey (where available)",
+                "Boundary and registration survey by a land & house investigator",
+                "Disaster risk context for the plot (earthquake, flood maps)"
+            ),
+            liveabilityFields = listOf(
+                LiveabilityField.BUILDING_CONDITION,
+                LiveabilityField.BUILDING_AGE,
+                LiveabilityField.DISASTER_CONTEXT,
+                LiveabilityField.RENOVATION_YEAR
+            ),
+            identityVerificationNote = "Japanese transactions run through licensed takken professionals; DORJA prepares evidence and handoff, it does not replace the licensed explanation of important matters.",
             confidence = AtlasConfidence.REGIONAL_EVIDENCE, launchStage = 4
         ),
         CountryProfile(
             iso2 = "AE", displayName = "United Arab Emirates",
             currencyCode = "AED", currencySymbol = "د.إ", formatLocaleTag = "ar-AE",
             primaryLanguages = listOf("ar-AE", "en"), rtlScripts = true,
+            documentTypes = listOf(
+                DocumentTypeSpec("TITLE_DEED", "Title Deed"),
+                DocumentTypeSpec("EJARI_REGISTRATION", "Tenancy Registration (Ejari-style)"),
+                DocumentTypeSpec("AGENT_PERMIT", "Broker RERA Permit"),
+                DocumentTypeSpec("OTHER", "Other Document")
+            ),
+            professionalRoles = listOf("RERA-licensed Broker", "Advocate (Tenancy)", "Property Registrar"),
+            authorityRails = listOf("Emirate land department / tenancy registry (link-out)"),
+            disclosureChecklist = listOf(
+                "Title deed from the emirate land department",
+                "Tenancy registration (Ejari in Dubai) current",
+                "Broker's RERA permit number",
+                "Service charge / maintenance history",
+                "Developer completion and handover status (off-plan)"
+            ),
+            subnationalProfiles = listOf(
+                SubnationalProfile(
+                    code = "AE-DXB",
+                    displayName = "Dubai",
+                    extraDocumentTypes = listOf(
+                        DocumentTypeSpec("EJARI_REGISTRATION", "Ejari Tenancy Registration"),
+                        DocumentTypeSpec("DLD_TITLE_DEED", "DLD Title Deed"),
+                        DocumentTypeSpec("OQOOD_OFFPLAN", "Oqood Off-Plan Registration")
+                    ),
+                    extraAuthorityRails = listOf("Dubai Land Department (dubailand.gov.ae)"),
+                    govtVerifyUrl = "https://dubailand.gov.ae",
+                    govtVerifyLabel = "Dubai Land Department (dubailand.gov.ae)",
+                    notes = "Ejari tenancy registration is mandatory for rentals; Oqood registers off-plan sales before title issue."
+                ),
+                SubnationalProfile(
+                    code = "AE-AUH",
+                    displayName = "Abu Dhabi",
+                    extraDocumentTypes = listOf(
+                        DocumentTypeSpec("TAWTHEQ_REGISTRATION", "Tawtheq Tenancy Contract Registration")
+                    ),
+                    extraAuthorityRails = listOf("ADREC / Tawtheq (adrec.gov.ae)"),
+                    govtVerifyUrl = "https://www.adrec.gov.ae",
+                    govtVerifyLabel = "ADREC / Tawtheq (adrec.gov.ae)",
+                    notes = "Tenancy contracts are registered via Tawtheq under ADREC."
+                ),
+                SubnationalProfile(
+                    code = "AE-SHJ",
+                    displayName = "Sharjah",
+                    extraDocumentTypes = listOf(
+                        DocumentTypeSpec("SQ_TOTALITIES", "Sharjah Municipality Tenancy Attestation")
+                    ),
+                    extraAuthorityRails = listOf("Sharjah Municipality (shjmun.gov.ae)"),
+                    notes = "Rental contracts require municipality attestation; freehold ownership is restricted to designated zones."
+                )
+            ),
+            identityVerificationNote = "UAE transactions run through RERA-licensed brokers and emirate land departments; DORJA stores your evidence and handoff trail but does not replace the registries.",
             confidence = AtlasConfidence.DISCOVERY_REQUIRED, launchStage = 4
         )
     )

@@ -9,6 +9,7 @@ import com.example.data.model.EvidenceSummary
 import com.example.data.model.LegalDocument
 import com.example.data.model.Listing
 import com.example.data.model.Message
+import com.example.data.model.ProfessionalEndorsement
 import com.example.data.model.Promise
 import com.example.data.model.PropertyPassport
 import com.example.data.model.RoomItem
@@ -35,6 +36,7 @@ class DorjaRepository(private val database: DorjaDatabase) {
     private val promiseDao = database.promiseDao()
     private val legalDocumentDao = database.legalDocumentDao()
     private val propertyPassportDao = database.propertyPassportDao()
+    private val endorsementDao = database.professionalEndorsementDao()
 
     private val _currentUser = MutableStateFlow<User?>(null)
     val currentUser: StateFlow<User?> = _currentUser.asStateFlow()
@@ -123,7 +125,10 @@ class DorjaRepository(private val database: DorjaDatabase) {
         renovationYear: Int? = null,
         powerBackup: String? = null,
         waterSupply: String? = null,
-        floodRisk: String? = null
+        floodRisk: String? = null,
+        buildingCondition: String? = null,
+        buildingAgeYears: Int? = null,
+        disasterContext: String? = null
     ): String {
         val ownerId = _currentUser.value?.id ?: "u1"
         val id = "l_" + UUID.randomUUID().toString().take(8)
@@ -161,6 +166,9 @@ class DorjaRepository(private val database: DorjaDatabase) {
             powerBackup = powerBackup,
             waterSupply = waterSupply,
             floodRisk = floodRisk,
+            buildingCondition = buildingCondition,
+            buildingAgeYears = buildingAgeYears,
+            disasterContext = disasterContext,
             createdAt = System.currentTimeMillis()
         )
         listingDao.insertListing(listing)
@@ -200,7 +208,40 @@ class DorjaRepository(private val database: DorjaDatabase) {
         scanDao.deleteScansByListing(listingId)
         promiseDao.deletePromisesByListing(listingId)
         legalDocumentDao.deleteLegalDocumentsByListing(listingId)
+        endorsementDao.deleteByListing(listingId)
     }
+
+    // Professional handoff endorsements (Phase 4)
+    fun observeEndorsementsForListing(listingId: String): Flow<List<ProfessionalEndorsement>> =
+        endorsementDao.observeByListing(listingId)
+
+    suspend fun addEndorsement(
+        listingId: String,
+        section: String,
+        professionalName: String,
+        licenceId: String,
+        roleLabel: String,
+        statement: String
+    ): ProfessionalEndorsement {
+        val endorsement = ProfessionalEndorsement(
+            id = "pe_" + UUID.randomUUID().toString().take(8),
+            listingId = listingId,
+            section = section,
+            professionalName = professionalName,
+            licenceId = licenceId,
+            roleLabel = roleLabel,
+            statement = statement
+        )
+        endorsementDao.insert(endorsement)
+        return endorsement
+    }
+
+    suspend fun deleteEndorsement(id: String) {
+        endorsementDao.deleteById(id)
+    }
+
+    suspend fun getEndorsementsForListingSync(listingId: String): List<ProfessionalEndorsement> =
+        endorsementDao.getByListingSync(listingId)
 
     /**
      * Aggregate evidence-health snapshot across every legal document the user
@@ -278,6 +319,7 @@ class DorjaRepository(private val database: DorjaDatabase) {
         messageDao.deleteAllMessages()
         conversationDao.deleteAllConversations()
         viewingDao.deleteAllViewings()
+        endorsementDao.deleteAll()
     }
 
     /**

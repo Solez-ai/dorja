@@ -52,7 +52,29 @@ data class Listing(
     val powerBackup: String? = null,
     val waterSupply: String? = null,
     val floodRisk: String? = null,
+    // Phase 4: Japan condition/age/disaster fields (profile-gated)
+    val buildingCondition: String? = null,
+    val buildingAgeYears: Int? = null,
+    val disasterContext: String? = null,
     val createdAt: Long = System.currentTimeMillis()
+)
+
+/**
+ * Professional handoff (atlas §8, PLAN.md Phase 4): a licensed professional
+ * (takken agent, advocate, land investigator…) takes responsibility for one
+ * section of a listing's evidence by signing/timestamping it. DORJA records
+ * the endorsement; it never verifies the licence itself.
+ */
+@Entity(tableName = "professional_endorsements")
+data class ProfessionalEndorsement(
+    @PrimaryKey val id: String,
+    val listingId: String,
+    val section: String,             // e.g. OWNERSHIP, CONDITION, MEASUREMENTS, DISCLOSURE
+    val professionalName: String,
+    val licenceId: String,
+    val roleLabel: String = "",      // e.g. "Licensed Takken Agent (宅建士)"
+    val statement: String = "",
+    val endorsedAt: Long = System.currentTimeMillis()
 )
 
 @Entity(tableName = "rooms")
