@@ -28,7 +28,9 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Shield
@@ -60,8 +62,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.DorjaApp
+import com.example.data.country.CountryRegistry
 import com.example.ui.components.BentoCard
 import com.example.ui.components.BentoMetricTile
+import com.example.ui.components.CountryPicker
 import com.example.ui.components.DorjaAvatar
 import com.example.ui.components.DorjaBadge
 import com.example.ui.components.DorjaButton
@@ -89,6 +93,7 @@ fun AccountScreen(
     var editLocation by remember { mutableStateOf("") }
     var editBio by remember { mutableStateOf("") }
     var editRole by remember { mutableStateOf("SELLER") }
+    var editCountryCode by remember { mutableStateOf("BD") }
 
     var showResetDialog by remember { mutableStateOf(false) }
 
@@ -179,6 +184,14 @@ fun AccountScreen(
                             unfocusedBorderColor = DorjaColors.BentoCardBorder
                         )
                     )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    CountryPicker(
+                        selected = editCountryCode,
+                        onSelect = { editCountryCode = it },
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
             },
             confirmButton = {
@@ -192,7 +205,8 @@ fun AccountScreen(
                                 email = editEmail,
                                 location = editLocation,
                                 bio = editBio,
-                                role = editRole
+                                role = editRole,
+                                countryCode = editCountryCode
                             )
                             showEditProfileDialog = false
                         }
@@ -320,10 +334,16 @@ fun AccountScreen(
                                         textColor = if (user.role == "SELLER") DorjaColors.BentoBlueText else DorjaColors.BentoGreenText
                                     )
                                     DorjaBadge(
-                                        text = "NID VERIFIED",
+                                        text = if (user.countryCode == "BD") "NID VERIFIED" else "IDENTITY VERIFIED",
                                         icon = Icons.Default.VerifiedUser,
                                         backgroundColor = DorjaColors.BentoGreenBg,
                                         textColor = DorjaColors.BentoGreenText
+                                    )
+                                    DorjaBadge(
+                                        text = CountryRegistry.profile(user.countryCode).displayName,
+                                        icon = Icons.Default.Place,
+                                        backgroundColor = DorjaColors.BentoBlueBg,
+                                        textColor = DorjaColors.BentoBlueText
                                     )
                                 }
                             }
@@ -336,6 +356,7 @@ fun AccountScreen(
                                     editLocation = user.location
                                     editBio = user.bio
                                     editRole = user.role
+                                    editCountryCode = user.countryCode
                                     showEditProfileDialog = true
                                 },
                                 modifier = Modifier
@@ -363,6 +384,17 @@ fun AccountScreen(
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(user.location, style = MaterialTheme.typography.bodySmall, color = DorjaColors.Gray700)
                             }
+                        }
+
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Public, contentDescription = null, tint = DorjaColors.Gray500, modifier = Modifier.size(14.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "${CountryRegistry.profile(user.countryCode).displayName} • ${CountryRegistry.profile(user.countryCode).currencyCode}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = DorjaColors.Gray700
+                            )
                         }
 
                         if (user.bio.isNotBlank()) {
@@ -412,7 +444,7 @@ fun AccountScreen(
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = "Switch to $targetUserLabel to chat & explore as the other party",
+                                text = "Switch to $targetUserLabel to chat & explore as the other party. Each demo account keeps its own country & currency.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = DorjaColors.Gray700
                             )
@@ -438,7 +470,11 @@ fun AccountScreen(
                             fontWeight = FontWeight.Bold
                         )
                         Spacer(modifier = Modifier.height(10.dp))
-                        SecurityRow(title = "NID Verification", status = "PASSED", icon = Icons.Default.Shield)
+                        SecurityRow(
+                            title = if (user.countryCode == "BD") "NID Verification" else "Identity Verification",
+                            status = "PASSED",
+                            icon = Icons.Default.Shield
+                        )
                         SecurityRow(title = "SafeView GPS Token Registry", status = "ACTIVE", icon = Icons.Default.Lock)
                         SecurityRow(title = "Local Room Persistence", status = "ON-DEVICE", icon = Icons.Default.CheckCircle)
                     }
