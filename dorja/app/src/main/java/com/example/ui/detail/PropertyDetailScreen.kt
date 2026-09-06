@@ -49,6 +49,7 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MeetingRoom
 import androidx.compose.material.icons.filled.OpenInNew
@@ -796,6 +797,30 @@ fun PropertyDetailScreen(
 
                         Spacer(modifier = Modifier.height(8.dp))
 
+                        // Jurisdiction badges — country of transaction, plus emirate/state when set.
+                        // The subdivision badge only appears when the listing's subnationalCode
+                        // resolves to a registry profile (e.g. AE-DXB); otherwise country only.
+                        val jurisdictionProfile = CountryRegistry.profile(safeListing.countryCode)
+                        val jurisdictionSubnational = jurisdictionProfile.subnational(safeListing.subnationalCode)
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            DorjaBadge(
+                                text = jurisdictionProfile.displayName,
+                                icon = Icons.Default.Public,
+                                backgroundColor = DorjaColors.BentoBlueBg,
+                                textColor = DorjaColors.BentoBlueText
+                            )
+                            if (jurisdictionSubnational != null) {
+                                DorjaBadge(
+                                    text = jurisdictionSubnational.displayName,
+                                    icon = Icons.Default.LocationOn,
+                                    backgroundColor = DorjaColors.BentoPurpleBg,
+                                    textColor = DorjaColors.BentoPurpleText
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
                         // SafeView Protected Address Shield
                         SafeAddressShield(approximateArea = safeListing.publicArea)
 
@@ -1296,8 +1321,9 @@ fun PropertyDetailScreen(
                                 fontSize = 11.sp
                             )
                             if (passport != null) {
+                                val p = passport!!
                                 Text(
-                                    text = "Property Passport ${passport!!.id.uppercase()} • ${CountryRegistry.profile(passport!!.countryCode).displayName}",
+                                    text = "Property Passport ${p.id.uppercase()} • ${CountryRegistry.profile(p.countryCode).displayName}",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = DorjaColors.BentoGreenIcon,
                                     fontSize = 10.sp

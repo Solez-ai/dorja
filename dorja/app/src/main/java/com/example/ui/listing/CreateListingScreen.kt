@@ -1916,10 +1916,11 @@ fun CreateListingScreen(
                             onClick = {
                                 newDocTitle = ""
                                 newDocNumber = ""
-                                newDocAuthority = ""                            newDocNotes = ""
-                            newDocEvidenceLevel = EvidenceLevel.SELF_DECLARED.code
-                            showAddDocDialog = true
-                        },
+                                newDocAuthority = ""
+                                newDocNotes = ""
+                                newDocEvidenceLevel = EvidenceLevel.SELF_DECLARED.code
+                                showAddDocDialog = true
+                            },
                             icon = Icons.Default.Add,
                             modifier = Modifier.height(36.dp),
                             testTag = "add_legal_doc_button"

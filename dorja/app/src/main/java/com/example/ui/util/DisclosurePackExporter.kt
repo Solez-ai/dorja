@@ -33,10 +33,10 @@ object DisclosurePackExporter {
     private const val MARGIN = 48f
     private const val BOTTOM = 70f
     private const val LINE_H = 14f
-    private const val BRAND = Color.rgb(0x00, 0x61, 0xA4)
-    private const val MUTED = Color.rgb(0x74, 0x77, 0x7F)
-    private const val AMBER = Color.rgb(0x82, 0x55, 0x00)
-    private const val LINK = Color.rgb(0x00, 0x4A, 0x82)
+    private val BRAND = Color.rgb(0x00, 0x61, 0xA4)
+    private val MUTED = Color.rgb(0x74, 0x77, 0x7F)
+    private val AMBER = Color.rgb(0x82, 0x55, 0x00)
+    private val LINK = Color.rgb(0x00, 0x4A, 0x82)
 
     suspend fun generate(context: Context, listingId: String): File? {
         val repo = DorjaApp.instance.repository
@@ -58,8 +58,8 @@ object DisclosurePackExporter {
         val sectionPaint = Paint().apply { color = BRAND; textSize = 13f; typeface = Typeface.DEFAULT_BOLD }
         val bodyPaint = Paint().apply { color = Color.BLACK; textSize = 9.5f; typeface = Typeface.DEFAULT }
         val bodyBold = Paint().apply { color = Color.BLACK; textSize = 9.5f; typeface = Typeface.DEFAULT_BOLD }
-        val smallPaint = Paint().apply { color = MUTED; textSize = 8f; typeface = Typeface.ITALIC }
-        val amberPaint = Paint().apply { color = AMBER; textSize = 8.5f; typeface = Typeface.ITALIC }
+        val smallPaint = Paint().apply { color = MUTED; textSize = 8f; typeface = Typeface.create(Typeface.DEFAULT, Typeface.ITALIC) }
+        val amberPaint = Paint().apply { color = AMBER; textSize = 8.5f; typeface = Typeface.create(Typeface.DEFAULT, Typeface.ITALIC) }
         val linkPaint = Paint().apply { color = LINK; textSize = 9.5f; typeface = Typeface.DEFAULT_BOLD }
 
         fun newPageIfNeeded(needed: Float) {
