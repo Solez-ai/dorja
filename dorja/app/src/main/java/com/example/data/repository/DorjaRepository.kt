@@ -2,6 +2,7 @@ package com.example.data.repository
 
 import com.example.data.country.CountryRegistry
 import com.example.data.db.DorjaDatabase
+import com.example.data.model.AppealRecord
 import com.example.data.model.Conversation
 import com.example.data.model.EVIDENCE_STALENESS_MS
 import com.example.data.model.EvidenceExpiry
@@ -13,6 +14,8 @@ import com.example.data.model.Message
 import com.example.data.model.ProfessionalEndorsement
 import com.example.data.model.Promise
 import com.example.data.model.PropertyPassport
+import com.example.data.model.Report
+import com.example.data.model.ReportResponse
 import com.example.data.model.RoomItem
 import com.example.data.model.Scan
 import com.example.data.model.User

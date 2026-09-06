@@ -42,6 +42,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.DorjaApp
+import com.example.data.model.LegalDocument
 import com.example.ui.components.DorjaBadge
 import com.example.ui.components.DorjaCard
 import com.example.ui.theme.DorjaColors
@@ -58,7 +59,10 @@ fun CaptureScreen(
     val ownerId = currentUser?.id ?: "u1"
     val myListings by repository.getListingsByOwner(ownerId).collectAsState(initial = emptyList())
     // Evidence-gated status (atlas §3): docs per listing drive the badge.
-    val docsByListing by produceState(emptyMap(), myListings) {
+    val docsByListing by produceState(
+        initialValue = emptyMap<String, List<LegalDocument>>(),
+        key = myListings
+    ) {
         value = repository.getDocsForListings(myListings.map { it.id })
     }
 

@@ -73,6 +73,7 @@ import androidx.compose.ui.unit.sp
 import com.example.DorjaApp
 import com.example.data.country.CountryRegistry
 import com.example.data.model.EvidenceSummary
+import com.example.data.model.Report
 import com.example.ui.components.BentoCard
 import com.example.ui.components.BentoMetricTile
 import com.example.ui.components.CountryPicker
@@ -792,7 +793,7 @@ fun AccountScreen(
 
             // Reports & Appeals (Phase 5, atlas §2 appeal & dispute record)
             item {
-                val myReports by repository.observeReportsByUser(user.id).collectAsState(initial = emptyList())
+                val myReports by repository.observeReportsByUser(user.id).collectAsState(initial = emptyList<Report>())
                 BentoCard(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(

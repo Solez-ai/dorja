@@ -63,6 +63,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.DorjaApp
+import com.example.data.model.LegalDocument
 import com.example.data.model.Listing
 import com.example.ui.components.BentoCard
 import com.example.ui.components.BentoMetricTile
@@ -88,7 +89,10 @@ fun ExploreScreen(
     val scope = rememberCoroutineScope()
     val allListings by repository.getAllListings().collectAsState(initial = emptyList())
     // Evidence-gated status per listing (atlas §3 honesty rule)
-    val docsByListing by produceState(emptyMap(), allListings) {
+    val docsByListing by produceState(
+        initialValue = emptyMap<String, List<LegalDocument>>(),
+        key = allListings
+    ) {
         value = repository.getDocsForListings(allListings.map { it.id })
     }
 

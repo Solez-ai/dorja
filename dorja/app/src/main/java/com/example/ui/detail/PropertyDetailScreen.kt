@@ -96,6 +96,9 @@ import com.example.data.country.CountryRegistry
 import com.example.data.country.LiveabilityField
 import com.example.ui.util.DisclosurePackExporter
 import androidx.compose.ui.res.stringResource
+import com.example.data.model.AppealRecord
+import com.example.data.model.Report
+import com.example.data.model.ReportResponse
 import com.example.data.model.RoomItem
 import com.example.ui.components.BentoCard
 import com.example.ui.components.DorjaBadge
@@ -134,12 +137,12 @@ fun PropertyDetailScreen(
     val rooms by repository.getRoomsByListing(listingId).collectAsState(initial = emptyList())
     val passport by repository.observePassportForListing(listingId).collectAsState(initial = null)
     val endorsements by repository.observeEndorsementsForListing(listingId).collectAsState(initial = emptyList())
-    val listingReports by repository.observeReportsForListing(listingId).collectAsState(initial = emptyList())
+    val listingReports by repository.observeReportsForListing(listingId).collectAsState(initial = emptyList<Report>())
     val reportResponsesById = listingReports.associate { report ->
-        report.id to repository.observeResponsesForReport(report.id).collectAsState(initial = emptyList()).value
+        report.id to repository.observeResponsesForReport(report.id).collectAsState(initial = emptyList<ReportResponse>()).value
     }
     val reportAppealsById = listingReports.associate { report ->
-        report.id to repository.observeAppealsForReport(report.id).collectAsState(initial = emptyList()).value
+        report.id to repository.observeAppealsForReport(report.id).collectAsState(initial = emptyList<AppealRecord>()).value
     }
     val currentUser by repository.currentUser.collectAsState()
 
