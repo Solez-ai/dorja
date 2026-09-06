@@ -37,6 +37,9 @@ class DorjaRepository(private val database: DorjaDatabase) {
     private val legalDocumentDao = database.legalDocumentDao()
     private val propertyPassportDao = database.propertyPassportDao()
     private val endorsementDao = database.professionalEndorsementDao()
+    private val reportDao = database.reportDao()
+    private val reportResponseDao = database.reportResponseDao()
+    private val appealDao = database.appealDao()
 
     private val _currentUser = MutableStateFlow<User?>(null)
     val currentUser: StateFlow<User?> = _currentUser.asStateFlow()
@@ -211,6 +214,9 @@ class DorjaRepository(private val database: DorjaDatabase) {
         promiseDao.deletePromisesByListing(listingId)
         legalDocumentDao.deleteLegalDocumentsByListing(listingId)
         endorsementDao.deleteByListing(listingId)
+        reportResponseDao.deleteByListing(listingId)
+        appealDao.deleteByListing(listingId)
+        reportDao.deleteByListing(listingId)
     }
 
     // Professional handoff endorsements (Phase 4)
@@ -322,6 +328,9 @@ class DorjaRepository(private val database: DorjaDatabase) {
         conversationDao.deleteAllConversations()
         viewingDao.deleteAllViewings()
         endorsementDao.deleteAll()
+        appealDao.deleteAll()
+        reportResponseDao.deleteAll()
+        reportDao.deleteAll()
     }
 
     /**
@@ -513,6 +522,115 @@ class DorjaRepository(private val database: DorjaDatabase) {
             evidenceNote = evidenceNote
         )
         promiseDao.insertPromise(promise)
+    }
+
+    // ── Reports / responses / appeals (Phase 5, atlas §2 & §8) ────────────
+    // Neutral records: DORJA records, notifies and displays. It does not
+    // adjudicate truth and never picks a silent winner.
+
+    fun observeReportsForListing(listingId: String): Flow<List<Report>> =
+        reportDao.observeByListing(listingId)
+
+    fun observeReportsByUser(userId: String): Flow<List<Report>> =
+        reportDao.observeByReporter(userId)
+
+    fun observeResponsesForReport(reportId: String): Flow<List<ReportResponse>> =
+        reportResponseDao.observeByReport(reportId)
+
+    fun observeAppealsForReport(reportId: String): Flow<List<AppealRecord>> =
+        appealDao.observeByReport(reportId)
+
+    suspend fun getReportsForListingSync(listingId: String): List<Report> =
+        reportDao.getByListingSync(listingId)
+
+    suspend fun getResponsesForReportSync(reportId: String): List<ReportResponse> =
+        reportResponseDao.getByReportSync(reportId)
+
+    suspend fun addReport(
+        listingId: String,
+        reportedByUserId: String,
+        reason: String,
+        details: String,
+        subjectClaim: String
+    ): Report {
+        val report = Report(
+            id = "rep_" + UUID.randomUUID().toString().take(8),
+            listingId = listingId,
+            reportedByUserId = reportedByUserId,
+            reason = reason,
+            details = details,
+            subjectClaim = subjectClaim
+        )
+        reportDao.insert(report)
+        return report
+    }
+
+    suspend fun addReportResponse(
+        reportId: String,
+        respondedByUserId: String,
+        counterClaim: String,
+        evidenceReference: String
+    ) {
+        reportResponseDao.insert(
+            ReportResponse(
+                id = "rr_" + UUID.randomUUID().toString().take(8),
+                reportId = reportId,
+                respondedByUserId = respondedByUserId,
+                counterClaim = counterClaim,
+                evidenceReference = evidenceReference
+            )
+        )
+        // First response moves the report into the responded state.
+        reportDao.getById(reportId)?.let { report ->
+            if (report.state == "OPEN") {
+                reportDao.update(report.copy(state = "COUNTERPARTY_RESPONDED"))
+            }
+        }
+    }
+
+    suspend fun resolveReport(reportId: String, resolutionNote: String) {
+        reportDao.getById(reportId)?.let { report ->
+            reportDao.update(
+                report.copy(
+                    state = "RESOLVED",
+                    resolvedAt = System.currentTimeMillis(),
+                    resolutionNote = resolutionNote
+                )
+            )
+        }
+    }
+
+    suspend fun withdrawReport(reportId: String) {
+        reportDao.getById(reportId)?.let { report ->
+            reportDao.update(report.copy(state = "WITHDRAWN", resolvedAt = System.currentTimeMillis()))
+        }
+    }
+
+    suspend fun addAppeal(
+        reportId: String,
+        appealedByUserId: String,
+        grounds: String
+    ): AppealRecord {
+        val appeal = AppealRecord(
+            id = "apl_" + UUID.randomUUID().toString().take(8),
+            reportId = reportId,
+            appealedByUserId = appealedByUserId,
+            grounds = grounds
+        )
+        appealDao.insert(appeal)
+        return appeal
+    }
+
+    suspend fun decideAppeal(reportId: String, appealId: String, upheld: Boolean, decisionNote: String) {
+        appealDao.getByReportSync(reportId).firstOrNull { it.id == appealId }?.let { appeal ->
+            appealDao.update(
+                appeal.copy(
+                    state = if (upheld) "UPHELD" else "OVERTURNED",
+                    decidedAt = System.currentTimeMillis(),
+                    decisionNote = decisionNote
+                )
+            )
+        }
     }
 
     suspend fun resetAllData() {

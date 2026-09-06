@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.FactCheck
+import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.FlightTakeoff
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
@@ -785,6 +786,83 @@ fun AccountScreen(
                             contentDescription = null,
                             tint = DorjaColors.Gray500
                         )
+                    }
+                }
+            }
+
+            // Reports & Appeals (Phase 5, atlas §2 appeal & dispute record)
+            item {
+                val myReports by repository.observeReportsByUser(user.id).collectAsState(initial = emptyList())
+                BentoCard(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = "REPORTS & APPEALS",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = DorjaColors.Gray500,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = "Reports you filed and their resolution state. Counterparty responses stay visible in the listing's conflict view — nothing is hidden and nobody is silently judged.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = DorjaColors.Gray700
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        if (myReports.isEmpty()) {
+                            Text(
+                                text = "No reports filed.",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = DorjaColors.Gray500
+                            )
+                        } else {
+                            myReports.take(5).forEach { report ->
+                                val reasonLabel = com.example.data.model.ReportReason.fromCode(report.reason).label
+                                val stateLabel = report.state.replace('_', ' ').lowercase()
+                                    .replaceFirstChar { it.uppercase() }
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        Icons.Default.Flag,
+                                        contentDescription = null,
+                                        tint = DorjaColors.BentoAmberIcon,
+                                        modifier = Modifier.size(14.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = reasonLabel,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = DorjaColors.Ink950,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                        Text(
+                                            text = stateLabel,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = DorjaColors.Gray500
+                                        )
+                                    }
+                                    if (report.state == "OPEN" || report.state == "RESOLVED") {
+                                        TextButton(onClick = {
+                                            scope.launch { repository.withdrawReport(report.id) }
+                                        }) {
+                                            Text("Withdraw", color = DorjaColors.Gray700)
+                                        }
+                                    }
+                                }
+                            }
+                            if (myReports.size > 5) {
+                                Text(
+                                    text = "…and ${myReports.size - 5} more",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = DorjaColors.Gray500
+                                )
+                            }
+                        }
                     }
                 }
             }

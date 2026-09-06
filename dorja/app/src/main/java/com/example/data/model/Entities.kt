@@ -189,3 +189,73 @@ data class Promise(
     val evidenceNote: String = "Contract clause verified by developer registry.",
     val createdAt: Long = System.currentTimeMillis()
 )
+
+// ═════════════════════════════════════════════════════════════
+//  Moderation & appeals (atlas §2 "Appeal and dispute record") —
+//  Phase 5: neutral records, no silent winner, no opaque score.
+// ═════════════════════════════════════════════════════════════
+
+/** Why a listing or claim was reported (atlas §2 moderation rails). */
+enum class ReportReason(val code: String, val label: String) {
+    INACCURATE_CLAIM("INACCURATE_CLAIM", "Inaccurate claim or measurement"),
+    SUSPECTED_FRAUD("SUSPECTED_FRAUD", "Suspected fraud or fake listing"),
+    DOCUMENT_CONCERN("DOCUMENT_CONCERN", "Document authenticity concern"),
+    SAFETY_CONCERN("SAFETY_CONCERN", "Viewing or property safety concern"),
+    CONDUCT("CONDUCT", "Counterparty conduct"),
+    OTHER("OTHER", "Other");
+
+    companion object {
+        fun fromCode(code: String?): ReportReason =
+            entries.firstOrNull { it.code == code } ?: OTHER
+    }
+}
+
+/**
+ * A neutral report record. DORJA records the report, notifies the
+ * counterparty, and tracks resolution state — it does not adjudicate
+ * truth or punish anyone. Resolution options are recorded, not judged.
+ */
+@Entity(tableName = "reports")
+data class Report(
+    @PrimaryKey val id: String,
+    val listingId: String,
+    val reportedByUserId: String,
+    val reason: String,                 // ReportReason.code
+    val details: String = "",
+    val subjectClaim: String = "",      // what the reporting party says is true
+    val state: String = "OPEN",         // OPEN, COUNTERPARTY_RESPONDED, RESOLVED, WITHDRAWN
+    val createdAt: Long = System.currentTimeMillis(),
+    val resolvedAt: Long? = null,
+    val resolutionNote: String = ""     // how it ended, recorded neutrally
+)
+
+/**
+ * The counterparty's response to a report. Both claims are stored side by
+ * side and displayed side by side — the evidence graph conflict view shows
+ * both, with source and date, and never picks a silent winner.
+ */
+@Entity(tableName = "report_responses")
+data class ReportResponse(
+    @PrimaryKey val id: String,
+    val reportId: String,
+    val respondedByUserId: String,
+    val counterClaim: String,           // what the responding party says is true
+    val evidenceReference: String = "", // doc ID, promise ID, or free-text source
+    val createdAt: Long = System.currentTimeMillis()
+)
+
+/**
+ * Appeal of a moderation or resolution outcome (atlas §2). The appeal is
+ * a record of disagreement with a resolution — it re-opens review, nothing more.
+ */
+@Entity(tableName = "appeals")
+data class AppealRecord(
+    @PrimaryKey val id: String,
+    val reportId: String,
+    val appealedByUserId: String,
+    val grounds: String,
+    val state: String = "SUBMITTED",    // SUBMITTED, UNDER_REVIEW, UPHELD, OVERTURNED
+    val createdAt: Long = System.currentTimeMillis(),
+    val decidedAt: Long? = null,
+    val decisionNote: String = ""
+)

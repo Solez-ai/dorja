@@ -6,12 +6,15 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
+import com.example.data.model.AppealRecord
 import com.example.data.model.Conversation
 import com.example.data.model.Listing
 import com.example.data.model.Message
 import com.example.data.model.ProfessionalEndorsement
 import com.example.data.model.Promise
 import com.example.data.model.PropertyPassport
+import com.example.data.model.Report
+import com.example.data.model.ReportResponse
 import com.example.data.model.RoomItem
 import com.example.data.model.Scan
 import com.example.data.model.User
@@ -241,6 +244,81 @@ interface PromiseDao {
 
     @Query("DELETE FROM promises")
     suspend fun deleteAllPromises()
+}
+
+@Dao
+interface ReportDao {
+    @Query("SELECT * FROM reports WHERE listingId = :listingId ORDER BY createdAt DESC")
+    fun observeByListing(listingId: String): Flow<List<Report>>
+
+    @Query("SELECT * FROM reports WHERE reportedByUserId = :userId ORDER BY createdAt DESC")
+    fun observeByReporter(userId: String): Flow<List<Report>>
+
+    @Query("SELECT * FROM reports ORDER BY createdAt DESC")
+    fun observeAll(): Flow<List<Report>>
+
+    @Query("SELECT * FROM reports WHERE id = :id LIMIT 1")
+    suspend fun getById(id: String): Report?
+
+    @Query("SELECT * FROM reports WHERE listingId = :listingId ORDER BY createdAt DESC")
+    suspend fun getByListingSync(listingId: String): List<Report>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(report: Report)
+
+    @Update
+    suspend fun update(report: Report)
+
+    @Query("DELETE FROM reports WHERE listingId = :listingId")
+    suspend fun deleteByListing(listingId: String)
+
+    @Query("DELETE FROM reports WHERE reportedByUserId = :userId")
+    suspend fun deleteByReporter(userId: String)
+
+    @Query("DELETE FROM reports")
+    suspend fun deleteAll()
+}
+
+@Dao
+interface ReportResponseDao {
+    @Query("SELECT * FROM report_responses WHERE reportId = :reportId ORDER BY createdAt ASC")
+    fun observeByReport(reportId: String): Flow<List<ReportResponse>>
+
+    @Query("SELECT * FROM report_responses WHERE reportId = :reportId ORDER BY createdAt ASC")
+    suspend fun getByReportSync(reportId: String): List<ReportResponse>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(response: ReportResponse)
+
+    @Query("DELETE FROM report_responses WHERE reportId IN (SELECT id FROM reports WHERE listingId = :listingId)")
+    suspend fun deleteByListing(listingId: String)
+
+    @Query("DELETE FROM report_responses")
+    suspend fun deleteAll()
+}
+
+@Dao
+interface AppealDao {
+    @Query("SELECT * FROM appeals WHERE reportId = :reportId ORDER BY createdAt DESC")
+    fun observeByReport(reportId: String): Flow<List<AppealRecord>>
+
+    @Query("SELECT * FROM appeals WHERE appealedByUserId = :userId ORDER BY createdAt DESC")
+    fun observeByUser(userId: String): Flow<List<AppealRecord>>
+
+    @Query("SELECT * FROM appeals WHERE reportId = :reportId ORDER BY createdAt DESC")
+    suspend fun getByReportSync(reportId: String): List<AppealRecord>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(appeal: AppealRecord)
+
+    @Update
+    suspend fun update(appeal: AppealRecord)
+
+    @Query("DELETE FROM appeals WHERE reportId IN (SELECT id FROM reports WHERE listingId = :listingId)")
+    suspend fun deleteByListing(listingId: String)
+
+    @Query("DELETE FROM appeals")
+    suspend fun deleteAll()
 }
 
 @Dao

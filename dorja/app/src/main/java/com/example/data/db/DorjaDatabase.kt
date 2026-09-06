@@ -5,6 +5,7 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.example.data.model.AppealRecord
 import com.example.data.model.Conversation
 import com.example.data.model.LegalDocument
 import com.example.data.model.Listing
@@ -12,6 +13,8 @@ import com.example.data.model.Message
 import com.example.data.model.ProfessionalEndorsement
 import com.example.data.model.Promise
 import com.example.data.model.PropertyPassport
+import com.example.data.model.Report
+import com.example.data.model.ReportResponse
 import com.example.data.model.RoomItem
 import com.example.data.model.Scan
 import com.example.data.model.User
@@ -32,9 +35,12 @@ import kotlinx.coroutines.launch
         Promise::class,
         LegalDocument::class,
         PropertyPassport::class,
-        ProfessionalEndorsement::class
+        ProfessionalEndorsement::class,
+        Report::class,
+        ReportResponse::class,
+        AppealRecord::class
     ],
-    version = 10,
+    version = 11,
     exportSchema = false
 )
 abstract class DorjaDatabase : RoomDatabase() {
@@ -49,6 +55,9 @@ abstract class DorjaDatabase : RoomDatabase() {
     abstract fun legalDocumentDao(): LegalDocumentDao
     abstract fun propertyPassportDao(): PropertyPassportDao
     abstract fun professionalEndorsementDao(): ProfessionalEndorsementDao
+    abstract fun reportDao(): ReportDao
+    abstract fun reportResponseDao(): ReportResponseDao
+    abstract fun appealDao(): AppealDao
 
     companion object {
         @Volatile

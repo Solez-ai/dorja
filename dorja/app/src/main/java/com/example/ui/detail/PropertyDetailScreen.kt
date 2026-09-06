@@ -33,9 +33,11 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Chat
+import androidx.compose.material.icons.filled.Balance
 import androidx.compose.material.icons.filled.Balcony
 import androidx.compose.material.icons.filled.Bathtub
 import androidx.compose.material.icons.filled.Bed
+import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.CheckCircle
@@ -101,6 +103,8 @@ import com.example.ui.components.DorjaButton
 import com.example.ui.components.DorjaChip
 import com.example.ui.components.DorjaOutlinedButton
 import com.example.ui.components.SafeAddressShield
+import com.example.data.model.ReportReason
+import com.example.ui.negotiation.ConflictCard
 import com.example.ui.theme.DorjaColors
 import com.example.ui.util.Formatters
 import kotlinx.coroutines.launch
@@ -130,6 +134,13 @@ fun PropertyDetailScreen(
     val rooms by repository.getRoomsByListing(listingId).collectAsState(initial = emptyList())
     val passport by repository.observePassportForListing(listingId).collectAsState(initial = null)
     val endorsements by repository.observeEndorsementsForListing(listingId).collectAsState(initial = emptyList())
+    val listingReports by repository.observeReportsForListing(listingId).collectAsState(initial = emptyList())
+    val reportResponsesById = listingReports.associate { report ->
+        report.id to repository.observeResponsesForReport(report.id).collectAsState(initial = emptyList()).value
+    }
+    val reportAppealsById = listingReports.associate { report ->
+        report.id to repository.observeAppealsForReport(report.id).collectAsState(initial = emptyList()).value
+    }
     val currentUser by repository.currentUser.collectAsState()
 
     var showVisitRequestDialog by remember { mutableStateOf(false) }
@@ -140,6 +151,17 @@ fun PropertyDetailScreen(
     var fullScreenPhotoUrl by remember { mutableStateOf<String?>(null) }
     var exportingPack by remember { mutableStateOf(false) }
     var showEndorsementDialog by remember { mutableStateOf(false) }
+    var showReportDialog by remember { mutableStateOf(false) }
+    var showRespondDialog by remember { mutableStateOf(false) }
+
+    // Report dialog state (Phase 5)
+    var reportReason by remember { mutableStateOf(ReportReason.INACCURATE_CLAIM.code) }
+    var reportDetails by remember { mutableStateOf("") }
+    var reportClaim by remember { mutableStateOf("") }
+    // Respond dialog state
+    var respondReportId by remember { mutableStateOf("") }
+    var respondClaim by remember { mutableStateOf("") }
+    var respondEvidence by remember { mutableStateOf("") }
 
     // Professional handoff dialog state
     var endSection by remember { mutableStateOf("OWNERSHIP") }
@@ -298,6 +320,144 @@ fun PropertyDetailScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showEndorsementDialog = false }) {
+                    Text("Cancel", color = DorjaColors.Gray700)
+                }
+            }
+        )
+    }
+
+    // Report a Problem dialog (Phase 5, atlas §2)
+    if (showReportDialog) {
+        val reasonOptions = ReportReason.entries.toList()
+        AlertDialog(
+            onDismissRequest = { showReportDialog = false },
+            icon = { Icon(Icons.Default.Flag, contentDescription = null, tint = DorjaColors.BentoAmberIcon) },
+            title = { Text("Report a Problem", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        "This creates a neutral record. The host can respond and both claims remain visible to everyone — DORJA does not judge truth.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = DorjaColors.Gray500
+                    )
+                    Text("Reason", style = MaterialTheme.typography.labelSmall, color = DorjaColors.Gray700, fontWeight = FontWeight.Bold)
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        reasonOptions.forEach { reason ->
+                            DorjaChip(
+                                selected = reportReason == reason.code,
+                                label = reason.label,
+                                onClick = { reportReason = reason.code }
+                            )
+                        }
+                    }
+                    OutlinedTextField(
+                        value = reportClaim,
+                        onValueChange = { reportClaim = it },
+                        label = { Text("What do you say is true?") },
+                        placeholder = { Text("e.g. The listing states 1250 sqft but the flat is visibly smaller.") },
+                        modifier = Modifier.fillMaxWidth(),
+                        maxLines = 3
+                    )
+                    OutlinedTextField(
+                        value = reportDetails,
+                        onValueChange = { reportDetails = it },
+                        label = { Text("Additional details (optional)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        maxLines = 2
+                    )
+                }
+            },
+            confirmButton = {
+                DorjaButton(
+                    text = "Submit Report",
+                    onClick = {
+                        if (reportClaim.isNotBlank()) {
+                            scope.launch {
+                                repository.addReport(
+                                    listingId = safeListing.id,
+                                    reportedByUserId = currentUser?.id ?: "u2",
+                                    reason = reportReason,
+                                    details = reportDetails.trim(),
+                                    subjectClaim = reportClaim.trim()
+                                )
+                                reportReason = ReportReason.INACCURATE_CLAIM.code
+                                reportDetails = ""; reportClaim = ""
+                                showReportDialog = false
+                            }
+                        }
+                    },
+                    enabled = reportClaim.isNotBlank()
+                )
+            },
+            dismissButton = {
+                TextButton(onClick = { showReportDialog = false }) {
+                    Text("Cancel", color = DorjaColors.Gray700)
+                }
+            }
+        )
+    }
+
+    // Respond to a Report dialog (host side, Phase 5)
+    if (showRespondDialog) {
+        val openReports = listingReports.filter { it.state == "OPEN" || it.state == "COUNTERPARTY_RESPONDED" }
+        AlertDialog(
+            onDismissRequest = { showRespondDialog = false },
+            icon = { Icon(Icons.Default.Balance, contentDescription = null, tint = DorjaColors.BentoBlueIcon) },
+            title = { Text("Respond to a Report", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (openReports.isEmpty()) {
+                        Text("No open reports on this listing.", color = DorjaColors.Gray700)
+                    } else {
+                        Text("Select report", style = MaterialTheme.typography.labelSmall, color = DorjaColors.Gray700, fontWeight = FontWeight.Bold)
+                        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            openReports.forEach { report ->
+                                DorjaChip(
+                                    selected = respondReportId == report.id,
+                                    label = ReportReason.fromCode(report.reason).label,
+                                    onClick = { respondReportId = report.id }
+                                )
+                            }
+                        }
+                        OutlinedTextField(
+                            value = respondClaim,
+                            onValueChange = { respondClaim = it },
+                            label = { Text("Your side — what do you say is true?") },
+                            modifier = Modifier.fillMaxWidth(),
+                            maxLines = 3
+                        )
+                        OutlinedTextField(
+                            value = respondEvidence,
+                            onValueChange = { respondEvidence = it },
+                            label = { Text("Evidence reference (document no., promise, deed clause…)") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                DorjaButton(
+                    text = "Submit Response",
+                    onClick = {
+                        if (respondReportId.isNotBlank() && respondClaim.isNotBlank()) {
+                            scope.launch {
+                                repository.addReportResponse(
+                                    reportId = respondReportId,
+                                    respondedByUserId = currentUser?.id ?: safeListing.ownerId,
+                                    counterClaim = respondClaim.trim(),
+                                    evidenceReference = respondEvidence.trim()
+                                )
+                                respondReportId = ""; respondClaim = ""; respondEvidence = ""
+                                showRespondDialog = false
+                            }
+                        }
+                    },
+                    enabled = respondReportId.isNotBlank() && respondClaim.isNotBlank()
+                )
+            },
+            dismissButton = {
+                TextButton(onClick = { showRespondDialog = false }) {
                     Text("Cancel", color = DorjaColors.Gray700)
                 }
             }
@@ -1518,6 +1678,122 @@ fun PropertyDetailScreen(
                             contentDescription = "Export",
                             tint = DorjaColors.BentoBlueIcon
                         )
+                    }
+                }
+            }
+
+            // Reports & conflict view (Phase 5, atlas §2 & §8)
+            if (listingReports.isNotEmpty()) {
+                item {
+                    BentoCard(modifier = Modifier.fillMaxWidth()) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(
+                                text = "DISPUTES & CONFLICT VIEW",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = DorjaColors.Gray500,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            listingReports.forEach { report ->
+                                ConflictCard(
+                                    report = report,
+                                    responses = reportResponses[report.id] ?: emptyList(),
+                                    appeals = reportAppeals[report.id] ?: emptyList()
+                                )
+                                Spacer(modifier = Modifier.height(10.dp))
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Report a problem (non-owners) — a neutral record, not a judgement
+            if (!isOwner) {
+                item {
+                    BentoCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = { showReportDialog = true }
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(38.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(DorjaColors.BentoAmberBg),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Default.Flag,
+                                    contentDescription = null,
+                                    tint = DorjaColors.BentoAmberIcon,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Report a Problem",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    color = DorjaColors.Ink950,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "Record a claim conflict. The host can respond; both sides stay visible.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = DorjaColors.Gray700,
+                                    fontSize = 11.sp
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Host: respond to open reports on this listing
+            if (isOwner && listingReports.any { it.state == "OPEN" || it.state == "COUNTERPARTY_RESPONDED" }) {
+                item {
+                    BentoCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = { showRespondDialog = true }
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(38.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(DorjaColors.BentoBlueBg),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Default.Balance,
+                                    contentDescription = null,
+                                    tint = DorjaColors.BentoBlueIcon,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Respond to a Report",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    color = DorjaColors.Ink950,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "State your side with an evidence reference. Both claims stay visible.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = DorjaColors.Gray700,
+                                    fontSize = 11.sp
+                                )
+                            }
+                        }
                     }
                 }
             }

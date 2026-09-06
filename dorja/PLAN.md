@@ -201,6 +201,11 @@ Choose after partner validation; build the machinery country-agnostic so any EU 
 
 ### Phase 5 — Atlas-as-product (continuous)
 
+**Status (partially shipped):**
+- **Moderation & appeals live** (atlas §2): `Report` (neutral record with reason, subject claim, state), `ReportResponse` (counterparty's counter-claim + evidence reference), `AppealRecord` (grounds, state, decision note) — Room v11. Repository exposes observe/add/resolve/withdraw/decide flows and cascades all three tables in `deleteListing` and the GDPR erasure paths.
+- **Conflict view live** (atlas §8): `ui/negotiation/ConflictView.kt` renders the reporting party's claim and the counterparty's claim **side by side, equal weight, with dates and evidence references** — no silent winner, no opaque score, and the standing honesty note. Non-owners file reports from the Property Detail screen; hosts respond; open disputes surface in a "DISPUTES & CONFLICT VIEW" card visible to both parties.
+- **Account-level visibility**: "REPORTS & APPEALS" card on AccountScreen lists the user's filed reports with state and withdraw action.
+- What a report can never do: change an evidence level, hide a claim, or mark a listing safe/unsafe — resolution notes are recorded as text, never as verdicts.
 - Every additional country = a JSON profile + language review + support process, gated by the atlas confidence label. Nothing marked `DISCOVERY_REQUIRED`/`NO_LAUNCH` is ever selectable in the app.
 - Language packs (atlas §7) launch only when translated legal terminology, moderation templates, and source labels have been reviewed by a competent speaker. Structure: `res/values-{locale}/strings.xml` + `assets/countries/` terminology packs; four separated layers per the atlas (interface, legal terminology, user content, machine-assisted explanation).
 
