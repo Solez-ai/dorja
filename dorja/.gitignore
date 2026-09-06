@@ -20,5 +20,7 @@ dorja-release.keystore
 dorja-release.keystore.base64
 release.keystore
 doc/DORJA.pptx
-docs/
+# docs/ holds the public download page (docs/index.html) — keep tracked
+docs/*
+!docs/index.html
 .gitattributes
