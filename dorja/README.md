@@ -9,6 +9,17 @@
 
 ---
 
+## Install the App
+
+Every push to `main` produces a fresh APK automatically. Users never need to understand GitHub:
+
+- **Permanent download page:** <https://solez-ai.github.io/dorja/> — always points at the latest build
+- **Direct latest release:** <https://github.com/Solez-ai/dorja/releases/latest> — grab `app-debug.apk`
+
+Requirements: any Android device on Android 7.0+. The debug APK works without signing keys; a signed release APK appears when release credentials are configured.
+
+---
+
 ## 1. What is Dorja?
 
 Dorja is a native Android application built to solve the real estate trust crisis in Bangladesh. Every year, thousands of buyers are scammed through fake property listings, forged documents, and unverified sellers. Women and families face safety risks when visiting unknown properties for viewings.
