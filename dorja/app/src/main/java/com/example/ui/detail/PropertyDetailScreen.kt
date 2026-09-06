@@ -1704,8 +1704,8 @@ fun PropertyDetailScreen(
                             listingReports.forEach { report ->
                                 ConflictCard(
                                     report = report,
-                                    responses = reportResponses[report.id] ?: emptyList(),
-                                    appeals = reportAppeals[report.id] ?: emptyList()
+                                    responses = reportResponsesById[report.id] ?: emptyList(),
+                                    appeals = reportAppealsById[report.id] ?: emptyList()
                                 )
                                 Spacer(modifier = Modifier.height(10.dp))
                             }
