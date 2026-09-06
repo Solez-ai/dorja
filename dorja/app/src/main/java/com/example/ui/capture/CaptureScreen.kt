@@ -61,7 +61,7 @@ fun CaptureScreen(
     // Evidence-gated status (atlas §3): docs per listing drive the badge.
     val docsByListing by produceState(
         initialValue = emptyMap<String, List<LegalDocument>>(),
-        key = myListings
+        key1 = myListings
     ) {
         value = repository.getDocsForListings(myListings.map { it.id })
     }

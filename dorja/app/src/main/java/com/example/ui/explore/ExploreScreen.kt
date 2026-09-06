@@ -65,6 +65,7 @@ import androidx.compose.ui.unit.sp
 import com.example.DorjaApp
 import com.example.data.model.LegalDocument
 import com.example.data.model.Listing
+import com.example.data.repository.DorjaRepository
 import com.example.ui.components.BentoCard
 import com.example.ui.components.BentoMetricTile
 import com.example.ui.components.DorjaBadge
@@ -91,7 +92,7 @@ fun ExploreScreen(
     // Evidence-gated status per listing (atlas §3 honesty rule)
     val docsByListing by produceState(
         initialValue = emptyMap<String, List<LegalDocument>>(),
-        key = allListings
+        key1 = allListings
     ) {
         value = repository.getDocsForListings(allListings.map { it.id })
     }
@@ -353,7 +354,9 @@ fun ExploreScreen(
                 items(filteredListings, key = { it.id }) { listing ->
                     ExploreListingCard(
                         listing = listing,
-                        onClick = { onSelectListing(listing.id) }
+                        onClick = { onSelectListing(listing.id) },
+                        repository = repository,
+                        docsByListing = docsByListing
                     )
                 }
             }
@@ -364,7 +367,9 @@ fun ExploreScreen(
 @Composable
 private fun ExploreListingCard(
     listing: Listing,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    repository: DorjaRepository,
+    docsByListing: Map<String, List<LegalDocument>>
 ) {
     BentoCard(
         modifier = Modifier
