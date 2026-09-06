@@ -142,6 +142,7 @@ Bangladesh already has the fullest profile: SafeView, promises, handover, 3D sca
 2. Add evidence levels to `LegalDocument` + `EvidenceBadge` composable; update `PropertyDetailScreen` Handover card (line ~1076) to show levels instead of the current binary "VERIFIED" status.
 3. Build the **Disclosure Pack** exporter: `ui/detail/PropertyDetailScreen` → "Export decision pack" button → generates a multi-page PDF/PNG summary (property summary, source labels, open questions, documents, appointment history, promises). Country checklist comes from `CountryProfile.disclosureChecklist`.
 4. Enforce the atlas rule in code: if a listing has zero `ISSUER_CONFIRMED`-or-better documents, the "Verified Listing" badge in `CaptureScreen` (line 160) is not shown — status becomes "Evidence pending".
+   **Status (shipped, Phase 6):** `repository.hasVerifiedEvidence(docs)` — a listing earns "EVIDENCE VERIFIED" only with a confirmed, unexpired, non-stale document (`ISSUER_CONFIRMED` / `GOVERNMENT_SOURCE_LINKED` / `INDEPENDENTLY_INSPECTED`); every other listing shows amber "EVIDENCE PENDING" on both CaptureScreen (host hub) and ExploreScreen (seeker side). The last deprecated BDT-only formatter shims were removed; every price call site is now currency-aware.
 
 ### Phase 2 — India, Nepal, Bhutan adapters (atlas Stage 2)
 

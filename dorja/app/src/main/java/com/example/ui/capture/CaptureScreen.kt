@@ -30,6 +30,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -56,6 +57,10 @@ fun CaptureScreen(
     val currentUser by repository.currentUser.collectAsState()
     val ownerId = currentUser?.id ?: "u1"
     val myListings by repository.getListingsByOwner(ownerId).collectAsState(initial = emptyList())
+    // Evidence-gated status (atlas §3): docs per listing drive the badge.
+    val docsByListing by produceState(emptyMap(), myListings) {
+        value = repository.getDocsForListings(myListings.map { it.id })
+    }
 
     Column(
         modifier = Modifier
@@ -223,13 +228,24 @@ fun CaptureScreen(
                                 )
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
-                                    text = "${listing.publicArea} • ${Formatters.formatPriceShort(listing.priceAmount)}",
+                                    text = "${listing.publicArea} • ${Formatters.formatPriceShort(listing.priceAmount, listing.currency)}",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = DorjaColors.Gray700
                                 )
                             }
-                            if (listing.hasScan) {
-                                DorjaBadge(text = "3D PASS", backgroundColor = DorjaColors.Teal100, textColor = DorjaColors.Teal900)
+                            // Evidence status first (atlas honesty rule), then scan badge
+                            if (repository.hasVerifiedEvidence(docsByListing[listing.id].orEmpty())) {
+                                DorjaBadge(
+                                    text = "EVIDENCE VERIFIED",
+                                    backgroundColor = DorjaColors.Teal100,
+                                    textColor = DorjaColors.Teal900
+                                )
+                            } else {
+                                DorjaBadge(
+                                    text = "EVIDENCE PENDING",
+                                    backgroundColor = DorjaColors.BentoAmberBg,
+                                    textColor = DorjaColors.BentoAmberText
+                                )
                             }
                             Spacer(modifier = Modifier.width(6.dp))
                             Icon(

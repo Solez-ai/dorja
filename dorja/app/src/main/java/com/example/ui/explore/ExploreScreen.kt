@@ -49,6 +49,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -86,6 +87,10 @@ fun ExploreScreen(
     val repository = DorjaApp.instance.repository
     val scope = rememberCoroutineScope()
     val allListings by repository.getAllListings().collectAsState(initial = emptyList())
+    // Evidence-gated status per listing (atlas §3 honesty rule)
+    val docsByListing by produceState(emptyMap(), allListings) {
+        value = repository.getDocsForListings(allListings.map { it.id })
+    }
 
     var searchQuery by remember { mutableStateOf("") }
     var selectedIntent by remember { mutableStateOf("ALL") }
@@ -375,6 +380,22 @@ private fun ExploreListingCard(
                     backgroundColor = if (listing.intent == "RENT") DorjaColors.BentoBlueBg else DorjaColors.BentoPurpleBg,
                     textColor = if (listing.intent == "RENT") DorjaColors.BentoBlueText else DorjaColors.BentoPurpleText
                 )
+                // Evidence status — amber "pending" unless a confirmed, unexpired
+                // document backs the listing (never implied by an upload alone).
+                if (repository.hasVerifiedEvidence(docsByListing[listing.id].orEmpty())) {
+                    DorjaBadge(
+                        text = "EVIDENCE VERIFIED",
+                        icon = Icons.Default.VerifiedUser,
+                        backgroundColor = DorjaColors.Teal100,
+                        textColor = DorjaColors.Teal900
+                    )
+                } else {
+                    DorjaBadge(
+                        text = "EVIDENCE PENDING",
+                        backgroundColor = DorjaColors.BentoAmberBg,
+                        textColor = DorjaColors.BentoAmberText
+                    )
+                }
 
                 if (listing.hasScan || !listing.virtualTourUrl.isNullOrBlank()) {
                     DorjaBadge(

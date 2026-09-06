@@ -51,14 +51,6 @@ object Formatters {
     fun formatPriceShort(amount: Int, currencyCode: String): String =
         formatAmount(amount, currencyCode)
 
-    // ── Deprecated Bangladesh-only shims (kept so the build never breaks mid-refactor) ──
-
-    @Deprecated("Use the currency-aware overload", ReplaceWith("formatPrice(amount, \"BDT\", intent)"))
-    fun formatPrice(amount: Int, intent: String): String = formatPrice(amount, "BDT", intent)
-
-    @Deprecated("Use the currency-aware overload", ReplaceWith("formatPriceShort(amount, \"BDT\")"))
-    fun formatPriceShort(amount: Int): String = formatPriceShort(amount, "BDT")
-
     fun formatDateTime(timestamp: Long): String {
         val sdf = SimpleDateFormat("MMM d, h:mm a", Locale.getDefault())
         return sdf.format(Date(timestamp))

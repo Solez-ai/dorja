@@ -5,6 +5,7 @@ import com.example.data.db.DorjaDatabase
 import com.example.data.model.Conversation
 import com.example.data.model.EVIDENCE_STALENESS_MS
 import com.example.data.model.EvidenceExpiry
+import com.example.data.model.EvidenceLevel
 import com.example.data.model.EvidenceSummary
 import com.example.data.model.LegalDocument
 import com.example.data.model.Listing
@@ -383,6 +384,33 @@ class DorjaRepository(private val database: DorjaDatabase) {
 
     // Legal Documents
     fun getLegalDocumentsByListing(listingId: String): Flow<List<LegalDocument>> = legalDocumentDao.getLegalDocumentsByListing(listingId)
+
+    /**
+     * Evidence-gated listing status (atlas §3 + PLAN Phase 1 rule 4): a
+     * listing shows "EVIDENCE VERIFIED" only when at least one attached
+     * document is ISSUER_CONFIRMED, GOVERNMENT_SOURCE_LINKED, or
+     * INDEPENDENTLY_INSPECTED and not expired/stale. Everything else is
+     * "EVIDENCE PENDING" — an upload alone never earns the verified claim.
+     */
+    fun hasVerifiedEvidence(docs: List<LegalDocument>): Boolean {
+        val now = System.currentTimeMillis()
+        return docs.any { doc ->
+            val level = EvidenceLevel.fromCode(doc.evidenceLevel)
+            EvidenceLevel.isConfirmed(level) &&
+                level != EvidenceLevel.EXPIRED &&
+                doc.expiryState != EvidenceExpiry.EXPIRED.code &&
+                !(doc.checkedAt != null && now - doc.checkedAt > EVIDENCE_STALENESS_MS)
+        }
+    }
+
+    /** One-shot synchronous doc fetch for composable-level status derivation. */
+    suspend fun getDocsForListings(listingIds: List<String>): Map<String, List<LegalDocument>> {
+        val map = mutableMapOf<String, List<LegalDocument>>()
+        for (id in listingIds) {
+            map[id] = legalDocumentDao.getLegalDocumentsByListingSync(id)
+        }
+        return map
+    }
 
     // Property Passport
     fun observePassportForListing(listingId: String): Flow<PropertyPassport?> =
