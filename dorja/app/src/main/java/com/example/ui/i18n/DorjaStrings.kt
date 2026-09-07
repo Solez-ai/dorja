@@ -107,7 +107,7 @@ data class DorjaStrings(
             "scan_finish" to "Finish & Save",
             "scan_cancel" to "Cancel Scan",
             "scan_saving" to "Saving panorama…",
-            "scan_shot_progress" to "Shot %1$d of %2$d",
+            "scan_shot_progress" to "Shot %1\$d of %2\$d",
             "scan_move_next" to "Move to next position",
             "scan_tilt_up" to "Tilt up",
             "scan_tilt_down" to "Tilt down",
