@@ -170,6 +170,15 @@ import android.net.Uri
 import kotlin.math.min
 import kotlin.math.max
 
+// GDPR-style retention windows offered at document upload (Phase 3 minimisation).
+// null days = the user keeps control until they delete it themselves.
+private val RETENTION_CHOICES = listOf(
+    null to "Until I delete it",
+    30 to "30 days",
+    365 to "1 year",
+    730 to "2 years"
+)
+
 @Composable
 private fun energyFieldColors() = OutlinedTextFieldDefaults.colors(
     focusedContainerColor = DorjaColors.White,
@@ -278,6 +287,8 @@ fun CreateListingScreen(
     var newDocNotes by remember { mutableStateOf("") }
     var newDocEvidenceLevel by remember { mutableStateOf(EvidenceLevel.SELF_DECLARED.code) }
     var newDocOfficialSourceUrl by remember { mutableStateOf("") }
+    // GDPR-style retention choice (Phase 3): null = keep until the user deletes it.
+    var newDocRetentionDays by remember { mutableStateOf<Int?>(null) }
 
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
@@ -791,6 +802,29 @@ fun CreateListingScreen(
                         }
                     }
 
+                    // ── GDPR-style retention choice (Phase 3 minimisation) ──
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text("Keep this evidence for", style = MaterialTheme.typography.labelSmall, color = DorjaColors.Gray700, fontWeight = FontWeight.Bold)
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        items(RETENTION_CHOICES) { choice ->
+                            DorjaChip(
+                                selected = newDocRetentionDays == choice.first,
+                                label = choice.second,
+                                onClick = { newDocRetentionDays = choice.first }
+                            )
+                        }
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Info, contentDescription = null, tint = DorjaColors.Gray500, modifier = Modifier.size(14.dp))
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            if (newDocRetentionDays == null) "Kept until you delete it — you can also erase all your data from Account."
+                            else "Auto-deleted from DORJA after this window. Download anything you need first.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = DorjaColors.Gray500
+                        )
+                    }
+
                     // ── Government-source verification (Phase 2/4 authority rails) ──
                     // Subdivision-specific rail first (e.g. Dubai DLD), then country rail.
                     val activeRail = activeProfile.subnational(subnationalCode)?.let { sub ->
@@ -941,6 +975,9 @@ fun CreateListingScreen(
                             if (newDocNotes.isNotBlank()) "${newDocNotes}\nOfficial source: $govtUrl"
                             else "Official source: $govtUrl"
                         } else newDocNotes
+                        val retentionUntil = newDocRetentionDays?.let { days ->
+                            System.currentTimeMillis() + days * 24L * 60L * 60L * 1000L
+                        }
 
                         customLegalDocs.add(
                             LegalDocument(
@@ -955,7 +992,8 @@ fun CreateListingScreen(
                                 notes = notesWithSource,
                                 evidenceLevel = level.code,
                                 checkedAt = if (level != EvidenceLevel.SELF_DECLARED) System.currentTimeMillis() else null,
-                                limitationNote = if (level == EvidenceLevel.SELF_DECLARED) DEFAULT_SELF_DECLARED_NOTE else ""
+                                limitationNote = if (level == EvidenceLevel.SELF_DECLARED) DEFAULT_SELF_DECLARED_NOTE else "",
+                                retentionUntil = retentionUntil
                             )
                         )
                         newDocTitle = ""

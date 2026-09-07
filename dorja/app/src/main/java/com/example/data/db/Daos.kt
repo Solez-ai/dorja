@@ -368,6 +368,10 @@ interface LegalDocumentDao {
     @Query("SELECT * FROM legal_documents")
     suspend fun getAllLegalDocuments(): List<com.example.data.model.LegalDocument>
 
+    /** Documents whose GDPR retention window has passed (retentionUntil set + elapsed). */
+    @Query("SELECT * FROM legal_documents WHERE retentionUntil IS NOT NULL AND retentionUntil < :now")
+    suspend fun getExpiredByRetention(now: Long): List<com.example.data.model.LegalDocument>
+
     @Query("DELETE FROM legal_documents")
     suspend fun deleteAllLegalDocuments()
 }

@@ -40,7 +40,7 @@ import kotlinx.coroutines.launch
         ReportResponse::class,
         AppealRecord::class
     ],
-    version = 11,
+    version = 12,
     exportSchema = false
 )
 abstract class DorjaDatabase : RoomDatabase() {

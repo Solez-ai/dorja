@@ -179,6 +179,7 @@ Choose after partner validation; build the machinery country-agnostic so any EU 
 2. **GDPR-style data controls** — the atlas requires minimization + deletion:
    - Add "Delete my data" + "Expire evidence" to `AccountScreen` security section.
    - Every evidence item gets `retentionUntil: Long?`; a periodic `WorkManager` job nulls out expired uploads (files + rows).
+   **Status (shipped, final):** `LegalDocument.retentionUntil` is live (Room v12) with a per-document retention choice at upload (Until I delete it / 30 days / 1 year / 2 years) in the Add Document dialog. `data/work/EvidenceRetentionWorker` deletes rows past their cutoff — scheduled daily via WorkManager and swept once at app start; evidence is stored as metadata rows only, so removal is a row delete. `repository.applyRetentionCutoff()` is the enforcement point.
 3. **EUDI-aware identity note** — do **not** integrate wallet yet; add a `identityVerificationNote` field per profile explaining what identity proof the market expects, so the UI can be honest about what DORJA does and does not check.
 4. **Moderation & appeals** — `ReportReason` enum + `AppealRecord` entity (atlas §2 "Appeal and dispute record"), plus a neutral conflict view: when seeker and host claims differ (area, date, price), show both, side by side, with source and date. No silent winner, no opaque score.
 5. **Cross-border relocation mode** — new screen `ui/relocation/RelocationModeScreen.kt`: pick origin + destination country, get the destination checklist, document requirements, unit conversions (sqft ↔ m²), language notes, and the list of professional roles. Data entirely from the two `CountryProfile`s.
@@ -209,6 +210,7 @@ Choose after partner validation; build the machinery country-agnostic so any EU 
 - What a report can never do: change an evidence level, hide a claim, or mark a listing safe/unsafe — resolution notes are recorded as text, never as verdicts.
 - Every additional country = a JSON profile + language review + support process, gated by the atlas confidence label. Nothing marked `DISCOVERY_REQUIRED`/`NO_LAUNCH` is ever selectable in the app.
 - Language packs (atlas §7) launch only when translated legal terminology, moderation templates, and source labels have been reviewed by a competent speaker. Structure: `res/values-{locale}/strings.xml` + `assets/countries/` terminology packs; four separated layers per the atlas (interface, legal terminology, user content, machine-assisted explanation).
+  **Status (scaffold shipped, final):** `assets/countries/README.md` defines the pack format (JSON per ISO-2 code, the four separated layers, `reviewedBy`/`reviewedAt` gating fields) and the non-negotiable rule: unreviewed packs stay inactive, unreviewed legal terminology falls back to English, and sub-`REGIONAL_EVIDENCE` markets never get a pack. Actual packs wait on human review by design.
 
 ---
 

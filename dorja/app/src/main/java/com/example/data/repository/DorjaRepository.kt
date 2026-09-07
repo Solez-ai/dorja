@@ -313,6 +313,23 @@ class DorjaRepository(private val database: DorjaDatabase) {
     }
 
     /**
+     * GDPR-style retention enforcement (Phase 3 minimisation rule): removes
+     * every evidence row whose `retentionUntil` timestamp has passed. Evidence
+     * is stored as metadata rows only (no binary files on disk), so removal is
+     * a row delete. Called by [com.example.data.work.EvidenceRetentionWorker]
+     * on a schedule and once at app start.
+     *
+     * @return the number of evidence rows removed.
+     */
+    suspend fun applyRetentionCutoff(now: Long = System.currentTimeMillis()): Int {
+        val due = legalDocumentDao.getExpiredByRetention(now)
+        for (doc in due) {
+            legalDocumentDao.deleteLegalDocumentById(doc.id)
+        }
+        return due.size
+    }
+
+    /**
      * GDPR Art. 17 "right to erasure" — content scope: removes every listing
      * the user owns plus all conversations, messages, viewings, scans,
      * promises and legal documents. User profile rows are kept.

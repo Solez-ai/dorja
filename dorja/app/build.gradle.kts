@@ -100,6 +100,7 @@ dependencies {
   implementation(libs.androidx.navigation.compose)
   implementation(libs.androidx.room.ktx)
   implementation(libs.androidx.room.runtime)
+  implementation(libs.androidx.work.runtime.ktx)
   implementation(libs.zxing.core)
   implementation(libs.arcore)
   implementation(libs.androidx.camera.camera2)

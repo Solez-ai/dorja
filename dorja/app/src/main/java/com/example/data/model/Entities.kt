@@ -110,6 +110,10 @@ data class LegalDocument(
     val checkedAt: Long? = null,
     val expiryState: String = EvidenceExpiry.UNKNOWN.code,
     val limitationNote: String = DEFAULT_SELF_DECLARED_NOTE,
+    // GDPR-style retention: when set, the evidence row is removed automatically
+    // once this timestamp passes (atlas §3 + Phase 3 minimisation rule).
+    // null = keep until the user deletes it.
+    val retentionUntil: Long? = null,
     val createdAt: Long = System.currentTimeMillis()
 )
 
