@@ -806,8 +806,8 @@ fun PropertyCard(
 
 /**
  * Country-of-transaction picker built on the [CountryRegistry].
- * Only launchable markets (atlas stage <= 1) are selectable; every other
- * profile is shown with its confidence label and disabled.
+ * All registered markets are selectable so the user can freely switch
+ * between countries regardless of launch stage.
  */
 @Composable
 fun CountryPicker(
@@ -866,24 +866,17 @@ fun CountryPicker(
         ) {
             CountryRegistry.profiles.forEach { profile ->
                 DropdownMenuItem(
-                    text = {
-                        Text(
-                            if (profile.selectable) profile.displayName
-                            else "${profile.displayName} — ${profile.confidenceLabel}"
-                        )
-                    },
+                    text = { Text(profile.displayName) },
                     onClick = {
-                        if (profile.selectable) {
-                            onSelect(profile.iso2)
-                            expanded = false
-                        }
+                        onSelect(profile.iso2)
+                        expanded = false
                     },
-                    enabled = profile.selectable,
+                    enabled = true,
                     leadingIcon = {
                         Icon(
                             imageVector = Icons.Default.Place,
                             contentDescription = null,
-                            tint = if (profile.selectable) DorjaColors.Jol600 else DorjaColors.Gray500
+                            tint = DorjaColors.Jol600
                         )
                     }
                 )
