@@ -58,7 +58,11 @@ data class Listing(
     val buildingCondition: String? = null,
     val buildingAgeYears: Int? = null,
     val disasterContext: String? = null,
-    val createdAt: Long = System.currentTimeMillis()
+    val createdAt: Long = System.currentTimeMillis(),
+    // Compatibility fields for UI
+    val photos: List<String> = emptyList(),
+    val currencyCode: String = currency,
+    val areaSqm: Int = sqft
 )
 
 /**

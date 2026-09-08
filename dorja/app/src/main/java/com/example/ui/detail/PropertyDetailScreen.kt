@@ -988,7 +988,7 @@ fun PropertyDetailScreen(
                         Spacer(modifier = Modifier.height(8.dp))
 
                         // SafeView Protected Address Shield
-                        SafeAddressShield(approximateArea = safeListing.publicArea)
+                        SafeAddressShield(publicArea = safeListing.publicArea)
 
                         // Open in Google Maps button
                         Spacer(modifier = Modifier.height(6.dp))

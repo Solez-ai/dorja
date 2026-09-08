@@ -28,6 +28,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.input.KeyboardOptions
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.data.country.CountryRegistry
@@ -524,6 +525,7 @@ fun DorjaInput(
     isError: Boolean = false,
     singleLine: Boolean = true,
     maxLines: Int = 1,
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
     testTag: String? = null
 ) {
     val baseModifier = if (testTag != null) modifier.testTag(testTag) else modifier
@@ -539,6 +541,7 @@ fun DorjaInput(
         isError = isError,
         singleLine = singleLine,
         maxLines = maxLines,
+        keyboardOptions = keyboardOptions,
         modifier = baseModifier.fillMaxWidth(),
         shape = RoundedCornerShape(14.dp),
         colors = OutlinedTextFieldDefaults.colors(
@@ -641,7 +644,7 @@ fun ListingCard(
     onSelect: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val country = CountryRegistry.profile(listing.countryIso2)
+    val country = CountryRegistry.profile(listing.countryCode)
 
     BentoCard(
         modifier = modifier.fillMaxWidth(),
@@ -724,7 +727,7 @@ fun ListingCard(
                         .padding(horizontal = 12.dp, vertical = 6.dp)
                 ) {
                     Text(
-                        text = Formatters.formatPrice(listing.priceAmount, listing.currencyCode),
+                        text = Formatters.formatPrice(listing.priceAmount, listing.currencyCode, listing.intent),
                         style = MaterialTheme.typography.titleMedium,
                         color = Color.White,
                         fontWeight = FontWeight.Bold,
