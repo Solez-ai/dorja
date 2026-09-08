@@ -46,6 +46,11 @@ object LiquidGlassDefaults {
     val StainedGlassTint = Color(0xD90061A4)     // Stained Jol600 brand accent for primary CTAs
     val SpecularHighlightTop = Color(0x60FFFFFF)  // Top specular lens stroke
     val SpecularHighlightBottom = Color(0x0A000000)// Bottom subtle shadow stroke
+
+    // Blur radius constants
+    val BlurSmall = 8.dp
+    val BlurMedium = 16.dp
+    val BlurLarge = 24.dp
     
     val SpecularBorderBrush = Brush.verticalGradient(
         colors = listOf(SpecularHighlightTop, Color(0x20FFFFFF), SpecularHighlightBottom)
@@ -59,32 +64,42 @@ fun Modifier.liquidGlass(
     shape: Shape = RoundedCornerShape(20.dp),
     tint: Color = LiquidGlassDefaults.LightGlassTint,
     blurRadius: Dp = 24.dp,
+    glassColor: Color? = null,
+    specularColor: Color? = null,
     showSpecularBorder: Boolean = true,
     borderWidth: Dp = 0.5.dp
-): Modifier = this
-    .clip(shape)
-    .graphicsLayer {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            val px = blurRadius.toPx()
-            if (px > 0f) {
-                renderEffect = RenderEffect.createBlurEffect(
-                    px, px, android.graphics.Shader.TileMode.CLAMP
-                )
-            }
-        }
-        shadowElevation = 4f
-        shape = shape
-        clip = true
+): Modifier {
+    val finalTint = glassColor ?: tint
+    val specularBrush = if (specularColor != null) {
+        Brush.verticalGradient(listOf(specularColor, Color(0x20FFFFFF), LiquidGlassDefaults.SpecularHighlightBottom))
+    } else {
+        LiquidGlassDefaults.SpecularBorderBrush
     }
-    .background(tint, shape)
-    .then(
-        if (showSpecularBorder) {
-            Modifier.border(
-                border = BorderStroke(borderWidth, LiquidGlassDefaults.SpecularBorderBrush),
-                shape = shape
-            )
-        } else Modifier
-    )
+
+    return this
+        .clip(shape)
+        .graphicsLayer {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val px = blurRadius.toPx()
+                if (px > 0f) {
+                    renderEffect = RenderEffect.createBlurEffect(
+                        px, px, android.graphics.Shader.TileMode.CLAMP
+                    )
+                }
+            }
+            shadowElevation = 4f
+            clip = true
+        }
+        .background(finalTint, shape)
+        .then(
+            if (showSpecularBorder) {
+                Modifier.border(
+                    border = BorderStroke(borderWidth, specularBrush),
+                    shape = shape
+                )
+            } else Modifier
+        )
+}
 
 /**
  * Tactile spring press scale animation modifier for touch feedback.

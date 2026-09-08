@@ -152,7 +152,8 @@ fun ViewingPassScreen(
                 DorjaCard(
                     modifier = Modifier.fillMaxWidth(),
                     backgroundColor = DorjaColors.White,
-                    border = androidx.compose.foundation.BorderStroke(1.5.dp, DorjaColors.Jol600)
+                    borderColor = DorjaColors.Jol600,
+                    borderWidth = 1.5.dp
                 ) {
                     Column(
                         modifier = Modifier.padding(20.dp),
@@ -218,7 +219,8 @@ fun ViewingPassScreen(
                         DorjaCard(
                             modifier = Modifier.fillMaxWidth(),
                             backgroundColor = DorjaColors.Sand100,
-                            border = androidx.compose.foundation.BorderStroke(1.dp, DorjaColors.Sand300)
+                            borderColor = DorjaColors.Sand300,
+                            borderWidth = 1.dp
                         ) {
                             Row(
                                 modifier = Modifier.padding(12.dp),

@@ -7,12 +7,15 @@ object DorjaColors {
     val CanvasBg = Color(0xFFFDFBFF)   // Bento canvas soft bright background
     val Ink950 = Color(0xFF1A1C1E)     // Primary high-contrast dark text/icons
     val Jol600 = Color(0xFF0061A4)     // Primary brand accent
+    val Jol100 = Color(0xFFD6E3FF)     // Light Jol brand accent
+    val Jol700 = Color(0xFF00487B)     // Deep Jol brand accent
     val Paper50 = Color(0xFFF8F9FE)    // Bento page background
     val Sand300 = Color(0xFFE1E2EC)    // Bento card subtle border outline
     val Sand100 = Color(0xFFF0F4FA)    // Neutral soft container
     val Teal100 = Color(0xFFD6E3FF)    // Bento Blue/Teal tile container
     val Teal900 = Color(0xFF001B3E)    // Bento Blue deep text / icon color
     val Gray700 = Color(0xFF44474E)    // Secondary text
+    val Gray600 = Color(0xFF5E6066)    // Medium gray text
     val Gray500 = Color(0xFF74777F)    // Muted text
     val Gray300 = Color(0xFFE1E2EC)    // Light divider / border
     val White = Color(0xFFFFFFFF)      // Pure white card background
@@ -42,4 +45,3 @@ object DorjaColors {
     val BentoCardBg = Color(0xFFFFFFFF)
     val BentoCardBorder = Color(0xFFE1E2EC)
 }
-

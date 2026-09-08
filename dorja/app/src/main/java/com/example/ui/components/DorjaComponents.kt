@@ -46,8 +46,10 @@ fun BentoCard(
     backgroundColor: Color = Color.White,
     borderColor: Color = Color(0x0C000000),
     borderWidth: Dp = 0.5.dp,
+    border: BorderStroke? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
+    val finalBorder = border ?: BorderStroke(borderWidth, borderColor)
     val clickableModifier = if (onClick != null) {
         Modifier.pressScale(onClick = onClick)
     } else {
@@ -58,7 +60,7 @@ fun BentoCard(
         modifier = modifier.then(clickableModifier),
         shape = shape,
         color = backgroundColor,
-        border = BorderStroke(borderWidth, borderColor),
+        border = finalBorder,
         shadowElevation = 2.dp
     ) {
         Column(
@@ -76,6 +78,7 @@ fun DorjaCard(
     backgroundColor: Color = Color.White,
     borderColor: Color = Color(0x0C000000),
     borderWidth: Dp = 0.5.dp,
+    border: BorderStroke? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
     BentoCard(
@@ -85,6 +88,7 @@ fun DorjaCard(
         backgroundColor = backgroundColor,
         borderColor = borderColor,
         borderWidth = borderWidth,
+        border = border,
         content = content
     )
 }
