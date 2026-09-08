@@ -2,6 +2,10 @@ package com.example.data.model
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import com.example.data.model.EvidenceLevel
+import com.example.data.model.EvidenceExpiry
+import com.example.data.model.DEFAULT_SELF_DECLARED_NOTE
+import androidx.room.Transient
 
 @Entity(tableName = "users")
 data class User(
@@ -60,8 +64,11 @@ data class Listing(
     val disasterContext: String? = null,
     val createdAt: Long = System.currentTimeMillis(),
     // Compatibility fields for UI
+    @Transient
     val photos: List<String> = emptyList(),
+    @Transient
     val currencyCode: String = currency,
+    @Transient
     val areaSqm: Int = sqft
 )
 
