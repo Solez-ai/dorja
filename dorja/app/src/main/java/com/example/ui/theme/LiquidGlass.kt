@@ -23,9 +23,8 @@ import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.RenderEffect
-import androidx.compose.ui.graphics.Shader
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.asComposeRenderEffect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -82,9 +81,9 @@ fun Modifier.liquidGlass(
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 val px = blurRadius.toPx()
                 if (px > 0f) {
-                    renderEffect = RenderEffect.createBlurEffect(
+                    renderEffect = android.graphics.RenderEffect.createBlurEffect(
                         px, px, android.graphics.Shader.TileMode.CLAMP
-                    )
+                    ).asComposeRenderEffect()
                 }
             }
             shadowElevation = 4f

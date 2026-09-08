@@ -46,6 +46,9 @@ import com.example.ui.relocation.RelocationModeScreen
 import com.example.ui.seller.HostListingsScreen
 import com.example.ui.splash.SplashScreen
 import com.example.ui.theme.DorjaColors
+import com.example.ui.theme.LiquidGlassDefaults
+import com.example.ui.theme.liquidGlass
+import com.example.ui.theme.pressScale
 import com.example.ui.tour.TourViewerScreen
 import com.example.ui.scanner.RoomScannerScreen
 import com.example.ui.visits.VisitsScreen
@@ -332,8 +335,8 @@ fun MainContainer(
                 .padding(horizontal = 16.dp, vertical = 12.dp)
                 .fillMaxWidth()
                 .height(64.dp)
-                .com.example.ui.theme.liquidGlass(
-                    blurRadius = com.example.ui.theme.LiquidGlassDefaults.BlurMedium,
+                .liquidGlass(
+                    blurRadius = LiquidGlassDefaults.BlurMedium,
                     glassColor = androidx.compose.ui.graphics.Color(0xE6FFFFFF),
                     specularColor = androidx.compose.ui.graphics.Color(0x40FFFFFF),
                     shape = androidx.compose.foundation.shape.RoundedCornerShape(28.dp)
@@ -403,7 +406,7 @@ private fun FloatingTabItem(
         modifier = modifier
             .clip(androidx.compose.foundation.shape.RoundedCornerShape(22.dp))
             .background(animatedBg)
-            .com.example.ui.theme.pressScale(onClick = onClick)
+            .pressScale(onClick = onClick)
             .padding(vertical = 6.dp)
             .testTag(testTag),
         contentAlignment = androidx.compose.ui.Alignment.Center
@@ -423,7 +426,7 @@ private fun FloatingTabItem(
                 text = title,
                 style = androidx.compose.material3.MaterialTheme.typography.labelSmall,
                 color = animatedFg,
-                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                fontWeight = FontWeight.Bold,
                 fontSize = 10.sp
             )
         }
