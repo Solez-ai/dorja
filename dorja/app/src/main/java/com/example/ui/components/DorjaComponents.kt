@@ -5,6 +5,8 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -64,6 +66,27 @@ fun BentoCard(
             content = content
         )
     }
+}
+
+@Composable
+fun DorjaCard(
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
+    shape: Shape = RoundedCornerShape(20.dp),
+    backgroundColor: Color = Color.White,
+    borderColor: Color = Color(0x0C000000),
+    borderWidth: Dp = 0.5.dp,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    BentoCard(
+        modifier = modifier,
+        onClick = onClick,
+        shape = shape,
+        backgroundColor = backgroundColor,
+        borderColor = borderColor,
+        borderWidth = borderWidth,
+        content = content
+    )
 }
 
 @Composable
@@ -163,12 +186,14 @@ fun DorjaButton(
     enabled: Boolean = true,
     icon: ImageVector? = null,
     containerColor: Color = DorjaColors.Jol600,
-    contentColor: Color = Color.White
+    contentColor: Color = Color.White,
+    testTag: String? = null
 ) {
+    val finalModifier = if (testTag != null) modifier.testTag(testTag) else modifier
     Button(
         onClick = onClick,
         enabled = enabled,
-        modifier = modifier
+        modifier = finalModifier
             .height(50.dp)
             .pressScale(),
         shape = RoundedCornerShape(16.dp),
@@ -207,10 +232,12 @@ fun StainedLiquidGlassButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     icon: ImageVector? = null,
-    stainedColor: Color = DorjaColors.Jol600
+    stainedColor: Color = DorjaColors.Jol600,
+    testTag: String? = null
 ) {
+    val finalModifier = if (testTag != null) modifier.testTag(testTag) else modifier
     Box(
-        modifier = modifier
+        modifier = finalModifier
             .height(52.dp)
             .liquidGlass(
                 blurRadius = LiquidGlassDefaults.BlurMedium,
@@ -253,12 +280,14 @@ fun DorjaOutlinedButton(
     enabled: Boolean = true,
     icon: ImageVector? = null,
     borderColor: Color = DorjaColors.Jol600,
-    contentColor: Color = DorjaColors.Jol600
+    contentColor: Color = DorjaColors.Jol600,
+    testTag: String? = null
 ) {
+    val finalModifier = if (testTag != null) modifier.testTag(testTag) else modifier
     OutlinedButton(
         onClick = onClick,
         enabled = enabled,
-        modifier = modifier
+        modifier = finalModifier
             .height(48.dp)
             .pressScale(),
         shape = RoundedCornerShape(16.dp),
@@ -370,6 +399,151 @@ fun DorjaChip(
             )
         }
     }
+}
+
+@Composable
+fun DorjaAvatar(
+    name: String,
+    modifier: Modifier = Modifier,
+    size: Dp = 40.dp,
+    backgroundColor: Color = DorjaColors.Jol600,
+    textColor: Color = Color.White
+) {
+    val initials = name.trim().split(" ")
+        .take(2)
+        .mapNotNull { it.firstOrNull()?.uppercase() }
+        .joinToString("")
+        .ifEmpty { "D" }
+
+    Box(
+        modifier = modifier
+            .size(size)
+            .clip(CircleShape)
+            .background(backgroundColor),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = initials,
+            color = textColor,
+            fontWeight = FontWeight.Bold,
+            fontSize = (size.value * 0.38f).sp
+        )
+    }
+}
+
+@Composable
+fun PulseDot(
+    modifier: Modifier = Modifier,
+    color: Color = DorjaColors.Success,
+    size: Dp = 8.dp
+) {
+    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+    val alpha by infiniteTransition.animateFloat(
+        initialValue = 0.35f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(900, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulseAlpha"
+    )
+
+    Box(
+        modifier = modifier
+            .size(size)
+            .clip(CircleShape)
+            .background(color.copy(alpha = alpha))
+    )
+}
+
+@Composable
+fun SafeAddressShield(
+    publicArea: String,
+    modifier: Modifier = Modifier,
+    isVerified: Boolean = true
+) {
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = DorjaColors.Paper50,
+        border = BorderStroke(0.5.dp, Color(0x0C000000))
+    ) {
+        Row(
+            modifier = Modifier.padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(38.dp)
+                    .clip(CircleShape)
+                    .background(if (isVerified) DorjaColors.BentoGreenBg else DorjaColors.BentoAmberBg),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Shield,
+                    contentDescription = null,
+                    tint = if (isVerified) DorjaColors.BentoGreenIcon else DorjaColors.BentoAmberIcon,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+            Column {
+                Text(
+                    text = "SAFEADDRESS™ PRIVACY SHIELD",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (isVerified) DorjaColors.BentoGreenText else DorjaColors.BentoAmberText,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 10.sp
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = publicArea,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = DorjaColors.Ink950,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 14.sp
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun DorjaInput(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String,
+    modifier: Modifier = Modifier,
+    placeholder: String? = null,
+    leadingIcon: ImageVector? = null,
+    trailingIcon: @Composable (() -> Unit)? = null,
+    isError: Boolean = false,
+    singleLine: Boolean = true,
+    maxLines: Int = 1,
+    testTag: String? = null
+) {
+    val baseModifier = if (testTag != null) modifier.testTag(testTag) else modifier
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text(label) },
+        placeholder = if (placeholder != null) { { Text(placeholder) } } else null,
+        leadingIcon = if (leadingIcon != null) {
+            { Icon(leadingIcon, contentDescription = null, tint = DorjaColors.Jol600) }
+        } else null,
+        trailingIcon = trailingIcon,
+        isError = isError,
+        singleLine = singleLine,
+        maxLines = maxLines,
+        modifier = baseModifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedContainerColor = Color.White,
+            unfocusedContainerColor = Color.White,
+            focusedBorderColor = DorjaColors.Jol600,
+            unfocusedBorderColor = Color(0x1A000000)
+        )
+    )
 }
 
 @Composable
@@ -650,15 +824,27 @@ fun ListingCard(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CountryPicker(
-    selectedIso2: String,
-    onCountrySelected: (String) -> Unit,
+    selectedIso2: String = "BD",
+    selected: String = selectedIso2,
+    selectedCountry: String = selected,
+    onCountrySelected: (String) -> Unit = {},
+    onSelect: (String) -> Unit = onCountrySelected,
     modifier: Modifier = Modifier,
     label: String = "Select Country"
 ) {
+    val activeIso2 = if (selected.isNotBlank() && selected != "BD") selected
+    else if (selectedCountry.isNotBlank() && selectedCountry != "BD") selectedCountry
+    else selectedIso2
+
+    val activeOnSelect = { code: String ->
+        onSelect(code)
+        onCountrySelected(code)
+    }
+
     var showSheet by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val selectedProfile = CountryRegistry.getProfile(selectedIso2)
+    val selectedProfile = CountryRegistry.getProfile(activeIso2)
 
     Surface(
         modifier = modifier
@@ -758,19 +944,19 @@ fun CountryPicker(
                             it.iso2.contains(searchQuery, ignoreCase = true)
                 }
 
-                androidx.compose.foundation.lazy.LazyColumn(
+                LazyColumn(
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(max = 400.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     items(filteredProfiles, key = { it.iso2 }) { profile ->
-                        val isSelected = profile.iso2 == selectedIso2
+                        val isSelected = profile.iso2 == activeIso2
                         Surface(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .pressScale(onClick = {
-                                    onCountrySelected(profile.iso2)
+                                    activeOnSelect(profile.iso2)
                                     showSheet = false
                                 }),
                             shape = RoundedCornerShape(14.dp),
