@@ -20,7 +20,8 @@ import com.example.data.model.Scan
 import com.example.data.model.User
 import com.example.data.model.Viewing
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
+import androidx.room.TypeConverters
+import com.example.data.db.Converters
 import kotlinx.coroutines.launch
 
 @Database(
@@ -43,6 +44,7 @@ import kotlinx.coroutines.launch
     version = 12,
     exportSchema = false
 )
+@TypeConverters(Converters::class)
 abstract class DorjaDatabase : RoomDatabase() {
     abstract fun userDao(): UserDao
     abstract fun listingDao(): ListingDao
