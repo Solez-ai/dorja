@@ -19,7 +19,7 @@ import com.example.data.model.RoomItem
 import com.example.data.model.Scan
 import com.example.data.model.User
 import com.example.data.model.Viewing
-import androidx.room.Callback
+import androidx.room.RoomDatabase.Callback
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import androidx.room.TypeConverters

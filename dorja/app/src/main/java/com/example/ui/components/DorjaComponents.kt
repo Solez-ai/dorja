@@ -28,7 +28,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.text.input.KeyboardOptions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.data.country.CountryRegistry
@@ -525,7 +525,7 @@ fun DorjaInput(
     isError: Boolean = false,
     singleLine: Boolean = true,
     maxLines: Int = 1,
-    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    keyboardOptions: KeyboardOptions = KeyboardOptions(),
     testTag: String? = null
 ) {
     val baseModifier = if (testTag != null) modifier.testTag(testTag) else modifier
