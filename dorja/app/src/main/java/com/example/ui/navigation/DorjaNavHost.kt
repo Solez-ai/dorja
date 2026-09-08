@@ -285,77 +285,18 @@ fun MainContainer(
 
     var currentHostTab by remember { mutableStateOf(HostTab.PROPERTIES) }
     var currentBuyerTab by remember { mutableStateOf(BuyerTab.EXPLORE) }
+    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
 
-    Scaffold(
-        bottomBar = {
-            NavigationBar(
-                containerColor = DorjaColors.White,
-                tonalElevation = 0.dp
-            ) {
-                if (isHost) {
-                    HostTab.values().forEach { tab ->
-                        val isSelected = currentHostTab == tab
-                        NavigationBarItem(
-                            selected = isSelected,
-                            onClick = { currentHostTab = tab },
-                            icon = {
-                                Icon(
-                                    imageVector = tab.icon,
-                                    contentDescription = tab.title
-                                )
-                            },
-                            label = {
-                                Text(
-                                    text = tab.title,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                                )
-                            },
-                            colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = DorjaColors.BentoBlueIcon,
-                                selectedTextColor = DorjaColors.BentoBlueText,
-                                indicatorColor = DorjaColors.BentoBlueBg,
-                                unselectedIconColor = DorjaColors.Gray500,
-                                unselectedTextColor = DorjaColors.Gray500
-                            ),
-                            modifier = Modifier.testTag(tab.tag)
-                        )
-                    }
-                } else {
-                    BuyerTab.values().forEach { tab ->
-                        val isSelected = currentBuyerTab == tab
-                        NavigationBarItem(
-                            selected = isSelected,
-                            onClick = { currentBuyerTab = tab },
-                            icon = {
-                                Icon(
-                                    imageVector = tab.icon,
-                                    contentDescription = tab.title
-                                )
-                            },
-                            label = {
-                                Text(
-                                    text = tab.title,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                                )
-                            },
-                            colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = DorjaColors.BentoBlueIcon,
-                                selectedTextColor = DorjaColors.BentoBlueText,
-                                indicatorColor = DorjaColors.BentoBlueBg,
-                                unselectedIconColor = DorjaColors.Gray500,
-                                unselectedTextColor = DorjaColors.Gray500
-                            ),
-                            modifier = Modifier.testTag(tab.tag)
-                        )
-                    }
-                }
-            }
-        }
-    ) { innerPadding ->
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(DorjaColors.CanvasBg)
+    ) {
+        // Main Screen Content
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
+                .padding(bottom = 76.dp)
         ) {
             if (isHost) {
                 when (currentHostTab) {
@@ -383,5 +324,109 @@ fun MainContainer(
                 }
             }
         }
+
+        // Authentic Apple Floating Liquid Glass Bottom Navigation Bar
+        Box(
+            modifier = Modifier
+                .align(androidx.compose.ui.Alignment.BottomCenter)
+                .padding(horizontal = 16.dp, vertical = 12.dp)
+                .fillMaxWidth()
+                .height(64.dp)
+                .com.example.ui.theme.liquidGlass(
+                    blurRadius = com.example.ui.theme.LiquidGlassDefaults.BlurMedium,
+                    glassColor = androidx.compose.ui.graphics.Color(0xE6FFFFFF),
+                    specularColor = androidx.compose.ui.graphics.Color(0x40FFFFFF),
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(28.dp)
+                )
+                .padding(horizontal = 8.dp, vertical = 6.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxSize(),
+                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceAround,
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+            ) {
+                if (isHost) {
+                    HostTab.values().forEach { tab ->
+                        val isSelected = currentHostTab == tab
+                        FloatingTabItem(
+                            title = tab.title,
+                            icon = tab.icon,
+                            isSelected = isSelected,
+                            testTag = tab.tag,
+                            onClick = {
+                                haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
+                                currentHostTab = tab
+                            },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                } else {
+                    BuyerTab.values().forEach { tab ->
+                        val isSelected = currentBuyerTab == tab
+                        FloatingTabItem(
+                            title = tab.title,
+                            icon = tab.icon,
+                            isSelected = isSelected,
+                            testTag = tab.tag,
+                            onClick = {
+                                haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
+                                currentBuyerTab = tab
+                            },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+            }
+        }
     }
 }
+
+@Composable
+private fun FloatingTabItem(
+    title: String,
+    icon: ImageVector,
+    isSelected: Boolean,
+    testTag: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val animatedBg by androidx.compose.animation.animateColorAsState(
+        targetValue = if (isSelected) DorjaColors.Jol100 else androidx.compose.ui.graphics.Color.Transparent,
+        label = "tabBg"
+    )
+    val animatedFg by androidx.compose.animation.animateColorAsState(
+        targetValue = if (isSelected) DorjaColors.Jol600 else DorjaColors.Gray500,
+        label = "tabFg"
+    )
+
+    Box(
+        modifier = modifier
+            .clip(androidx.compose.foundation.shape.RoundedCornerShape(22.dp))
+            .background(animatedBg)
+            .com.example.ui.theme.pressScale(onClick = onClick)
+            .padding(vertical = 6.dp)
+            .testTag(testTag),
+        contentAlignment = androidx.compose.ui.Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
+            verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = title,
+                tint = animatedFg,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = title,
+                style = androidx.compose.material3.MaterialTheme.typography.labelSmall,
+                color = animatedFg,
+                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                fontSize = 10.sp
+            )
+        }
+    }
+}
+
