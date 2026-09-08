@@ -294,13 +294,27 @@ These are the official and research sources behind the global plan. Each claim i
 | 2 | [European Commission — European Digital Identity](https://commission.europa.eu/topics/digital-economy-and-society/european-digital-identity_en) | EU identity-wallet context for the European pilot's identity adapter |
 | 3 | [European Commission — Digital Services Act](https://digital-strategy.ec.europa.eu/en/policies/digital-services-act) | Moderation, appeals, and platform-obligation requirements for EU operation |
 | 4 | [European Commission — Energy Performance of Buildings Directive](https://energy.ec.europa.eu/topics/energy-efficiency/energy-performance-buildings/energy-performance-buildings-directive_en) | Energy-certificate evidence layer (DPE, Energieausweis, energielabel) for Europe |
-| 5 | [Asian Development Bank — Adequate and Affordable Housing](https://www.adb.org/publications/adequate-affordable-housing) | Regional housing-affordability context across Asia |
-| 6 | [Government of India — RERA Key Features](https://rera.mohua.gov.in/key-features-of-RERA.html) | India RERA project/agent disclosure adapter |
-| 7 | [Government of India, MoHUA — RERA Act 2016](https://www.mohua.gov.in/documents/acts-and-policies/rera-YDM4EzMtQWa?pageTitle=Real-Estate-(Regulation-and-Development)-Act,-2016-%5BRERA%5D) | Legal basis for the India source rails |
-| 8 | [Government of Nepal — MeroKitta](https://www.merokitta.dos.gov.np/) | Nepal land-record link-out adapter |
-| 9 | [Bhutan National Land Commission — eSakor Land Transaction](https://web.nlcs.gov.bt/land-transaction-urban-rural/) | Bhutan transaction-status companion adapter |
-| 10 | [Japan MLIT — Existing-Home Transactions and Important Matters](https://www.mlit.go.jp/totikensangyo/const/sosei_const_tk3_000132.html) | Japan professional-handoff and important-matters preparation |
-| 11 | [China Law Translate — Personal Information Protection Law](https://www.chinalawtranslate.com/en/Personal-Information-Protection-Law/) | PIPL data-governance constraints for any China profile |
+| 5 | [EU FRA — Rights-based Approach to Affordable Housing](https://fra.europa.eu/sites/default/files/fra_uploads/fra-2025-submission-affordable-housing-plan-2025_en.pdf) | Non-discrimination and fair access evidence standards |
+| 6 | [Asian Development Bank — Adequate and Affordable Housing](https://www.adb.org/publications/adequate-affordable-housing) | Regional housing-affordability context across Asia |
+| 7 | [World Bank / PPIAF — Access to Land in South Asia](https://documents1.worldbank.org/curated/en/099032824093529033/pdf/P17838718a9a5c05519d5915cc4addfec50.pdf) | Document explanation and completeness layer context |
+| 8 | [Government of India — RERA Key Features](https://rera.mohua.gov.in/key-features-of-RERA.html) | India RERA project/agent disclosure adapter |
+| 9 | [Government of Nepal — MeroKitta](https://www.merokitta.dos.gov.np/) | Nepal land-record link-out adapter |
+| 10 | [Bhutan National Land Commission — eSakor Land Transaction](https://web.nlcs.gov.bt/land-transaction-urban-rural/) | Bhutan transaction-status companion adapter |
+| 11 | [Japan MLIT — Existing-Home Transactions and Important Matters](https://www.mlit.go.jp/totikensangyo/const/sosei_const_tk3_000132.html) | Japan professional-handoff and important-matters preparation |
+| 12 | [China Law Translate — Personal Information Protection Law](https://www.chinalawtranslate.com/en/Personal-Information-Protection-Law/) | PIPL data-governance constraints for any China profile |
+| 13 | [UK EPC Register](https://www.epcregister.com) | UK tenancy condition and energy performance register |
+| 14 | [Ireland Residential Tenancies Board](https://www.rtb.ie) | Irish RTB tenancy registration and rights framework |
+| 15 | [France ADEME DPE Register](https://observatoire-dpe-audit.ademe.fr) | Official French DPE diagnostic validation portal |
+| 16 | [Poland Elektroniczne Księgi Wieczyste](https://ekw.ms.gov.pl) | Poland electronic land register verification |
+| 17 | [Türkiye Land Registry & Cadastre (TKGM)](https://www.tkgm.gov.tr) | Turkish Tapu and building registration verification |
+| 18 | [Sri Lanka Land Registry](https://www.landregistry.gov.lk) | Sri Lanka deed of transfer and title registration |
+| 19 | [Punjab Land Records Authority (PLRA)](https://www.plra.punjab.gov.pk) | Pakistan Fard land record verification |
+| 20 | [Thailand Department of Lands](https://www.dol.go.th) | Thailand Chanote title and foreign quota registry |
+| 21 | [Philippines Land Registration Authority](https://www.lra.gov.ph) | Philippines TCT title verification |
+| 22 | [Indonesia BPN Land Agency](https://www.atrbpn.go.id) | Indonesia SHM land certificate verification |
+| 23 | [Kazakhstan e-Government Portal](https://egov.kz) | Kazakhstan cadastral passport and property extract portal |
+| 24 | [Georgia National Agency of Public Registry](https://www.napr.gov.ge) | Georgia public registry property extract portal |
+| 25 | [Dubai Land Department](https://dubailand.gov.ae) | Dubai DLD title deed and Ejari tenancy registration |
 
 ---
 
