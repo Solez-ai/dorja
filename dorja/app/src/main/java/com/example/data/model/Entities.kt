@@ -5,7 +5,7 @@ import androidx.room.PrimaryKey
 import com.example.data.model.EvidenceLevel
 import com.example.data.model.EvidenceExpiry
 import com.example.data.model.DEFAULT_SELF_DECLARED_NOTE
-import androidx.room.Transient
+import androidx.room.Ignore
 
 @Entity(tableName = "users")
 data class User(

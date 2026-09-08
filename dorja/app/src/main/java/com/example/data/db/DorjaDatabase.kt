@@ -19,9 +19,10 @@ import com.example.data.model.RoomItem
 import com.example.data.model.Scan
 import com.example.data.model.User
 import com.example.data.model.Viewing
+import androidx.room.Callback
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import androidx.room.TypeConverters
-import com.example.data.db.Converters
 import kotlinx.coroutines.launch
 
 @Database(
