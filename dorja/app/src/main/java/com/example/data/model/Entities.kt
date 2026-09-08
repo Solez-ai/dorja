@@ -62,15 +62,17 @@ data class Listing(
     val buildingCondition: String? = null,
     val buildingAgeYears: Int? = null,
     val disasterContext: String? = null,
-    val createdAt: Long = System.currentTimeMillis(),
-    // Compatibility fields for UI
-    @Transient
-    val photos: List<String> = emptyList(),
-    @Transient
-    val currencyCode: String = currency,
-    @Transient
+    val createdAt: Long = System.currentTimeMillis()
+) {
+    @Ignore
+    val photos: List<String> = emptyList()
+
+    @Ignore
+    val currencyCode: String = currency
+
+    @Ignore
     val areaSqm: Int = sqft
-)
+}
 
 /**
  * Professional handoff (atlas §8, PLAN.md Phase 4): a licensed professional
