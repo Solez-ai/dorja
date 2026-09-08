@@ -1195,7 +1195,7 @@ fun CreateListingScreen(
                         },
                         placeholder = "e.g. 35000",
                         leadingIcon = Icons.Default.Payments,
-                        keyboardType = KeyboardType.Number,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         testTag = "input_listing_price"
                     )
 
@@ -1368,7 +1368,7 @@ fun CreateListingScreen(
                         label = "Total Floor Area (Sqft)",
                         placeholder = "e.g. 1450",
                         leadingIcon = Icons.Default.SquareFoot,
-                        keyboardType = KeyboardType.Number,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         testTag = "input_listing_sqft"
                     )
                 }

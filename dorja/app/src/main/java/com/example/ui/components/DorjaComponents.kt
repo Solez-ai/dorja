@@ -641,7 +641,7 @@ fun ListingCard(
     onSelect: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val country = CountryRegistry.getProfile(listing.countryIso2)
+    val country = CountryRegistry.profile(listing.countryIso2)
 
     BentoCard(
         modifier = modifier.fillMaxWidth(),
@@ -848,7 +848,7 @@ fun CountryPicker(
     var showSheet by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val selectedProfile = CountryRegistry.getProfile(activeIso2)
+    val selectedProfile = CountryRegistry.profile(activeIso2)
 
     Surface(
         modifier = modifier

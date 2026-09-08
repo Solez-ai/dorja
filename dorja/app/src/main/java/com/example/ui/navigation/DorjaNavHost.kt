@@ -34,6 +34,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.sp
 import androidx.navigation.compose.NavHost
@@ -392,7 +393,7 @@ fun MainContainer(
     }
 }
 
-@Composable
+
 @Composable
 private fun FloatingTabItem(
     title: String,
