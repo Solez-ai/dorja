@@ -19,6 +19,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -73,9 +74,9 @@ fun Modifier.liquidGlass(
     )
     val tintBrush = Brush.verticalGradient(
         colors = listOf(
-            finalTint.copy(alpha = (finalTint.alpha * 1.12f).coerceAtMost(1f)),
+            lerp(finalTint, Color.White, 0.07f),
             finalTint,
-            finalTint.copy(alpha = finalTint.alpha * 0.9f)
+            lerp(finalTint, Color.Black, 0.08f)
         )
     )
 

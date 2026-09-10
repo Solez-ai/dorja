@@ -4,6 +4,7 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -20,6 +21,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -569,8 +571,8 @@ fun LiquidGlassSearchBar(
             .height(52.dp)
             .liquidGlass(
                 blurRadius = LiquidGlassDefaults.BlurMedium,
-                glassColor = Color(0xECFAFBFD),
-                specularColor = Color(0x50FFFFFF),
+                glassColor = Color(0x26FFFFFF),
+                specularColor = Color(0x4DFFFFFF),
                 shape = RoundedCornerShape(26.dp)
             )
             .padding(horizontal = 16.dp),
@@ -583,7 +585,7 @@ fun LiquidGlassSearchBar(
             Icon(
                 imageVector = Icons.Default.Search,
                 contentDescription = "Search",
-                tint = DorjaColors.Jol600,
+                tint = DorjaColors.DrawerAccent,
                 modifier = Modifier.size(22.dp)
             )
             Spacer(modifier = Modifier.width(10.dp))
@@ -592,7 +594,7 @@ fun LiquidGlassSearchBar(
                     Text(
                         text = placeholderText,
                         style = MaterialTheme.typography.bodyMedium,
-                        color = DorjaColors.Gray600,
+                        color = DorjaColors.DrawerMuted,
                         fontSize = 14.sp
                     )
                 }
@@ -601,10 +603,11 @@ fun LiquidGlassSearchBar(
                     onValueChange = onQueryChange,
                     singleLine = true,
                     textStyle = MaterialTheme.typography.bodyMedium.copy(
-                        color = DorjaColors.Ink950,
+                        color = DorjaColors.DrawerCream,
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Medium
                     ),
+                    cursorBrush = SolidColor(DorjaColors.DrawerAccent),
                     modifier = Modifier.fillMaxWidth()
                 )
             }
@@ -616,7 +619,7 @@ fun LiquidGlassSearchBar(
                     Icon(
                         imageVector = Icons.Default.Close,
                         contentDescription = "Clear",
-                        tint = DorjaColors.Gray600,
+                        tint = DorjaColors.DrawerMuted,
                         modifier = Modifier.size(18.dp)
                     )
                 }
@@ -627,12 +630,12 @@ fun LiquidGlassSearchBar(
                 modifier = Modifier
                     .size(36.dp)
                     .clip(CircleShape)
-                    .background(DorjaColors.Jol600.copy(alpha = 0.1f))
+                    .background(DorjaColors.DrawerSidebarSoft)
             ) {
                 Icon(
                     imageVector = Icons.Default.Tune,
                     contentDescription = "Filter",
-                    tint = DorjaColors.Jol600,
+                    tint = DorjaColors.DrawerAccent,
                     modifier = Modifier.size(18.dp)
                 )
             }
@@ -906,12 +909,13 @@ fun CountryPicker(
         ModalBottomSheet(
             onDismissRequest = { showSheet = false },
             sheetState = sheetState,
-            containerColor = Color.White,
+            containerColor = DorjaColors.DrawerSidebar,
             shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .navigationBarsPadding()
                     .padding(horizontal = 20.dp, vertical = 12.dp)
             ) {
                 // Grab handle
@@ -921,20 +925,20 @@ fun CountryPicker(
                         .width(36.dp)
                         .height(4.dp)
                         .clip(CircleShape)
-                        .background(Color(0x33000000))
+                        .background(DorjaColors.DrawerSidebarSoft)
                 )
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Text(
                     text = "Select Country",
                     style = MaterialTheme.typography.titleLarge,
-                    color = DorjaColors.Ink950,
+                    color = DorjaColors.DrawerCream,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
                     text = "Choose your country to load specific property evidence, legal disclosures, and authority registries.",
                     style = MaterialTheme.typography.bodySmall,
-                    color = DorjaColors.Gray600
+                    color = DorjaColors.DrawerMuted
                 )
                 Spacer(modifier = Modifier.height(16.dp))
 
@@ -969,10 +973,10 @@ fun CountryPicker(
                                     showSheet = false
                                 }),
                             shape = RoundedCornerShape(14.dp),
-                            color = if (isSelected) DorjaColors.Jol100 else DorjaColors.Paper50,
+                            color = if (isSelected) DorjaColors.DrawerSidebarSoft else Color(0x14FFFFFF),
                             border = BorderStroke(
-                                0.5.dp,
-                                if (isSelected) DorjaColors.Jol600.copy(alpha = 0.3f) else Color(0x0C000000)
+                                1.dp,
+                                if (isSelected) DorjaColors.DrawerAccent.copy(alpha = 0.55f) else Color(0x1FFFFFFF)
                             )
                         ) {
                             Row(
@@ -988,13 +992,13 @@ fun CountryPicker(
                                             text = profile.displayName,
                                             style = MaterialTheme.typography.titleMedium,
                                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.SemiBold,
-                                            color = if (isSelected) DorjaColors.Jol700 else DorjaColors.Ink950
+                                            color = if (isSelected) DorjaColors.DrawerAccent else DorjaColors.DrawerCream
                                         )
                                         Spacer(modifier = Modifier.width(8.dp))
                                         Text(
                                             text = profile.iso2,
                                             style = MaterialTheme.typography.labelSmall,
-                                            color = DorjaColors.Gray600,
+                                            color = DorjaColors.DrawerMuted,
                                             fontWeight = FontWeight.Bold
                                         )
                                     }
@@ -1002,7 +1006,7 @@ fun CountryPicker(
                                     Text(
                                         text = "Currency: ${profile.currencyCode} (${profile.currencySymbol}) • Stage ${profile.launchStage}",
                                         style = MaterialTheme.typography.bodySmall,
-                                        color = DorjaColors.Gray600,
+                                        color = DorjaColors.DrawerMuted,
                                         fontSize = 12.sp
                                     )
                                 }
@@ -1010,7 +1014,7 @@ fun CountryPicker(
                                     Icon(
                                         imageVector = Icons.Default.CheckCircle,
                                         contentDescription = "Selected",
-                                        tint = DorjaColors.Jol600,
+                                        tint = DorjaColors.DrawerAccent,
                                         modifier = Modifier.size(20.dp)
                                     )
                                 }

@@ -6,6 +6,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -49,6 +51,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
@@ -342,6 +345,32 @@ fun MainContainer(
         modifier = Modifier
             .fillMaxSize()
             .background(DorjaColors.DrawerBackdrop)
+            .pointerInput(Unit) {
+                // Edge-swipe: drag right starting within 48dp of the left edge
+                // opens the drawer. Vertical scrolls are ignored because their
+                // deltas arrive consumed by the scrolling child.
+                awaitEachGesture {
+                    val down = awaitFirstDown()
+                    var totalX = 0f
+                    var openedThisGesture = false
+                    while (true) {
+                        val event = awaitPointerEvent()
+                        val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                        if (!change.isConsumed) {
+                            totalX += change.positionChange().x
+                        }
+                        if (!openedThisGesture && !drawerOpen &&
+                            down.position.x < 48.dp.toPx() &&
+                            totalX > 72.dp.toPx()
+                        ) {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            drawerOpen = true
+                            openedThisGesture = true
+                        }
+                        if (!change.pressed) break
+                    }
+                }
+            }
     ) {
         // ── Sidebar layer (sits behind the app card) ─────────────────────────
         DrawerSidebar(

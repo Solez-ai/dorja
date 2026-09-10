@@ -185,6 +185,7 @@ fun ExploreScreen(
                 }
             }
         }
+        }
 
         // Search and Filters
         Column(
