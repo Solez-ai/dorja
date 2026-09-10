@@ -119,37 +119,39 @@ fun HostListingsScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(DorjaColors.CanvasBg)
-                .padding(top = 44.dp, start = 16.dp, end = 16.dp, bottom = 12.dp)
+                .padding(top = 6.dp, start = 16.dp, end = 16.dp, bottom = 8.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
                     Image(
                         painter = painterResource(id = R.drawable.ic_dorja_logo),
                         contentDescription = "Dorja Logo",
-                        modifier = Modifier.size(36.dp)
+                        modifier = Modifier.size(32.dp)
                     )
                     Spacer(modifier = Modifier.width(10.dp))
-                    Column {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = "My Properties",
-                            style = MaterialTheme.typography.titleLarge,
+                            style = MaterialTheme.typography.titleMedium,
                             color = DorjaColors.Ink950,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
                             text = "Host Management Suite • Dorja BD",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = DorjaColors.Gray700
+                            style = MaterialTheme.typography.labelSmall,
+                            color = DorjaColors.Gray700,
+                            maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                         )
                     }
                 }
 
                 DorjaButton(
-                    text = "+ New Listing",
+                    text = "+ New",
                     onClick = onCreateListing,
                     icon = Icons.Default.Add,
                     modifier = Modifier.height(40.dp),

@@ -44,4 +44,12 @@ object DorjaColors {
 
     val BentoCardBg = Color(0xFFFFFFFF)
     val BentoCardBorder = Color(0xFFE1E2EC)
+
+    // Drawer / dimensions-style menu (dark green backdrop + cream sidebar)
+    val DrawerBackdrop = Color(0xFF0D1F17)      // Deep forest backdrop behind everything
+    val DrawerSidebar = Color(0xFF122B1F)       // Dark green sidebar panel
+    val DrawerSidebarSoft = Color(0x33FFFFFF)   // Selected nav pill on the sidebar
+    val DrawerCream = Color(0xFFF2EFE4)         // Warm cream used for text on sidebar
+    val DrawerMuted = Color(0xFF8FA89A)         // Muted sage text on sidebar
+    val DrawerAccent = Color(0xFF9BD4A8)        // Soft green accent for logo/active state
 }

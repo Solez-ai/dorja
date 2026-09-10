@@ -118,13 +118,13 @@ fun BentoMetricTile(
         border = BorderStroke(0.5.dp, Color(0x0C000000))
     ) {
         Row(
-            modifier = Modifier.padding(12.dp),
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             if (icon != null) {
                 Box(
                     modifier = Modifier
-                        .size(36.dp)
+                        .size(34.dp)
                         .clip(CircleShape)
                         .background(iconBg),
                     contentAlignment = Alignment.Center
@@ -133,33 +133,35 @@ fun BentoMetricTile(
                         imageVector = icon,
                         contentDescription = null,
                         tint = iconTint,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(17.dp)
                     )
                 }
-                Spacer(modifier = Modifier.width(10.dp))
+                Spacer(modifier = Modifier.width(9.dp))
             }
-            Column {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = label,
                     style = MaterialTheme.typography.labelSmall,
                     color = DorjaColors.Gray600,
-                    fontSize = 11.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    fontSize = 10.sp,
+                    maxLines = 2,
+                    softWrap = true
                 )
                 Text(
                     text = value,
                     style = MaterialTheme.typography.titleMedium,
                     color = DorjaColors.Ink950,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp
+                    fontSize = 15.sp
                 )
                 if (!subtext.isNullOrBlank()) {
                     Text(
                         text = subtext,
                         style = MaterialTheme.typography.bodySmall,
                         color = DorjaColors.Gray600,
-                        fontSize = 11.sp
+                        fontSize = 10.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }

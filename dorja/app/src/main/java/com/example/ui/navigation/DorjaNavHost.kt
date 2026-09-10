@@ -1,19 +1,39 @@
 package com.example.ui.navigation
 
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
+import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material3.Icon
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
-import androidx.compose.material3.Scaffold
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -22,26 +42,26 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.navigation.NavType
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.sp
+import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.DorjaApp
+import com.example.R
 import com.example.ui.account.AccountScreen
 import com.example.ui.auth.AuthScreen
 import com.example.ui.chat.ChatThreadScreen
@@ -55,9 +75,6 @@ import com.example.ui.relocation.RelocationModeScreen
 import com.example.ui.seller.HostListingsScreen
 import com.example.ui.splash.SplashScreen
 import com.example.ui.theme.DorjaColors
-import com.example.ui.theme.LiquidGlassDefaults
-import com.example.ui.theme.liquidGlass
-import com.example.ui.theme.pressScale
 import com.example.ui.tour.TourViewerScreen
 import com.example.ui.scanner.RoomScannerScreen
 import com.example.ui.visits.VisitsScreen
@@ -106,6 +123,13 @@ enum class BuyerTab(val title: String, val icon: ImageVector, val tag: String) {
     INBOX("Inbox", Icons.AutoMirrored.Filled.Chat, "nav_tab_inbox"),
     ACCOUNT("Account", Icons.Default.Person, "nav_tab_account")
 }
+
+/** Cubic-bezier(0.16, 1, 0.3, 1) — the smooth "expo out" easing requested for the drawer. */
+private val DrawerEasing = CubicBezierEasing(0.16f, 1f, 0.3f, 1f)
+private const val DRAWER_DURATION_MS = 350
+private const val DRAWER_SCALE = 0.82f
+private const val DRAWER_RADIUS_PX = 28f
+private const val SIDEBAR_WIDTH_FRACTION = 0.78f
 
 @Composable
 fun DorjaNavHost() {
@@ -163,6 +187,11 @@ fun DorjaNavHost() {
                 },
                 onNavigateToRelocation = { origin, dest ->
                     navController.navigate(Screen.RelocationMode.createRoute(origin, dest))
+                },
+                onLogout = {
+                    navController.navigate(Screen.Auth.route) {
+                        popUpTo(0) { inclusive = true }
+                    }
                 }
             )
         }
@@ -289,7 +318,8 @@ fun MainContainer(
     onNavigateToChatThread: (String) -> Unit,
     onNavigateToPass: (String) -> Unit,
     onNavigateToHandover: (String) -> Unit,
-    onNavigateToRelocation: (String, String) -> Unit = { _, _ -> }
+    onNavigateToRelocation: (String, String) -> Unit = { _, _ -> },
+    onLogout: () -> Unit = {}
 ) {
     val repository = DorjaApp.instance.repository
     val currentUser by repository.currentUser.collectAsState()
@@ -297,149 +327,306 @@ fun MainContainer(
 
     var currentHostTab by remember { mutableStateOf(HostTab.PROPERTIES) }
     var currentBuyerTab by remember { mutableStateOf(BuyerTab.EXPLORE) }
-    val haptic = androidx.compose.ui.platform.LocalHapticFeedback.current
+    var drawerOpen by remember { mutableStateOf(false) }
+    val haptic = LocalHapticFeedback.current
+
+    val progress by animateFloatAsState(
+        targetValue = if (drawerOpen) 1f else 0f,
+        animationSpec = tween(durationMillis = DRAWER_DURATION_MS, easing = DrawerEasing),
+        label = "drawerProgress"
+    )
+
+    val activeTabTitle = if (isHost) currentHostTab.title else currentBuyerTab.title
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(DorjaColors.CanvasBg)
+            .background(DorjaColors.DrawerBackdrop)
     ) {
-        // Main Screen Content
+        // ── Sidebar layer (sits behind the app card) ─────────────────────────
+        DrawerSidebar(
+            userName = currentUser?.displayName ?: "DORJA User",
+            activeLabel = activeTabTitle,
+            items = if (isHost) {
+                HostTab.values().map { DrawerItem(it.title, it.icon, it.tag) }
+            } else {
+                BuyerTab.values().map { DrawerItem(it.title, it.icon, it.tag) }
+            },
+            onNavigate = { tag ->
+                if (isHost) {
+                    HostTab.values().firstOrNull { it.tag == tag }?.let { currentHostTab = it }
+                } else {
+                    BuyerTab.values().firstOrNull { it.tag == tag }?.let { currentBuyerTab = it }
+                }
+                drawerOpen = false
+            },
+            onClose = { drawerOpen = false },
+            onLogout = {
+                drawerOpen = false
+                repository.logout()
+                onLogout()
+            }
+        )
+
+        // ── Main app card (scales down + slides right to reveal the drawer) ──
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(bottom = 76.dp)
-        ) {
-            if (isHost) {
-                when (currentHostTab) {
-                    HostTab.PROPERTIES -> HostListingsScreen(
-                        onCreateListing = onNavigateToCreateListing,
-                        onOpenListingDetail = onNavigateToDetail,
-                        onScan3DRooms = onNavigateToScanner
-                    )
-                    HostTab.VISITS -> VisitsScreen(onOpenPass = onNavigateToPass)
-                    HostTab.INBOX -> InboxScreen(onOpenConversation = onNavigateToChatThread)
-                    HostTab.ACCOUNT -> AccountScreen(
-                        onNavigateToSellerSuite = onNavigateToCreateListing,
-                        onNavigateToRelocation = onNavigateToRelocation
-                    )
+                .graphicsLayer {
+                    val slide = size.width * SIDEBAR_WIDTH_FRACTION
+                    translationX = slide * progress
+                    val scale = 1f - (1f - DRAWER_SCALE) * progress
+                    scaleX = scale
+                    scaleY = scale
+                    // Keep the card centered on the visible column while scaled.
+                    translationX -= (size.width * (1f - scale) / 2f) * progress
+                    shadowElevation = 24f * progress
+                    shape = RoundedCornerShape((DRAWER_RADIUS_PX * progress).dp)
+                    clip = progress > 0.01f
                 }
-            } else {
-                when (currentBuyerTab) {
-                    BuyerTab.EXPLORE -> ExploreScreen(onSelectListing = onNavigateToDetail)
-                    BuyerTab.VISITS -> VisitsScreen(onOpenPass = onNavigateToPass)
-                    BuyerTab.INBOX -> InboxScreen(onOpenConversation = onNavigateToChatThread)
-                    BuyerTab.ACCOUNT -> AccountScreen(
-                        onNavigateToSellerSuite = onNavigateToCreateListing,
-                        onNavigateToRelocation = onNavigateToRelocation
-                    )
-                }
-            }
-        }
-
-        // Authentic Apple Floating Liquid Glass Bottom Navigation Bar
-        Box(
-            modifier = Modifier
-                .align(androidx.compose.ui.Alignment.BottomCenter)
-                .padding(horizontal = 16.dp, vertical = 12.dp)
-                .fillMaxWidth()
-                .height(64.dp)
-                .liquidGlass(
-                    blurRadius = LiquidGlassDefaults.BlurMedium,
-                    glassColor = androidx.compose.ui.graphics.Color(0xE6FFFFFF),
-                    specularColor = androidx.compose.ui.graphics.Color(0x40FFFFFF),
-                    shape = androidx.compose.foundation.shape.RoundedCornerShape(28.dp)
-                )
-                .padding(horizontal = 8.dp, vertical = 6.dp)
+                .clickable(
+                    indication = null,
+                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+                ) { if (drawerOpen) drawerOpen = false }
+                .testTag("main_screen_card")
         ) {
-            Row(
-                modifier = Modifier.fillMaxSize(),
-                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.SpaceAround,
-                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(DorjaColors.CanvasBg)
             ) {
-                if (isHost) {
-                    HostTab.values().forEach { tab ->
-                        val isSelected = currentHostTab == tab
-                        FloatingTabItem(
-                            title = tab.title,
-                            icon = tab.icon,
-                            isSelected = isSelected,
-                            testTag = tab.tag,
-                            onClick = {
-                                haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
-                                currentHostTab = tab
-                            },
-                            modifier = Modifier.weight(1f)
+                // Compact top bar with hamburger replacing the old bottom nav bar.
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .statusBarsPadding()
+                        .padding(start = 6.dp, end = 16.dp, top = 6.dp, bottom = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(
+                        onClick = {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            drawerOpen = true
+                        },
+                        modifier = Modifier.testTag("drawer_open_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Menu,
+                            contentDescription = "Open menu",
+                            tint = DorjaColors.Ink950
                         )
                     }
-                } else {
-                    BuyerTab.values().forEach { tab ->
-                        val isSelected = currentBuyerTab == tab
-                        FloatingTabItem(
-                            title = tab.title,
-                            icon = tab.icon,
-                            isSelected = isSelected,
-                            testTag = tab.tag,
-                            onClick = {
-                                haptic.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
-                                currentBuyerTab = tab
-                            },
-                            modifier = Modifier.weight(1f)
-                        )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Image(
+                        painter = painterResource(id = R.drawable.ic_dorja_logo),
+                        contentDescription = "Dorja Logo",
+                        modifier = Modifier.size(26.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "DORJA",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.sp,
+                        color = DorjaColors.Ink950
+                    )
+                    Spacer(modifier = Modifier.weight(1f))
+                    Text(
+                        text = activeTabTitle,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = DorjaColors.Gray500,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+
+                Box(modifier = Modifier.fillMaxSize()) {
+                    if (isHost) {
+                        when (currentHostTab) {
+                            HostTab.PROPERTIES -> HostListingsScreen(
+                                onCreateListing = onNavigateToCreateListing,
+                                onOpenListingDetail = onNavigateToDetail,
+                                onScan3DRooms = onNavigateToScanner
+                            )
+                            HostTab.VISITS -> VisitsScreen(onOpenPass = onNavigateToPass)
+                            HostTab.INBOX -> InboxScreen(onOpenConversation = onNavigateToChatThread)
+                            HostTab.ACCOUNT -> AccountScreen(
+                                onNavigateToSellerSuite = onNavigateToCreateListing,
+                                onNavigateToRelocation = onNavigateToRelocation
+                            )
+                        }
+                    } else {
+                        when (currentBuyerTab) {
+                            BuyerTab.EXPLORE -> ExploreScreen(onSelectListing = onNavigateToDetail)
+                            BuyerTab.VISITS -> VisitsScreen(onOpenPass = onNavigateToPass)
+                            BuyerTab.INBOX -> InboxScreen(onOpenConversation = onNavigateToChatThread)
+                            BuyerTab.ACCOUNT -> AccountScreen(
+                                onNavigateToSellerSuite = onNavigateToCreateListing,
+                                onNavigateToRelocation = onNavigateToRelocation
+                            )
+                        }
                     }
+                }
+
+                // Touch-dismiss scrim inside the card: dims content and blocks
+                // taps on the scaled-down screen while the drawer is open.
+                if (progress > 0.01f) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer { alpha = progress }
+                            .background(Color.Black.copy(alpha = 0.45f))
+                            .clickable(
+                                indication = null,
+                                interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+                            ) { drawerOpen = false }
+                    )
                 }
             }
         }
     }
 }
 
+private data class DrawerItem(
+    val title: String,
+    val icon: ImageVector,
+    val tag: String
+)
 
 @Composable
-private fun FloatingTabItem(
-    title: String,
-    icon: ImageVector,
-    isSelected: Boolean,
-    testTag: String,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
+private fun DrawerSidebar(
+    userName: String,
+    activeLabel: String,
+    items: List<DrawerItem>,
+    onNavigate: (String) -> Unit,
+    onClose: () -> Unit,
+    onLogout: () -> Unit
 ) {
-    val animatedBg by androidx.compose.animation.animateColorAsState(
-        targetValue = if (isSelected) DorjaColors.Jol100 else androidx.compose.ui.graphics.Color.Transparent,
-        label = "tabBg"
-    )
-    val animatedFg by androidx.compose.animation.animateColorAsState(
-        targetValue = if (isSelected) DorjaColors.Jol600 else DorjaColors.Gray500,
-        label = "tabFg"
-    )
-
-    Box(
-        modifier = modifier
-            .clip(androidx.compose.foundation.shape.RoundedCornerShape(22.dp))
-            .background(animatedBg)
-            .pressScale(onClick = onClick)
-            .padding(vertical = 6.dp)
-            .testTag(testTag),
-        contentAlignment = androidx.compose.ui.Alignment.Center
+    Column(
+        modifier = Modifier
+            .fillMaxHeight()
+            .fillMaxWidth(SIDEBAR_WIDTH_FRACTION)
+            .background(DorjaColors.DrawerSidebar)
+            .statusBarsPadding()
+            .navigationBarsPadding()
+            .padding(horizontal = 18.dp, vertical = 18.dp)
+            .testTag("drawer_sidebar")
     ) {
-        Column(
-            horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
-            verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center
+        // Top row: logo + close button
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = title,
-                tint = animatedFg,
-                modifier = Modifier.size(20.dp)
-            )
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = title,
-                style = androidx.compose.material3.MaterialTheme.typography.labelSmall,
-                color = animatedFg,
-                fontWeight = FontWeight.Bold,
-                fontSize = 10.sp
-            )
+            Box(
+                modifier = Modifier
+                    .size(42.dp)
+                    .clip(CircleShape)
+                    .background(DorjaColors.DrawerSidebarSoft),
+                contentAlignment = Alignment.Center
+            ) {
+                Image(
+                    painter = painterResource(id = R.drawable.ic_dorja_logo),
+                    contentDescription = "Dorja Logo",
+                    modifier = Modifier.size(28.dp)
+                )
+            }
+            Spacer(modifier = Modifier.weight(1f))
+            IconButton(onClick = onClose) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "Close menu",
+                    tint = DorjaColors.DrawerCream
+                )
+            }
         }
+
+        Spacer(modifier = Modifier.height(14.dp))
+
+        Text(
+            text = userName,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = FontWeight.Bold,
+            color = DorjaColors.DrawerCream
+        )
+        Text(
+            text = "Verified account",
+            style = MaterialTheme.typography.bodySmall,
+            color = DorjaColors.DrawerMuted
+        )
+
+        Spacer(modifier = Modifier.height(26.dp))
+
+        // Vertical navigation list
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            items.forEach { item ->
+                val selected = item.title == activeLabel
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(if (selected) DorjaColors.DrawerSidebarSoft else Color.Transparent)
+                        .clickable { onNavigate(item.tag) }
+                        .padding(horizontal = 12.dp, vertical = 12.dp)
+                        .testTag(item.tag),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = item.icon,
+                        contentDescription = null,
+                        tint = if (selected) DorjaColors.DrawerAccent else Color.White,
+                        modifier = Modifier.size(22.dp)
+                    )
+                    Spacer(modifier = Modifier.width(14.dp))
+                    Text(
+                        text = item.title,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                        color = if (selected) DorjaColors.DrawerAccent else Color.White
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Logout action row
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(14.dp))
+                    .clickable(onClick = onLogout)
+                    .padding(horizontal = 12.dp, vertical = 12.dp)
+                    .testTag("drawer_logout_button"),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.Logout,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(22.dp)
+                )
+                Spacer(modifier = Modifier.width(14.dp))
+                Text(
+                    text = "Logout",
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium,
+                    color = Color.White
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.weight(1f))
+
+        // Footer brand mark
+        Text(
+            text = "DORJA",
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 3.sp,
+            color = DorjaColors.DrawerMuted
+        )
+        Text(
+            text = "Because every door should be trustworthy.",
+            style = MaterialTheme.typography.labelSmall,
+            color = DorjaColors.DrawerMuted
+        )
     }
 }
-

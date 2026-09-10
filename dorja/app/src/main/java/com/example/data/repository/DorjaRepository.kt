@@ -68,6 +68,13 @@ class DorjaRepository(private val database: DorjaDatabase) {
         }
     }
 
+    /** Clears the active session (demo auth). The profile rows stay on device. */
+    fun logout() {
+        CoroutineScope(Dispatchers.IO).launch {
+            _currentUser.value = null
+        }
+    }
+
     suspend fun updateUserProfile(
         displayName: String,
         phone: String,

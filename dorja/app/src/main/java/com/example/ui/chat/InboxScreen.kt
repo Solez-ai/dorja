@@ -38,6 +38,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.DorjaApp
 import com.example.ui.components.DorjaAvatar
 import com.example.ui.components.DorjaBadge
@@ -73,31 +74,33 @@ fun InboxScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(DorjaColors.White)
-                .padding(top = 44.dp, start = 16.dp, end = 16.dp, bottom = 14.dp)
+                .padding(top = 6.dp, start = 16.dp, end = 16.dp, bottom = 10.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
                     Image(
                         painter = painterResource(id = R.drawable.ic_dorja_logo),
                         contentDescription = "Dorja Logo",
-                        modifier = Modifier.size(36.dp)
+                        modifier = Modifier.size(32.dp)
                     )
                     Spacer(modifier = Modifier.width(10.dp))
-                    Column {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = "Encrypted Inbox",
-                            style = MaterialTheme.typography.titleLarge,
+                            style = MaterialTheme.typography.titleMedium,
                             color = DorjaColors.Ink950,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
                             text = "Zero-leak real estate messaging channel",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = DorjaColors.Gray700
+                            style = MaterialTheme.typography.labelSmall,
+                            color = DorjaColors.Gray700,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
@@ -107,7 +110,7 @@ fun InboxScreen(
                         imageVector = Icons.Default.Lock,
                         contentDescription = null,
                         tint = DorjaColors.Jol600,
-                        modifier = Modifier.size(16.dp)
+                        modifier = Modifier.size(14.dp)
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
@@ -115,7 +118,8 @@ fun InboxScreen(
                         style = MaterialTheme.typography.labelSmall,
                         color = DorjaColors.Jol600,
                         fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 10.sp
                     )
                 }
             }

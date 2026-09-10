@@ -92,56 +92,59 @@ fun VisitsScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(DorjaColors.CanvasBg)
-                .padding(top = 44.dp, start = 16.dp, end = 16.dp, bottom = 10.dp)
+                .padding(top = 6.dp, start = 16.dp, end = 16.dp, bottom = 8.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
                     Image(
                         painter = painterResource(id = R.drawable.ic_dorja_logo),
                         contentDescription = "Dorja Logo",
-                        modifier = Modifier.size(36.dp)
+                        modifier = Modifier.size(32.dp)
                     )
                     Spacer(modifier = Modifier.width(10.dp))
-                    Column {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = if (isHost) "Visitor Passes" else "My Viewing Passes",
-                            style = MaterialTheme.typography.titleLarge,
+                            style = MaterialTheme.typography.titleMedium,
                             color = DorjaColors.Ink950,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
                             text = if (isHost) "Scheduled appointments for your listed properties" else "SafeView geofenced access tokens",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = DorjaColors.Gray700
+                            style = MaterialTheme.typography.labelSmall,
+                            color = DorjaColors.Gray700,
+                            maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                         )
                     }
                 }
 
                 Surface(
-                    shape = RoundedCornerShape(20.dp),
+                    shape = RoundedCornerShape(16.dp),
                     color = DorjaColors.BentoGreenBg,
                     border = BorderStroke(1.dp, DorjaColors.BentoGreenIcon.copy(alpha = 0.3f))
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Shield,
                             contentDescription = null,
                             tint = DorjaColors.BentoGreenIcon,
-                            modifier = Modifier.size(14.dp)
+                            modifier = Modifier.size(13.dp)
                         )
-                        Spacer(modifier = Modifier.width(5.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
                         Text(
                             text = "GPS GATED",
-                            style = MaterialTheme.typography.labelMedium,
+                            style = MaterialTheme.typography.labelSmall,
                             color = DorjaColors.BentoGreenText,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 10.sp
                         )
                     }
                 }

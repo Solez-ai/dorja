@@ -4,6 +4,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -102,7 +103,7 @@ import com.example.R
 import androidx.compose.foundation.Image
 import androidx.compose.ui.res.painterResource
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun AccountScreen(
     onNavigateToSellerSuite: () -> Unit = {},
@@ -450,7 +451,7 @@ fun AccountScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(DorjaColors.CanvasBg)
-                .padding(top = 44.dp, start = 16.dp, end = 4.dp, bottom = 12.dp)
+                .padding(top = 6.dp, start = 16.dp, end = 4.dp, bottom = 6.dp)
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -459,27 +460,30 @@ fun AccountScreen(
                 Image(
                     painter = painterResource(id = R.drawable.ic_dorja_logo),
                     contentDescription = "Dorja Logo",
-                    modifier = Modifier.size(36.dp)
+                    modifier = Modifier.size(32.dp)
                 )
                 Spacer(modifier = Modifier.width(10.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = "My Dorja Account",
-                        style = MaterialTheme.typography.titleLarge,
+                        style = MaterialTheme.typography.titleMedium,
                         color = DorjaColors.Ink950,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = "Identity & Real Estate Credentials • Local Persistence",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = DorjaColors.Gray700
+                        text = "Identity & Real Estate Credentials",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = DorjaColors.Gray700,
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                     )
                 }
-                IconButton(onClick = { showLanguageSheet = true }) {
+                IconButton(onClick = { showLanguageSheet = true }, modifier = Modifier.size(36.dp)) {
                     Icon(
                         imageVector = Icons.Default.Settings,
                         contentDescription = "Language & Settings",
-                        tint = DorjaColors.Gray500
+                        tint = DorjaColors.Gray500,
+                        modifier = Modifier.size(20.dp)
                     )
                 }
             }
@@ -499,13 +503,13 @@ fun AccountScreen(
 
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             // Profile Card Bento
             item {
                 BentoCard(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(16.dp)) {
+                    Column(modifier = Modifier.padding(14.dp)) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             verticalAlignment = Alignment.CenterVertically
@@ -520,12 +524,12 @@ fun AccountScreen(
                                     fontWeight = FontWeight.Bold
                                 )
                                 Spacer(modifier = Modifier.height(2.dp))
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
+                                // Badges wrap across lines instead of being clipped in portrait.
+                                androidx.compose.foundation.layout.FlowRow(
                                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
                                     DorjaBadge(
-                                        text = if (user.role == "SELLER") "HOST / SELLER" else "SEEKER / BUYER",
+                                        text = if (user.role == "SELLER") "HOST" else "BUYER",
                                         backgroundColor = if (user.role == "SELLER") DorjaColors.BentoBlueBg else DorjaColors.BentoGreenBg,
                                         textColor = if (user.role == "SELLER") DorjaColors.BentoBlueText else DorjaColors.BentoGreenText
                                     )
