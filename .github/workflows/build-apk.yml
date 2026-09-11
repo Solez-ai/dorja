@@ -13,6 +13,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
 
+    env:
+      # Runner/step debug logs for better CI diagnostics
+      ACTIONS_STEP_DEBUG: true
+      ACTIONS_RUNNER_DEBUG: true
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -76,7 +81,34 @@ jobs:
 
       - name: Build debug APK
         working-directory: dorja
-        run: gradle assembleDebug --no-daemon --stacktrace
+        run: |
+          set -o pipefail
+          gradle assembleDebug --no-daemon --stacktrace 2>&1 | tee build-output.log
+
+      - name: Publish compiler errors to ci-logs branch
+        if: failure()
+        shell: bash
+        run: |
+          LOG="dorja/build-output.log"
+          {
+            echo "CI run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            echo "Commit: ${{ github.sha }}"
+            echo ""
+            echo "=== Kotlin compiler errors ==="
+            grep -E "^e: |^> Task .* FAILED|error: " "$LOG" | head -80 || true
+            echo ""
+            echo "=== Build failure tail ==="
+            tail -60 "$LOG" || true
+          } > ci-errors.txt
+          git clone --depth 1 --branch ci-logs "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" ci-logs-repo \
+            || git clone --depth 1 "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" ci-logs-repo
+          cd ci-logs-repo
+          git checkout --orphan ci-logs-new
+          git rm -rf --quiet . 2>/dev/null || true
+          cp ../ci-errors.txt .
+          git add ci-errors.txt
+          git -c user.name="ci-bot" -c user.email="noreply@users.noreply.github.com" commit -m "CI error log for run ${{ github.run_id }}"
+          git push origin HEAD:ci-logs --force
 
       - name: Build signed release APK
         working-directory: dorja
@@ -89,6 +121,7 @@ jobs:
         run: gradle assembleRelease --no-daemon --stacktrace
 
       - name: Upload debug APK artifact
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: dorja-debug-apk
