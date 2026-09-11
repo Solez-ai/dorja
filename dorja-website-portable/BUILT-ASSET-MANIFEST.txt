@@ -1,0 +1,8 @@
+dist/public/dorja-assets/detail-surface.jpg
+dist/public/dorja-assets/dorja-logo.png
+dist/public/dorja-assets/dorja-orbit-mark.png
+dist/public/dorja-assets/feature-collage.jpg
+dist/public/dorja-assets/hero-editorial.jpg
+dist/public/dorja-assets/listing.png
+dist/public/dorja-assets/records.jpg
+dist/public/dorja-assets/welcome.jpg

@@ -1,0 +1,12 @@
+Dorja portable bundle
+Created: 2026-09-11 08:51:33 UTC
+
+Source assets:
+client/public/dorja-assets/detail-surface.jpg
+client/public/dorja-assets/dorja-logo.png
+client/public/dorja-assets/dorja-orbit-mark.png
+client/public/dorja-assets/feature-collage.jpg
+client/public/dorja-assets/hero-editorial.jpg
+client/public/dorja-assets/listing.png
+client/public/dorja-assets/records.jpg
+client/public/dorja-assets/welcome.jpg

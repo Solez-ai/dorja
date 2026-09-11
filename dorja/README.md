@@ -13,8 +13,8 @@
 
 Every push to `main` produces a fresh APK automatically. Users never need to understand GitHub:
 
-- **Permanent download page:** <https://solez-ai.github.io/dorja/> — always points at the latest build
-- **Direct latest release:** <https://github.com/Solez-ai/dorja/releases/latest> — grab `app-debug.apk`
+- **Website:** <https://solez-ai.github.io/dorja/> — marketing site with app screenshots and the alpha/beta download
+- **Direct latest release:** <https://github.com/Solez-ai/dorja/releases/latest> — grab `app-debug.apk` or `app-release.apk`
 
 Requirements: any Android device on Android 7.0+. The debug APK works without signing keys; a signed release APK appears when release credentials are configured.
 
