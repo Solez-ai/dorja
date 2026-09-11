@@ -56,6 +56,7 @@ import com.example.ui.components.DorjaBadge
 import com.example.ui.components.DorjaButton
 import com.example.ui.components.DorjaOutlinedButton
 import com.example.ui.components.PulseDot
+import com.example.ui.i18n.L
 import com.example.ui.theme.DorjaColors
 import com.example.ui.util.Formatters
 import com.example.R
@@ -108,13 +109,13 @@ fun VisitsScreen(
                     Spacer(modifier = Modifier.width(10.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = if (isHost) "Visitor Passes" else "My Viewing Passes",
+                            text = if (isHost) L("visits_host_title") else L("visits_seeker_title"),
                             style = MaterialTheme.typography.titleMedium,
                             color = DorjaColors.Ink950,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = if (isHost) "Scheduled appointments for your listed properties" else "SafeView geofenced access tokens",
+                            text = if (isHost) L("visits_host_subtitle") else L("visits_seeker_subtitle"),
                             style = MaterialTheme.typography.labelSmall,
                             color = DorjaColors.Gray700,
                             maxLines = 1,
@@ -140,7 +141,7 @@ fun VisitsScreen(
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = "GPS GATED",
+                            text = L("visits_gps_gated"),
                             style = MaterialTheme.typography.labelSmall,
                             color = DorjaColors.BentoGreenText,
                             fontWeight = FontWeight.Bold,
@@ -177,8 +178,8 @@ fun VisitsScreen(
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         BentoMetricTile(
-                            value = "Active",
-                            label = "PASS STATUS",
+                            value = L("visits_active"),
+                            label = L("visits_pass_status"),
                             icon = Icons.Default.CheckCircle,
                             iconBg = DorjaColors.BentoGreenBg,
                             iconTint = DorjaColors.BentoGreenIcon,
@@ -186,7 +187,7 @@ fun VisitsScreen(
                         )
                         BentoMetricTile(
                             value = activeViewing.passToken.takeLast(4),
-                            label = "SECURITY TOKEN",
+                            label = L("visits_security_token"),
                             icon = Icons.Default.QrCode,
                             iconBg = DorjaColors.BentoBlueBg,
                             iconTint = DorjaColors.BentoBlueIcon,
@@ -221,14 +222,14 @@ fun VisitsScreen(
                             }
                             Spacer(modifier = Modifier.height(14.dp))
                             Text(
-                                text = if (isHost) "No Visitor Requests Yet" else "No Active Viewing Passes",
+                                text = if (isHost) L("visits_empty_host_title") else L("visits_empty_seeker_title"),
                                 style = MaterialTheme.typography.titleMedium,
                                 color = DorjaColors.Ink950,
                                 fontWeight = FontWeight.Bold
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = if (isHost) "When seekers book a visit for your properties, their encrypted pass requests will appear here for verification." else "When you book a physical inspection on any property, your SafeView QR access pass will be generated here.",
+                                text = if (isHost) L("visits_empty_host_body") else L("visits_empty_seeker_body"),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = DorjaColors.Gray700,
                                 textAlign = androidx.compose.ui.text.style.TextAlign.Center
@@ -240,7 +241,7 @@ fun VisitsScreen(
                 if (pastViewings.isNotEmpty()) {
                     item {
                         Text(
-                            text = "COMPLETED & PAST PASSES",
+                            text = L("visits_past_passes"),
                             style = MaterialTheme.typography.labelSmall,
                             color = DorjaColors.Gray500,
                             fontFamily = FontFamily.Monospace,

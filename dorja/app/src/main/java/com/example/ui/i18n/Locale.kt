@@ -15,3 +15,8 @@ fun t(): DorjaStrings = LocalDorjaLocale.current
 @Composable
 @ReadOnlyComposable
 fun L(key: String): String = LocalDorjaLocale.current[key]
+
+/** Formatted lookup for keys that contain %1$s / %1$d placeholders. */
+@Composable
+@ReadOnlyComposable
+fun Lf(key: String, vararg args: Any): String = LocalDorjaLocale.current.format(key, *args)

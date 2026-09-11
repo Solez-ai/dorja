@@ -62,6 +62,9 @@ import com.example.ui.components.BentoMetricTile
 import com.example.ui.components.DorjaBadge
 import com.example.ui.components.DorjaButton
 import com.example.ui.components.DorjaOutlinedButton
+import com.example.data.country.CountryRegistry
+import com.example.ui.i18n.L
+import com.example.ui.i18n.Lf
 import com.example.ui.theme.DorjaColors
 import com.example.ui.util.Formatters
 import com.example.R
@@ -86,11 +89,11 @@ fun HostListingsScreen(
     if (listingToDelete != null) {
         AlertDialog(
             onDismissRequest = { listingToDelete = null },
-            title = { Text("Delete Property Listing", fontWeight = FontWeight.Bold) },
-            text = { Text("Are you sure you want to remove '${listingToDelete!!.title}'? All associated room data will also be removed.") },
+            title = { Text(L("host_delete_title"), fontWeight = FontWeight.Bold) },
+            text = { Text(Lf("host_delete_body", listingToDelete!!.title)) },
             confirmButton = {
                 DorjaButton(
-                    text = "Delete",
+                    text = L("common_delete"),
                     onClick = {
                         scope.launch {
                             repository.deleteListing(listingToDelete!!.id)
@@ -102,7 +105,7 @@ fun HostListingsScreen(
             },
             dismissButton = {
                 TextButton(onClick = { listingToDelete = null }) {
-                    Text("Cancel", color = DorjaColors.Gray700)
+                    Text(L("common_cancel"), color = DorjaColors.Gray700)
                 }
             }
         )
@@ -135,13 +138,13 @@ fun HostListingsScreen(
                     Spacer(modifier = Modifier.width(10.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "My Properties",
+                            text = L("host_title"),
                             style = MaterialTheme.typography.titleMedium,
                             color = DorjaColors.Ink950,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "Host Management Suite • Dorja BD",
+                            text = "${L("host_subtitle")} • ${CountryRegistry.profile(currentUser?.countryCode ?: "BD").displayName}",
                             style = MaterialTheme.typography.labelSmall,
                             color = DorjaColors.Gray700,
                             maxLines = 1,
@@ -151,7 +154,7 @@ fun HostListingsScreen(
                 }
 
                 DorjaButton(
-                    text = "+ New",
+                    text = L("host_new"),
                     onClick = onCreateListing,
                     icon = Icons.Default.Add,
                     modifier = Modifier.height(40.dp),
@@ -173,7 +176,7 @@ fun HostListingsScreen(
                 ) {
                     BentoMetricTile(
                         value = "${myListings.size}",
-                        label = "MY LISTINGS",
+                        label = L("host_my_listings"),
                         icon = Icons.Default.Home,
                         iconBg = DorjaColors.BentoBlueBg,
                         iconTint = DorjaColors.BentoBlueIcon,
@@ -181,7 +184,7 @@ fun HostListingsScreen(
                     )
                     BentoMetricTile(
                         value = "${myListings.count { it.intent == "RENT" }}",
-                        label = "FOR RENT",
+                        label = L("explore_for_rent"),
                         icon = Icons.Default.Apartment,
                         iconBg = DorjaColors.BentoGreenBg,
                         iconTint = DorjaColors.BentoGreenIcon,
@@ -189,7 +192,7 @@ fun HostListingsScreen(
                     )
                     BentoMetricTile(
                         value = "${myListings.count { it.intent == "SALE" }}",
-                        label = "FOR SALE",
+                        label = L("explore_for_sale"),
                         icon = Icons.Default.Shield,
                         iconBg = DorjaColors.BentoPurpleBg,
                         iconTint = DorjaColors.BentoPurpleIcon,
@@ -223,21 +226,21 @@ fun HostListingsScreen(
                             }
                             Spacer(modifier = Modifier.height(14.dp))
                             Text(
-                                text = "No Properties Listed Yet",
+                                text = L("host_empty_title"),
                                 style = MaterialTheme.typography.titleMedium,
                                 color = DorjaColors.Ink950,
                                 fontWeight = FontWeight.Bold
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = "You are currently in Host mode. Tap the button below to add your first verified property listing with custom rooms and amenities.",
+                                text = L("host_empty_body"),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = DorjaColors.Gray700,
                                 textAlign = androidx.compose.ui.text.style.TextAlign.Center
                             )
                             Spacer(modifier = Modifier.height(18.dp))
                             DorjaButton(
-                                text = "Create Property Listing",
+                                text = L("host_create"),
                                 onClick = onCreateListing,
                                 icon = Icons.Default.Add,
                                 modifier = Modifier.fillMaxWidth(),
@@ -287,7 +290,7 @@ private fun HostListingCard(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         DorjaBadge(
-                            text = if (listing.intent == "RENT") "FOR RENT" else "FOR SALE",
+                            text = if (listing.intent == "RENT") L("explore_for_rent") else L("explore_for_sale"),
                             backgroundColor = if (listing.intent == "RENT") DorjaColors.BentoBlueBg else DorjaColors.BentoPurpleBg,
                             textColor = if (listing.intent == "RENT") DorjaColors.BentoBlueText else DorjaColors.BentoPurpleText
                         )
@@ -298,7 +301,7 @@ private fun HostListingCard(
                         )
                         if (listing.hasScan || !listing.virtualTourUrl.isNullOrBlank()) {
                             DorjaBadge(
-                                text = "3D TOUR",
+                                text = L("host_3d_tour"),
                                 icon = Icons.Default.ViewInAr,
                                 backgroundColor = DorjaColors.Jol600,
                                 textColor = DorjaColors.White
@@ -323,7 +326,7 @@ private fun HostListingCard(
                     ) {
                         Icon(
                             imageVector = Icons.Default.MoreVert,
-                            contentDescription = "Options",
+                            contentDescription = L("host_options"),
                             tint = DorjaColors.Gray500
                         )
                     }
@@ -332,14 +335,14 @@ private fun HostListingCard(
                         onDismissRequest = { showMenu = false }
                     ) {
                         DropdownMenuItem(
-                            text = { Text("View Listing") },
+                            text = { Text(L("host_view_listing")) },
                             onClick = {
                                 showMenu = false
                                 onClick()
                             }
                         )
                         DropdownMenuItem(
-                            text = { Text("Delete Listing", color = DorjaColors.Error) },
+                            text = { Text(L("common_delete"), color = DorjaColors.Error) },
                             onClick = {
                                 showMenu = false
                                 onDelete()

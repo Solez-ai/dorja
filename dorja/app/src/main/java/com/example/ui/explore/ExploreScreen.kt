@@ -72,13 +72,15 @@ import com.example.ui.components.DorjaBadge
 import com.example.ui.components.DorjaButton
 import com.example.ui.components.DorjaChip
 import com.example.ui.components.DorjaOutlinedButton
+import com.example.ui.i18n.L
+import com.example.ui.i18n.Lf
 import com.example.ui.theme.DorjaColors
 import com.example.ui.util.Formatters
 import com.example.R
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.stringResource
+
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -143,13 +145,13 @@ fun ExploreScreen(
                         Spacer(modifier = Modifier.width(12.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "Dorja Properties",
+                                text = L("explore_header"),
                                 style = MaterialTheme.typography.titleMedium,
                                 color = DorjaColors.White,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = stringResource(id = R.string.explore_subtitle),
+                                text = L("explore_subtitle"),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = DorjaColors.Sand300,
                                 maxLines = 1,
@@ -175,7 +177,7 @@ fun ExploreScreen(
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = "ANTI-SCAM",
+                            text = L("explore_anti_scam"),
                             style = MaterialTheme.typography.labelSmall,
                             color = DorjaColors.BentoGreenText,
                             fontWeight = FontWeight.Bold,
@@ -198,11 +200,11 @@ fun ExploreScreen(
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
-                placeholder = { Text("Search city or area") },
+                placeholder = { Text(L("explore_search_city")) },
                 leadingIcon = {
                     Icon(
                         imageVector = Icons.Default.Search,
-                        contentDescription = "Search",
+                        contentDescription = L("common_search"),
                         tint = DorjaColors.BentoBlueIcon
                     )
                 },
@@ -211,7 +213,7 @@ fun ExploreScreen(
                         IconButton(onClick = { searchQuery = "" }) {
                             Icon(
                                 imageVector = Icons.Default.Close,
-                                contentDescription = "Clear search",
+                                contentDescription = L("explore_clear_search"),
                                 tint = DorjaColors.Gray500
                             )
                         }
@@ -240,7 +242,7 @@ fun ExploreScreen(
                 item {
                     DorjaChip(
                         selected = selectedIntent == "ALL",
-                        label = "All Listings",
+                        label = L("explore_all_listings"),
                         onClick = { selectedIntent = "ALL" },
                         modifier = Modifier.testTag("filter_all")
                     )
@@ -248,7 +250,7 @@ fun ExploreScreen(
                 item {
                     DorjaChip(
                         selected = selectedIntent == "RENT",
-                        label = "For Rent",
+                        label = L("detail_for_rent"),
                         onClick = { selectedIntent = "RENT" },
                         modifier = Modifier.testTag("filter_rent")
                     )
@@ -256,7 +258,7 @@ fun ExploreScreen(
                 item {
                     DorjaChip(
                         selected = selectedIntent == "SALE",
-                        label = "For Sale",
+                        label = L("detail_for_sale"),
                         onClick = { selectedIntent = "SALE" },
                         modifier = Modifier.testTag("filter_sale")
                     )
@@ -264,7 +266,7 @@ fun ExploreScreen(
                 item {
                     DorjaChip(
                         selected = selectedPropertyType == "APARTMENT",
-                        label = "Apartments",
+                        label = L("explore_apartments"),
                         onClick = {
                             selectedPropertyType = if (selectedPropertyType == "APARTMENT") "ALL" else "APARTMENT"
                         }
@@ -273,7 +275,7 @@ fun ExploreScreen(
                 item {
                     DorjaChip(
                         selected = selectedPropertyType == "HOUSE",
-                        label = "Houses",
+                        label = L("explore_houses"),
                         onClick = {
                             selectedPropertyType = if (selectedPropertyType == "HOUSE") "ALL" else "HOUSE"
                         }
@@ -296,7 +298,7 @@ fun ExploreScreen(
                 ) {
                     BentoMetricTile(
                         value = "${filteredListings.size}",
-                        label = "PROPERTIES AVAILABLE",
+                        label = L("explore_properties_available"),
                         icon = Icons.Default.Apartment,
                         iconBg = DorjaColors.BentoBlueBg,
                         iconTint = DorjaColors.BentoBlueIcon,
@@ -304,7 +306,7 @@ fun ExploreScreen(
                     )
                     BentoMetricTile(
                         value = "100%",
-                        label = "SAFEVIEW GATED",
+                        label = L("explore_safeview_gated"),
                         icon = Icons.Default.Shield,
                         iconBg = DorjaColors.BentoGreenBg,
                         iconTint = DorjaColors.BentoGreenIcon,
@@ -338,14 +340,14 @@ fun ExploreScreen(
                             }
                             Spacer(modifier = Modifier.height(14.dp))
                             Text(
-                                text = "No Properties Found",
+                                text = L("explore_empty_title"),
                                 style = MaterialTheme.typography.titleMedium,
                                 color = DorjaColors.Ink950,
                                 fontWeight = FontWeight.Bold
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = if (searchQuery.isNotBlank()) "No properties match '$searchQuery'." else "No active listings published yet. Properties listed by hosts will appear here.",
+                                text = if (searchQuery.isNotBlank()) Lf("explore_empty_match", searchQuery) else L("explore_empty_none"),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = DorjaColors.Gray700,
                                 textAlign = androidx.compose.ui.text.style.TextAlign.Center

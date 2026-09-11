@@ -78,6 +78,7 @@ import com.example.ui.pass.ViewingPassScreen
 import com.example.ui.relocation.RelocationModeScreen
 import com.example.ui.seller.HostListingsScreen
 import com.example.ui.splash.SplashScreen
+import com.example.ui.i18n.L
 import com.example.ui.theme.DorjaColors
 import com.example.ui.tour.TourViewerScreen
 import com.example.ui.scanner.RoomScannerScreen
@@ -114,18 +115,18 @@ sealed class Screen(val route: String) {
     }
 }
 
-enum class HostTab(val title: String, val icon: ImageVector, val tag: String) {
-    PROPERTIES("Properties", Icons.Default.Home, "nav_tab_properties"),
-    VISITS("Visits", Icons.Default.QrCode, "nav_tab_visits"),
-    INBOX("Inbox", Icons.AutoMirrored.Filled.Chat, "nav_tab_inbox"),
-    ACCOUNT("Account", Icons.Default.Person, "nav_tab_account")
+enum class HostTab(val titleKey: String, val icon: ImageVector, val tag: String) {
+    PROPERTIES("tab_properties", Icons.Default.Home, "nav_tab_properties"),
+    VISITS("tab_visits", Icons.Default.QrCode, "nav_tab_visits"),
+    INBOX("tab_inbox", Icons.AutoMirrored.Filled.Chat, "nav_tab_inbox"),
+    ACCOUNT("tab_account", Icons.Default.Person, "nav_tab_account")
 }
 
-enum class BuyerTab(val title: String, val icon: ImageVector, val tag: String) {
-    EXPLORE("Explore", Icons.Default.Explore, "nav_tab_explore"),
-    VISITS("Visits", Icons.Default.QrCode, "nav_tab_visits"),
-    INBOX("Inbox", Icons.AutoMirrored.Filled.Chat, "nav_tab_inbox"),
-    ACCOUNT("Account", Icons.Default.Person, "nav_tab_account")
+enum class BuyerTab(val titleKey: String, val icon: ImageVector, val tag: String) {
+    EXPLORE("tab_explore", Icons.Default.Explore, "nav_tab_explore"),
+    VISITS("tab_visits", Icons.Default.QrCode, "nav_tab_visits"),
+    INBOX("tab_inbox", Icons.AutoMirrored.Filled.Chat, "nav_tab_inbox"),
+    ACCOUNT("tab_account", Icons.Default.Person, "nav_tab_account")
 }
 
 /** Cubic-bezier(0.16, 1, 0.3, 1) — the smooth "expo out" easing requested for the drawer. */
@@ -340,7 +341,7 @@ fun MainContainer(
         label = "drawerProgress"
     )
 
-    val activeTabTitle = if (isHost) currentHostTab.title else currentBuyerTab.title
+    val activeTabTitle = L(if (isHost) currentHostTab.titleKey else currentBuyerTab.titleKey)
 
     Box(
         modifier = Modifier
@@ -378,9 +379,9 @@ fun MainContainer(
             userName = currentUser?.displayName ?: "DORJA User",
             activeLabel = activeTabTitle,
             items = if (isHost) {
-                HostTab.values().map { DrawerItem(it.title, it.icon, it.tag) }
+                HostTab.values().map { DrawerItem(L(it.titleKey), it.icon, it.tag) }
             } else {
-                BuyerTab.values().map { DrawerItem(it.title, it.icon, it.tag) }
+                BuyerTab.values().map { DrawerItem(L(it.titleKey), it.icon, it.tag) }
             },
             onNavigate = { tag ->
                 if (isHost) {
@@ -442,7 +443,7 @@ fun MainContainer(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Menu,
-                            contentDescription = "Open menu",
+                            contentDescription = L("nav_open_menu"),
                             tint = DorjaColors.Ink950
                         )
                     }
@@ -563,7 +564,7 @@ private fun DrawerSidebar(
             IconButton(onClick = onClose) {
                 Icon(
                     imageVector = Icons.Default.Close,
-                    contentDescription = "Close menu",
+                    contentDescription = L("nav_close_menu"),
                     tint = DorjaColors.DrawerCream
                 )
             }
@@ -578,7 +579,7 @@ private fun DrawerSidebar(
             color = DorjaColors.DrawerCream
         )
         Text(
-            text = "Verified account",
+            text = L("nav_verified_account"),
             style = MaterialTheme.typography.bodySmall,
             color = DorjaColors.DrawerMuted
         )
@@ -635,7 +636,7 @@ private fun DrawerSidebar(
                 )
                 Spacer(modifier = Modifier.width(14.dp))
                 Text(
-                    text = "Logout",
+                    text = L("auth_logout"),
                     style = MaterialTheme.typography.bodyLarge,
                     fontWeight = FontWeight.Medium,
                     color = Color.White
@@ -654,7 +655,7 @@ private fun DrawerSidebar(
             color = DorjaColors.DrawerMuted
         )
         Text(
-            text = "Because every door should be trustworthy.",
+            text = L("nav_tagline"),
             style = MaterialTheme.typography.labelSmall,
             color = DorjaColors.DrawerMuted
         )

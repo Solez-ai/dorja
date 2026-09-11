@@ -1024,7 +1024,14 @@ object CountryRegistry {
         CountryProfile(iso2 = "TJ", displayName = "Tajikistan", currencyCode = "TJS", currencySymbol = "SM", formatLocaleTag = "tg-TJ", primaryLanguages = listOf("tg-TJ", "ru-RU"), confidence = AtlasConfidence.DISCOVERY_REQUIRED, launchStage = 99),
         CountryProfile(iso2 = "CN", displayName = "China", currencyCode = "CNY", currencySymbol = "¥", formatLocaleTag = "zh-CN", primaryLanguages = listOf("zh-CN"), confidence = AtlasConfidence.PARTNER_DEPENDENT, launchStage = 99),
         CountryProfile(iso2 = "IL", displayName = "Israel", currencyCode = "ILS", currencySymbol = "₪", formatLocaleTag = "he-IL", primaryLanguages = listOf("he-IL", "ar-IL", "en"), rtlScripts = true, confidence = AtlasConfidence.DISCOVERY_REQUIRED, launchStage = 99),
-        CountryProfile(iso2 = "MV", displayName = "Maldives", currencyCode = "MVR", currencySymbol = "Rf", formatLocaleTag = "dv-MV", primaryLanguages = listOf("dv-MV", "en"), rtlScripts = true, confidence = AtlasConfidence.DISCOVERY_REQUIRED, launchStage = 99)
+        CountryProfile(iso2 = "MV", displayName = "Maldives", currencyCode = "MVR", currencySymbol = "Rf", formatLocaleTag = "dv-MV", primaryLanguages = listOf("dv-MV", "en"), rtlScripts = true, confidence = AtlasConfidence.DISCOVERY_REQUIRED, launchStage = 99),
+        CountryProfile(
+            iso2 = "US", displayName = "United States",
+            currencyCode = "USD", currencySymbol = "$", formatLocaleTag = "en-US",
+            primaryLanguages = listOf("en-US"),
+            identityVerificationNote = "US rentals commonly use Social Security Number and credit checks; DORJA records identity evidence but does not run credit or background checks.",
+            confidence = AtlasConfidence.DISCOVERY_REQUIRED, launchStage = 99
+        )
     )
 
     /** Look up a profile; falls back to Bangladesh (the launch market). */
@@ -1036,4 +1043,66 @@ object CountryRegistry {
 
     /** Countries available for selection in UI pickers. */
     fun selectableProfiles(): List<CountryProfile> = profiles.filter { it.launchStage <= 6 }
+
+    /**
+     * Local identity-document name used on badges and the account credentials
+     * row (NID, Aadhaar, My Number, KTP, Social Security, …).
+     */
+    fun identityCredential(iso2: String): IdentityCredential =
+        IDENTITY_CREDENTIALS[iso2.uppercase()]
+            ?: IdentityCredential("Identity", "Identity Verification")
 }
+
+data class IdentityCredential(
+    val shortName: String,
+    val verificationLabel: String
+)
+
+private val IDENTITY_CREDENTIALS: Map<String, IdentityCredential> = mapOf(
+    "BD" to IdentityCredential("NID", "NID Verification"),
+    "IN" to IdentityCredential("Aadhaar", "Aadhaar Verification"),
+    "NP" to IdentityCredential("Citizenship ID", "Citizenship Verification"),
+    "BT" to IdentityCredential("CID", "CID Verification"),
+    "JP" to IdentityCredential("My Number", "My Number Verification"),
+    "ID" to IdentityCredential("KTP", "KTP Verification"),
+    "AE" to IdentityCredential("Emirates ID", "Emirates ID Verification"),
+    "GB" to IdentityCredential("Right to Rent", "Right to Rent Check"),
+    "IE" to IdentityCredential("PPS", "PPS Verification"),
+    "FR" to IdentityCredential("CNI", "Carte d'identité Verification"),
+    "DE" to IdentityCredential("Personalausweis", "Personalausweis Verification"),
+    "PK" to IdentityCredential("CNIC", "CNIC Verification"),
+    "LK" to IdentityCredential("NIC", "NIC Verification"),
+    "TH" to IdentityCredential("Thai ID", "Thai ID Verification"),
+    "PH" to IdentityCredential("PhilID", "PhilID Verification"),
+    "VN" to IdentityCredential("CCCD", "CCCD Verification"),
+    "KR" to IdentityCredential("RRN", "Resident Registration Verification"),
+    "CN" to IdentityCredential("Resident ID", "Resident ID Verification"),
+    "TR" to IdentityCredential("T.C. Kimlik", "T.C. Kimlik Verification"),
+    "NL" to IdentityCredential("BSN", "BSN Verification"),
+    "ES" to IdentityCredential("DNI", "DNI Verification"),
+    "IT" to IdentityCredential("Codice Fiscale", "Codice Fiscale Verification"),
+    "PL" to IdentityCredential("PESEL", "PESEL Verification"),
+    "RO" to IdentityCredential("CNP", "CNP Verification"),
+    "HU" to IdentityCredential("Személyi igazolvány", "ID Card Verification"),
+    "GR" to IdentityCredential("ID Card", "ID Card Verification"),
+    "PT" to IdentityCredential("NIF", "NIF Verification"),
+    "BE" to IdentityCredential("National Number", "National Number Verification"),
+    "KH" to IdentityCredential("Khmer ID", "Khmer ID Verification"),
+    "MY" to IdentityCredential("MyKad", "MyKad Verification"),
+    "SA" to IdentityCredential("Iqama", "Iqama Verification"),
+    "QA" to IdentityCredential("QID", "QID Verification"),
+    "KW" to IdentityCredential("Civil ID", "Civil ID Verification"),
+    "BH" to IdentityCredential("CPR", "CPR Verification"),
+    "OM" to IdentityCredential("Civil ID", "Civil ID Verification"),
+    "IL" to IdentityCredential("Teudat Zehut", "Teudat Zehut Verification"),
+    "KZ" to IdentityCredential("IIN", "IIN Verification"),
+    "UZ" to IdentityCredential("JSHSHIR", "JSHSHIR Verification"),
+    "GE" to IdentityCredential("ID Card", "ID Card Verification"),
+    "UA" to IdentityCredential("Tax ID", "Tax ID Verification"),
+    "JO" to IdentityCredential("National ID", "National ID Verification"),
+    "MN" to IdentityCredential("Civil ID", "Civil ID Verification"),
+    "CZ" to IdentityCredential("Rodné číslo", "Birth Number Verification"),
+    "AT" to IdentityCredential("Personalausweis", "Personalausweis Verification"),
+    "CH" to IdentityCredential("AHV", "AHV Number Verification"),
+    "US" to IdentityCredential("Social Security", "Social Security Verification")
+)

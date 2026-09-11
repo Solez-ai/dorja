@@ -1,6 +1,5 @@
 package com.example.ui.i18n
 
-import android.content.Context
 import androidx.compose.runtime.staticCompositionLocalOf
 
 /**
@@ -19,6 +18,17 @@ data class DorjaStrings(
     val values: Map<String, String> = emptyMap()
 ) {
     operator fun get(key: String): String = values[key] ?: ENGLISH[key] ?: key
+
+    fun format(key: String, vararg args: Any): String {
+        var result = this[key]
+        args.forEachIndexed { index, arg ->
+            val n = index + 1
+            result = result
+                .replace("%${n}\$s", arg.toString())
+                .replace("%${n}\$d", arg.toString())
+        }
+        return result
+    }
 
     companion object {
         val ENGLISH: Map<String, String> = mapOf(
@@ -142,12 +152,128 @@ data class DorjaStrings(
             "account_verified_identity" to "Identity Verified",
             "account_edit_profile" to "Edit Profile",
             "account_save_profile" to "Save Profile",
-            // ── Language picker ──
+            "account_title_full" to "My Dorja Account",
+            "account_subtitle" to "Identity & Real Estate Credentials",
+            "account_country_settings" to "Country & Settings",
+            "account_role_host" to "HOST",
+            "account_role_buyer" to "BUYER",
+            "account_switch_to_buyer" to "Switch to Buyer Account",
+            "account_switch_to_host" to "Switch to Host Account",
+            "account_switch_subtitle" to "Switch to %1\$s to chat & explore as the other party. Each demo account keeps its own country & currency.",
+            "account_identity_verified_fmt" to "%1\$s Verified",
+            "account_identity_verification_fmt" to "%1\$s Verification",
+            "account_safeview_gps" to "SafeView GPS Token Registry",
+            "account_local_persistence" to "Local Room Persistence",
+            "account_status_passed" to "PASSED",
+            "account_status_active" to "ACTIVE",
+            "account_status_on_device" to "ON-DEVICE",
+            "account_db_management" to "DATABASE MANAGEMENT",
+            "account_clear_data" to "Clear Local Data & Re-initialize",
+            "account_loading" to "Loading account...",
+            "account_edit_profile_role" to "Edit Profile & Role",
+            "account_select_mode" to "Select Active Account Mode",
+            "account_host_seller" to "Host / Seller",
+            "account_seeker_buyer" to "Seeker / Buyer",
+            "account_display_name" to "Display Name",
+            "account_phone_number" to "Phone Number",
+            "account_city_area" to "City / Area",
+            "account_bio" to "Bio / Tagline",
+            "account_save_changes" to "Save Changes",
+            "account_reset_title" to "Reset Local Storage",
+            "account_reset_body" to "This will clear all local listings, chats, and viewing passes.",
+            "account_reset_all" to "Reset All",
+            "account_delete_content_title" to "Delete My Content",
+            "account_delete_content_body" to "This permanently deletes your listings, rooms, 3D scans, legal documents, property passports, chats, messages, and viewing passes from this device. Your profile rows are kept. This cannot be undone.",
+            "account_delete_everything" to "Delete Everything",
+            "account_erase_title" to "Erase My Account Data",
+            "account_erase_body" to "This erases EVERYTHING stored about you on this device: all content plus your profile rows. The app then re-initializes with clean demo accounts. This cannot be undone.",
+            "account_erase_everything" to "Erase Everything",
+            "account_reconfirm_done_title" to "Evidence Re-confirmed",
+            "account_reconfirm_done_body" to "%1\$s document(s) re-confirmed. This is your own re-attestation — the evidence level of each document is unchanged and DORJA has not independently verified anything new.",
+            "account_content_deleted_title" to "Content Deleted",
+            "account_content_deleted_body" to "All of your listings, evidence, chats, and viewing passes have been removed from this device.",
+            "account_erased_title" to "Account Data Erased",
+            "account_erased_body" to "All personal data stored on this device has been erased and the app has been reset to clean demo accounts.",
+            "account_checking_evidence" to "Checking your document evidence…",
+            "account_no_docs" to "No legal documents attached to any listing yet. Evidence levels appear here once you add documents in Host Suite.",
+            "account_docs_on_record" to "Documents on record",
+            "account_issuer_confirmed" to "Issuer / government confirmed",
+            "account_self_declared" to "Self-declared (not verified)",
+            "account_stale_checks" to "Checks older than 24 months",
+            "account_marked_expired" to "Marked expired",
+            "account_reconfirming" to "Re-confirming…",
+            "account_reconfirm_hint" to "Re-confirming refreshes your own attestation and evidence-check dates. It never raises an evidence level and is never shown as independent verification.",
+            "account_relocation_subtitle" to "Moving abroad? Get the destination checklist, official records, language notes and the professionals you may need.",
+            "account_reports_intro" to "Reports you filed and their resolution state. Counterparty responses stay visible in the listing's conflict view — nothing is hidden and nobody is silently judged.",
+            "account_no_reports" to "No reports filed.",
+            "account_withdraw" to "Withdraw",
+            "account_and_more" to "…and %1\$s more",
+            "account_privacy_intro" to "Your evidence, chats, and viewing history live on this device. You control deletion — no support ticket required.",
+            "account_delete_content_sub" to "Removes your listings, evidence, scans, chats, and viewing passes. Keeps your profile.",
+            "account_erase_data_sub" to "Erases everything above plus your profile rows, then resets the app to clean demo accounts.",
+            "account_consent_note" to "Consent records and access logs stay with the data they describe — when the data goes, they go too.",
+            // ── Country settings (replaces language picker) ──
+            "settings_select_country" to "Select Country",
+            "settings_country_subtitle" to "Language, currency, and legal terms follow the country you choose.",
+            "settings_country_currency" to "Currency",
+            "settings_country_identity" to "Identity",
+            "settings_country_language" to "Language",
             "lang_title" to "App Language",
             "lang_subtitle" to "Choose from 40 languages. Untranslated screens fall back to English.",
             "lang_search" to "Search language…",
             "lang_priority_note" to "Priority languages are listed first.",
             "lang_changed" to "Language updated",
+            // ── Navigation chrome ──
+            "nav_verified_account" to "Verified account",
+            "nav_tagline" to "Because every door should be trustworthy.",
+            "nav_open_menu" to "Open menu",
+            "nav_close_menu" to "Close menu",
+            // ── Host listings ──
+            "host_title" to "My Properties",
+            "host_subtitle" to "Host Management Suite",
+            "host_new" to "+ New",
+            "host_my_listings" to "MY LISTINGS",
+            "host_empty_title" to "No Properties Listed Yet",
+            "host_empty_body" to "You are currently in Host mode. Tap the button below to add your first verified property listing with custom rooms and amenities.",
+            "host_create" to "Create Property Listing",
+            "host_delete_title" to "Delete Property Listing",
+            "host_delete_body" to "Are you sure you want to remove '%1\$s'? All associated room data will also be removed.",
+            "host_view_listing" to "View Listing",
+            "host_options" to "Options",
+            "host_3d_tour" to "3D TOUR",
+            // ── Explore extras ──
+            "explore_header" to "Dorja Properties",
+            "explore_anti_scam" to "ANTI-SCAM",
+            "explore_search_city" to "Search city or area",
+            "explore_all_listings" to "All Listings",
+            "explore_apartments" to "Apartments",
+            "explore_houses" to "Houses",
+            "explore_properties_available" to "PROPERTIES AVAILABLE",
+            "explore_safeview_gated" to "SAFEVIEW GATED",
+            "explore_empty_title" to "No Properties Found",
+            "explore_empty_none" to "No active listings published yet. Properties listed by hosts will appear here.",
+            "explore_empty_match" to "No properties match '%1\$s'.",
+            "explore_clear_search" to "Clear search",
+            // ── Inbox extras ──
+            "inbox_encrypted_title" to "Encrypted Inbox",
+            "inbox_encrypted_subtitle" to "Zero-leak real estate messaging channel",
+            "inbox_secured" to "SECURED",
+            "inbox_no_inquiries" to "No inquiries yet",
+            "inbox_start_chat" to "Start a chat directly from any property listing.",
+            // ── Visits extras ──
+            "visits_host_title" to "Visitor Passes",
+            "visits_seeker_title" to "My Viewing Passes",
+            "visits_host_subtitle" to "Scheduled appointments for your listed properties",
+            "visits_seeker_subtitle" to "SafeView geofenced access tokens",
+            "visits_gps_gated" to "GPS GATED",
+            "visits_empty_host_title" to "No Visitor Requests Yet",
+            "visits_empty_seeker_title" to "No Active Viewing Passes",
+            "visits_empty_host_body" to "When seekers book a visit for your properties, their encrypted pass requests will appear here for verification.",
+            "visits_empty_seeker_body" to "When you book a physical inspection on any property, your SafeView QR access pass will be generated here.",
+            "visits_pass_status" to "PASS STATUS",
+            "visits_security_token" to "SECURITY TOKEN",
+            "visits_active" to "Active",
+            "visits_past_passes" to "COMPLETED & PAST PASSES",
             // ── Common ──
             "common_ok" to "OK",
             "common_cancel" to "Cancel",
@@ -229,7 +355,8 @@ data class DorjaStrings(
 
                 else -> ENGLISH
             }
-            return DorjaStrings(rtl = locale.rtl, values = map)
+            val extras = DorjaTranslationsChrome.forTag(tag)
+            return DorjaStrings(rtl = locale.rtl, values = map + extras)
         }
     }
 }

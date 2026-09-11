@@ -43,6 +43,7 @@ import com.example.DorjaApp
 import com.example.ui.components.DorjaAvatar
 import com.example.ui.components.DorjaBadge
 import com.example.ui.components.DorjaCard
+import com.example.ui.i18n.L
 import com.example.ui.theme.DorjaColors
 import com.example.ui.util.Formatters
 import com.example.R
@@ -90,13 +91,13 @@ fun InboxScreen(
                     Spacer(modifier = Modifier.width(10.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "Encrypted Inbox",
+                            text = L("inbox_encrypted_title"),
                             style = MaterialTheme.typography.titleMedium,
                             color = DorjaColors.Ink950,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "Zero-leak real estate messaging channel",
+                            text = L("inbox_encrypted_subtitle"),
                             style = MaterialTheme.typography.labelSmall,
                             color = DorjaColors.Gray700,
                             maxLines = 1,
@@ -114,7 +115,7 @@ fun InboxScreen(
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        text = "SECURED",
+                        text = L("inbox_secured"),
                         style = MaterialTheme.typography.labelSmall,
                         color = DorjaColors.Jol600,
                         fontFamily = FontFamily.Monospace,
@@ -141,13 +142,13 @@ fun InboxScreen(
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
-                        text = "No inquiries yet",
+                        text = L("inbox_no_inquiries"),
                         style = MaterialTheme.typography.titleMedium,
                         color = DorjaColors.Ink950,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = "Start a chat directly from any property listing.",
+                        text = L("inbox_start_chat"),
                         style = MaterialTheme.typography.bodySmall,
                         color = DorjaColors.Gray700
                     )

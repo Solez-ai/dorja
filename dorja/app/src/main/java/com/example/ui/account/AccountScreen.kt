@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -46,7 +47,6 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.SwapHoriz
-import androidx.compose.material.icons.filled.Translate
 import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
@@ -92,9 +92,9 @@ import com.example.ui.components.DorjaButton
 import com.example.ui.components.DorjaChip
 import com.example.ui.components.DorjaOutlinedButton
 import com.example.ui.i18n.DorjaLocales
-import com.example.ui.i18n.LocalDorjaLocale
+import com.example.ui.i18n.L
+import com.example.ui.i18n.Lf
 import com.example.ui.i18n.LocaleSettings
-import com.example.ui.i18n.DorjaStrings
 import com.example.ui.theme.DorjaColors
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.LaunchedEffect
@@ -114,8 +114,8 @@ fun AccountScreen(
     val currentUser by repository.currentUser.collectAsState()
     val context = LocalContext.current
 
-    var showLanguageSheet by remember { mutableStateOf(false) }
-    val languageSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var showCountrySheet by remember { mutableStateOf(false) }
+    val countrySheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     var showEditProfileDialog by remember { mutableStateOf(false) }
     var editName by remember { mutableStateOf("") }
@@ -150,21 +150,21 @@ fun AccountScreen(
         AlertDialog(
             onDismissRequest = { showEditProfileDialog = false },
             title = {
-                Text("Edit Profile & Role", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(L("account_edit_profile_role"), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             },
             text = {
                 Column {
-                    Text("Select Active Account Mode", style = MaterialTheme.typography.labelSmall, color = DorjaColors.Gray500)
+                    Text(L("account_select_mode"), style = MaterialTheme.typography.labelSmall, color = DorjaColors.Gray500)
                     Spacer(modifier = Modifier.height(4.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         DorjaChip(
                             selected = editRole == "SELLER",
-                            label = "Host / Seller",
+                            label = L("account_host_seller"),
                             onClick = { editRole = "SELLER" }
                         )
                         DorjaChip(
                             selected = editRole == "BUYER",
-                            label = "Seeker / Buyer",
+                            label = L("account_seeker_buyer"),
                             onClick = { editRole = "BUYER" }
                         )
                     }
@@ -174,7 +174,7 @@ fun AccountScreen(
                     OutlinedTextField(
                         value = editName,
                         onValueChange = { editName = it },
-                        label = { Text("Display Name") },
+                        label = { Text(L("account_display_name")) },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                         colors = OutlinedTextFieldDefaults.colors(
@@ -190,7 +190,7 @@ fun AccountScreen(
                     OutlinedTextField(
                         value = editPhone,
                         onValueChange = { editPhone = it },
-                        label = { Text("Phone Number") },
+                        label = { Text(L("account_phone_number")) },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                         colors = OutlinedTextFieldDefaults.colors(
@@ -206,7 +206,7 @@ fun AccountScreen(
                     OutlinedTextField(
                         value = editLocation,
                         onValueChange = { editLocation = it },
-                        label = { Text("City / Area") },
+                        label = { Text(L("account_city_area")) },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                         colors = OutlinedTextFieldDefaults.colors(
@@ -222,7 +222,7 @@ fun AccountScreen(
                     OutlinedTextField(
                         value = editBio,
                         onValueChange = { editBio = it },
-                        label = { Text("Bio / Tagline") },
+                        label = { Text(L("account_bio")) },
                         modifier = Modifier.fillMaxWidth(),
                         maxLines = 2,
                         colors = OutlinedTextFieldDefaults.colors(
@@ -244,7 +244,7 @@ fun AccountScreen(
             },
             confirmButton = {
                 DorjaButton(
-                    text = "Save Changes",
+                    text = L("account_save_changes"),
                     onClick = {
                         scope.launch {
                             repository.updateUserProfile(
@@ -264,7 +264,7 @@ fun AccountScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showEditProfileDialog = false }) {
-                    Text("Cancel", color = DorjaColors.Gray700)
+                    Text(L("common_cancel"), color = DorjaColors.Gray700)
                 }
             }
         )
@@ -273,11 +273,11 @@ fun AccountScreen(
     if (showResetDialog) {
         AlertDialog(
             onDismissRequest = { showResetDialog = false },
-            title = { Text("Reset Local Storage", fontWeight = FontWeight.Bold) },
-            text = { Text("This will clear all local listings, chats, and viewing passes.") },
+            title = { Text(L("account_reset_title"), fontWeight = FontWeight.Bold) },
+            text = { Text(L("account_reset_body")) },
             confirmButton = {
                 DorjaButton(
-                    text = "Reset All",
+                    text = L("account_reset_all"),
                     onClick = {
                         scope.launch {
                             repository.resetAllData()
@@ -289,7 +289,7 @@ fun AccountScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showResetDialog = false }) {
-                    Text("Cancel", color = DorjaColors.Gray700)
+                    Text(L("common_cancel"), color = DorjaColors.Gray700)
                 }
             }
         )
@@ -299,17 +299,13 @@ fun AccountScreen(
         AlertDialog(
             onDismissRequest = { showDeleteContentDialog = false },
             icon = { Icon(Icons.Default.DeleteForever, contentDescription = null, tint = DorjaColors.Error) },
-            title = { Text("Delete My Content", fontWeight = FontWeight.Bold) },
+            title = { Text(L("account_delete_content_title"), fontWeight = FontWeight.Bold) },
             text = {
-                Text(
-                    "This permanently deletes your listings, rooms, 3D scans, legal documents, " +
-                        "property passports, chats, messages, and viewing passes from this device. " +
-                        "Your profile rows are kept. This cannot be undone."
-                )
+                Text(L("account_delete_content_body"))
             },
             confirmButton = {
                 DorjaButton(
-                    text = "Delete Everything",
+                    text = L("account_delete_everything"),
                     onClick = {
                         scope.launch {
                             isPrivacyWorking = true
@@ -330,7 +326,7 @@ fun AccountScreen(
                     onClick = { showDeleteContentDialog = false },
                     enabled = !isPrivacyWorking
                 ) {
-                    Text("Cancel", color = DorjaColors.Gray700)
+                    Text(L("common_cancel"), color = DorjaColors.Gray700)
                 }
             }
         )
@@ -340,17 +336,13 @@ fun AccountScreen(
         AlertDialog(
             onDismissRequest = { showEraseAccountDialog = false },
             icon = { Icon(Icons.Default.DeleteForever, contentDescription = null, tint = DorjaColors.Error) },
-            title = { Text("Erase My Account Data", fontWeight = FontWeight.Bold) },
+            title = { Text(L("account_erase_title"), fontWeight = FontWeight.Bold) },
             text = {
-                Text(
-                    "This erases EVERYTHING stored about you on this device: all content plus your " +
-                        "profile rows. The app then re-initializes with clean demo accounts. " +
-                        "This cannot be undone."
-                )
+                Text(L("account_erase_body"))
             },
             confirmButton = {
                 DorjaButton(
-                    text = "Erase Everything",
+                    text = L("account_erase_everything"),
                     onClick = {
                         scope.launch {
                             isPrivacyWorking = true
@@ -371,7 +363,7 @@ fun AccountScreen(
                     onClick = { showEraseAccountDialog = false },
                     enabled = !isPrivacyWorking
                 ) {
-                    Text("Cancel", color = DorjaColors.Gray700)
+                    Text(L("common_cancel"), color = DorjaColors.Gray700)
                 }
             }
         )
@@ -380,17 +372,13 @@ fun AccountScreen(
     if (showReconfirmDone) {
         AlertDialog(
             onDismissRequest = { showReconfirmDone = false },
-            title = { Text("Evidence Re-confirmed", fontWeight = FontWeight.Bold) },
+            title = { Text(L("account_reconfirm_done_title"), fontWeight = FontWeight.Bold) },
             text = {
-                Text(
-                    "$reconfirmedCount document(s) re-confirmed. This is your own re-attestation — " +
-                        "the evidence level of each document is unchanged and DORJA has not independently " +
-                        "verified anything new."
-                )
+                Text(Lf("account_reconfirm_done_body", reconfirmedCount))
             },
             confirmButton = {
                 TextButton(onClick = { showReconfirmDone = false }) {
-                    Text("OK", color = DorjaColors.Jol600)
+                    Text(L("common_ok"), color = DorjaColors.Jol600)
                 }
             }
         )
@@ -399,11 +387,11 @@ fun AccountScreen(
     if (showContentDeletedDone) {
         AlertDialog(
             onDismissRequest = { showContentDeletedDone = false },
-            title = { Text("Content Deleted", fontWeight = FontWeight.Bold) },
-            text = { Text("All of your listings, evidence, chats, and viewing passes have been removed from this device.") },
+            title = { Text(L("account_content_deleted_title"), fontWeight = FontWeight.Bold) },
+            text = { Text(L("account_content_deleted_body")) },
             confirmButton = {
                 TextButton(onClick = { showContentDeletedDone = false }) {
-                    Text("OK", color = DorjaColors.Jol600)
+                    Text(L("common_ok"), color = DorjaColors.Jol600)
                 }
             }
         )
@@ -412,11 +400,11 @@ fun AccountScreen(
     if (showEraseDone) {
         AlertDialog(
             onDismissRequest = { showEraseDone = false },
-            title = { Text("Account Data Erased", fontWeight = FontWeight.Bold) },
-            text = { Text("All personal data stored on this device has been erased and the app has been reset to clean demo accounts.") },
+            title = { Text(L("account_erased_title"), fontWeight = FontWeight.Bold) },
+            text = { Text(L("account_erased_body")) },
             confirmButton = {
                 TextButton(onClick = { showEraseDone = false }) {
-                    Text("OK", color = DorjaColors.Jol600)
+                    Text(L("common_ok"), color = DorjaColors.Jol600)
                 }
             }
         )
@@ -432,7 +420,7 @@ fun AccountScreen(
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 CircularProgressIndicator(color = DorjaColors.BentoBlueIcon)
                 Spacer(modifier = Modifier.height(12.dp))
-                Text("Loading account...", style = MaterialTheme.typography.bodySmall, color = DorjaColors.Gray700)
+                Text(L("account_loading"), style = MaterialTheme.typography.bodySmall, color = DorjaColors.Gray700)
             }
         }
         return
@@ -465,23 +453,23 @@ fun AccountScreen(
                 Spacer(modifier = Modifier.width(10.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "My Dorja Account",
+                        text = L("account_title_full"),
                         style = MaterialTheme.typography.titleMedium,
                         color = DorjaColors.Ink950,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = "Identity & Real Estate Credentials",
+                        text = L("account_subtitle"),
                         style = MaterialTheme.typography.labelSmall,
                         color = DorjaColors.Gray700,
                         maxLines = 1,
                         overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                     )
                 }
-                IconButton(onClick = { showLanguageSheet = true }, modifier = Modifier.size(36.dp)) {
+                IconButton(onClick = { showCountrySheet = true }, modifier = Modifier.size(36.dp)) {
                     Icon(
                         imageVector = Icons.Default.Settings,
-                        contentDescription = "Language & Settings",
+                        contentDescription = L("account_country_settings"),
                         tint = DorjaColors.Gray500,
                         modifier = Modifier.size(20.dp)
                     )
@@ -489,14 +477,15 @@ fun AccountScreen(
             }
         }
 
-        // Language Picker Bottom Sheet
-        if (showLanguageSheet) {
-            LanguagePickerSheet(
-                sheetState = languageSheetState,
-                onDismiss = { showLanguageSheet = false },
-                onLanguageSelected = { tag ->
-                    LocaleSettings.save(context, tag)
-                    showLanguageSheet = false
+        if (showCountrySheet) {
+            CountrySettingsSheet(
+                sheetState = countrySheetState,
+                selectedIso2 = user.countryCode,
+                onDismiss = { showCountrySheet = false },
+                onCountrySelected = { iso ->
+                    repository.setUserCountryCode(iso)
+                    LocaleSettings.applyCountry(context, iso)
+                    showCountrySheet = false
                 }
             )
         }
@@ -529,12 +518,15 @@ fun AccountScreen(
                                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
                                     DorjaBadge(
-                                        text = if (user.role == "SELLER") "HOST" else "BUYER",
+                                        text = if (user.role == "SELLER") L("account_role_host") else L("account_role_buyer"),
                                         backgroundColor = if (user.role == "SELLER") DorjaColors.BentoBlueBg else DorjaColors.BentoGreenBg,
                                         textColor = if (user.role == "SELLER") DorjaColors.BentoBlueText else DorjaColors.BentoGreenText
                                     )
                                     DorjaBadge(
-                                        text = if (user.countryCode == "BD") "NID VERIFIED" else "IDENTITY VERIFIED",
+                                        text = Lf(
+                                            "account_identity_verified_fmt",
+                                            CountryRegistry.identityCredential(user.countryCode).shortName
+                                        ),
                                         icon = Icons.Default.VerifiedUser,
                                         backgroundColor = DorjaColors.BentoGreenBg,
                                         textColor = DorjaColors.BentoGreenText
@@ -564,7 +556,7 @@ fun AccountScreen(
                                     .clip(CircleShape)
                                     .background(DorjaColors.CanvasBg)
                             ) {
-                                Icon(Icons.Default.Edit, contentDescription = "Edit Profile", modifier = Modifier.size(18.dp), tint = DorjaColors.Ink950)
+                                Icon(Icons.Default.Edit, contentDescription = L("account_edit_profile"), modifier = Modifier.size(18.dp), tint = DorjaColors.Ink950)
                             }
                         }
 
@@ -638,13 +630,13 @@ fun AccountScreen(
                         Spacer(modifier = Modifier.width(12.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = if (user.role == "SELLER") "Switch to Buyer Account" else "Switch to Host Account",
+                                text = if (user.role == "SELLER") L("account_switch_to_buyer") else L("account_switch_to_host"),
                                 style = MaterialTheme.typography.titleSmall,
                                 color = DorjaColors.Ink950,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = "Switch to $targetUserLabel to chat & explore as the other party. Each demo account keeps its own country & currency.",
+                                text = Lf("account_switch_subtitle", targetUserLabel),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = DorjaColors.Gray700
                             )
@@ -663,7 +655,7 @@ fun AccountScreen(
                 BentoCard(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
-                            text = "SECURITY CREDENTIALS",
+                            text = L("account_security"),
                             style = MaterialTheme.typography.labelSmall,
                             color = DorjaColors.Gray500,
                             fontFamily = FontFamily.Monospace,
@@ -671,12 +663,15 @@ fun AccountScreen(
                         )
                         Spacer(modifier = Modifier.height(10.dp))
                         SecurityRow(
-                            title = if (user.countryCode == "BD") "NID Verification" else "Identity Verification",
-                            status = "PASSED",
+                            title = Lf(
+                                "account_identity_verification_fmt",
+                                CountryRegistry.identityCredential(user.countryCode).shortName
+                            ),
+                            status = L("account_status_passed"),
                             icon = Icons.Default.Shield
                         )
-                        SecurityRow(title = "SafeView GPS Token Registry", status = "ACTIVE", icon = Icons.Default.Lock)
-                        SecurityRow(title = "Local Room Persistence", status = "ON-DEVICE", icon = Icons.Default.CheckCircle)
+                        SecurityRow(title = L("account_safeview_gps"), status = L("account_status_active"), icon = Icons.Default.Lock)
+                        SecurityRow(title = L("account_local_persistence"), status = L("account_status_on_device"), icon = Icons.Default.CheckCircle)
                     }
                 }
             }
@@ -686,7 +681,7 @@ fun AccountScreen(
                 BentoCard(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
-                            text = "DATABASE MANAGEMENT",
+                            text = L("account_db_management"),
                             style = MaterialTheme.typography.labelSmall,
                             color = DorjaColors.Gray500,
                             fontFamily = FontFamily.Monospace,
@@ -694,7 +689,7 @@ fun AccountScreen(
                         )
                         Spacer(modifier = Modifier.height(10.dp))
                         DorjaOutlinedButton(
-                            text = "Clear Local Data & Re-initialize",
+                            text = L("account_clear_data"),
                             onClick = { showResetDialog = true },
                             icon = Icons.Default.DeleteSweep,
                             modifier = Modifier.fillMaxWidth()
@@ -709,7 +704,7 @@ fun AccountScreen(
                 BentoCard(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
-                            text = "EVIDENCE HEALTH",
+                            text = L("account_evidence_health"),
                             style = MaterialTheme.typography.labelSmall,
                             color = DorjaColors.Gray500,
                             fontFamily = FontFamily.Monospace,
@@ -718,51 +713,51 @@ fun AccountScreen(
                         Spacer(modifier = Modifier.height(10.dp))
                         if (summary == null) {
                             Text(
-                                text = "Checking your document evidence…",
+                                text = L("account_checking_evidence"),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = DorjaColors.Gray500
                             )
                         } else if (summary.totalDocs == 0) {
                             Text(
-                                text = "No legal documents attached to any listing yet. Evidence levels appear here once you add documents in Host Suite.",
+                                text = L("account_no_docs"),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = DorjaColors.Gray500
                             )
                         } else {
                             EvidenceStatRow(
                                 icon = Icons.Default.FactCheck,
-                                label = "Documents on record",
+                                label = L("account_docs_on_record"),
                                 value = summary.totalDocs.toString(),
                                 tone = EvidenceTone.NEUTRAL
                             )
                             EvidenceStatRow(
                                 icon = Icons.Default.VerifiedUser,
-                                label = "Issuer / government confirmed",
+                                label = L("account_issuer_confirmed"),
                                 value = summary.confirmedDocs.toString(),
                                 tone = EvidenceTone.GOOD
                             )
                             EvidenceStatRow(
                                 icon = Icons.Default.Info,
-                                label = "Self-declared (not verified)",
+                                label = L("account_self_declared"),
                                 value = summary.selfDeclaredDocs.toString(),
                                 tone = EvidenceTone.WARN
                             )
                             EvidenceStatRow(
                                 icon = Icons.Default.History,
-                                label = "Checks older than 24 months",
+                                label = L("account_stale_checks"),
                                 value = summary.staleDocs.toString(),
                                 tone = if (summary.staleDocs > 0) EvidenceTone.WARN else EvidenceTone.GOOD
                             )
                             EvidenceStatRow(
                                 icon = Icons.Default.Warning,
-                                label = "Marked expired",
+                                label = L("account_marked_expired"),
                                 value = summary.expiredDocs.toString(),
                                 tone = if (summary.expiredDocs > 0) EvidenceTone.BAD else EvidenceTone.GOOD
                             )
                         }
                         Spacer(modifier = Modifier.height(12.dp))
                         DorjaOutlinedButton(
-                            text = if (isReconfirming) "Re-confirming…" else "Re-confirm My Evidence",
+                            text = if (isReconfirming) L("account_reconfirming") else L("account_reconfirm"),
                             onClick = {
                                 scope.launch {
                                     isReconfirming = true
@@ -778,7 +773,7 @@ fun AccountScreen(
                         )
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
-                            text = "Re-confirming refreshes your own attestation and evidence-check dates. It never raises an evidence level and is never shown as independent verification.",
+                            text = L("account_reconfirm_hint"),
                             style = MaterialTheme.typography.labelSmall,
                             color = DorjaColors.Gray500
                         )
@@ -815,13 +810,13 @@ fun AccountScreen(
                         Spacer(modifier = Modifier.width(12.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "Relocation Mode",
+                                text = L("account_relocation"),
                                 style = MaterialTheme.typography.titleSmall,
                                 color = DorjaColors.Ink950,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = "Moving abroad? Get the destination checklist, official records, language notes and the professionals you may need.",
+                                text = L("account_relocation_subtitle"),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = DorjaColors.Gray700
                             )
@@ -841,7 +836,7 @@ fun AccountScreen(
                 BentoCard(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
-                            text = "REPORTS & APPEALS",
+                            text = L("account_reports"),
                             style = MaterialTheme.typography.labelSmall,
                             color = DorjaColors.Gray500,
                             fontFamily = FontFamily.Monospace,
@@ -849,14 +844,14 @@ fun AccountScreen(
                         )
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
-                            text = "Reports you filed and their resolution state. Counterparty responses stay visible in the listing's conflict view — nothing is hidden and nobody is silently judged.",
+                            text = L("account_reports_intro"),
                             style = MaterialTheme.typography.bodySmall,
                             color = DorjaColors.Gray700
                         )
                         Spacer(modifier = Modifier.height(10.dp))
                         if (myReports.isEmpty()) {
                             Text(
-                                text = "No reports filed.",
+                                text = L("account_no_reports"),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = DorjaColors.Gray500
                             )
@@ -895,14 +890,14 @@ fun AccountScreen(
                                         TextButton(onClick = {
                                             scope.launch { repository.withdrawReport(report.id) }
                                         }) {
-                                            Text("Withdraw", color = DorjaColors.Gray700)
+                                            Text(L("account_withdraw"), color = DorjaColors.Gray700)
                                         }
                                     }
                                 }
                             }
                             if (myReports.size > 5) {
                                 Text(
-                                    text = "…and ${myReports.size - 5} more",
+                                    text = Lf("account_and_more", myReports.size - 5),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = DorjaColors.Gray500
                                 )
@@ -917,7 +912,7 @@ fun AccountScreen(
                 BentoCard(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
-                            text = "PRIVACY & DATA",
+                            text = L("account_privacy_data"),
                             style = MaterialTheme.typography.labelSmall,
                             color = DorjaColors.Gray500,
                             fontFamily = FontFamily.Monospace,
@@ -925,21 +920,21 @@ fun AccountScreen(
                         )
                         Spacer(modifier = Modifier.height(6.dp))
                         Text(
-                            text = "Your evidence, chats, and viewing history live on this device. You control deletion — no support ticket required.",
+                            text = L("account_privacy_intro"),
                             style = MaterialTheme.typography.bodySmall,
                             color = DorjaColors.Gray700
                         )
                         Spacer(modifier = Modifier.height(10.dp))
                         PrivacyActionRow(
                             icon = Icons.Default.PrivacyTip,
-                            title = "Delete My Content",
-                            subtitle = "Removes your listings, evidence, scans, chats, and viewing passes. Keeps your profile.",
+                            title = L("account_delete_content"),
+                            subtitle = L("account_delete_content_sub"),
                             onClick = { showDeleteContentDialog = true }
                         )
                         PrivacyActionRow(
                             icon = Icons.Default.DeleteForever,
-                            title = "Erase My Account Data",
-                            subtitle = "Erases everything above plus your profile rows, then resets the app to clean demo accounts.",
+                            title = L("account_erase_data"),
+                            subtitle = L("account_erase_data_sub"),
                             destructive = true,
                             onClick = { showEraseAccountDialog = true }
                         )
@@ -953,7 +948,7 @@ fun AccountScreen(
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = "Consent records and access logs stay with the data they describe — when the data goes, they go too.",
+                                text = L("account_consent_note"),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = DorjaColors.Gray500
                             )
@@ -1061,13 +1056,19 @@ private fun SecurityRow(title: String, status: String, icon: ImageVector) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun LanguagePickerSheet(
+private fun CountrySettingsSheet(
     sheetState: androidx.compose.material3.SheetState,
+    selectedIso2: String,
     onDismiss: () -> Unit,
-    onLanguageSelected: (String) -> Unit
+    onCountrySelected: (String) -> Unit
 ) {
-    val context = LocalContext.current
-    val currentTag = remember { LocaleSettings.load(context) }
+    var searchQuery by remember { mutableStateOf("") }
+    val profiles = remember { CountryRegistry.profiles.sortedBy { it.displayName } }
+    val filtered = profiles.filter {
+        searchQuery.isBlank() ||
+            it.displayName.contains(searchQuery, ignoreCase = true) ||
+            it.iso2.contains(searchQuery, ignoreCase = true)
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -1080,20 +1081,19 @@ private fun LanguagePickerSheet(
                 .padding(horizontal = 20.dp)
                 .padding(bottom = 32.dp)
         ) {
-            // Sheet header
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Icon(
-                    imageVector = Icons.Default.Translate,
+                    imageVector = Icons.Default.Public,
                     contentDescription = null,
                     tint = DorjaColors.Jol600,
                     modifier = Modifier.size(22.dp)
                 )
                 Spacer(modifier = Modifier.width(10.dp))
                 Text(
-                    text = "App Language",
+                    text = L("settings_select_country"),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = DorjaColors.Ink950
@@ -1101,58 +1101,48 @@ private fun LanguagePickerSheet(
             }
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "Choose the language for the Dorja interface",
+                text = L("settings_country_subtitle"),
                 style = MaterialTheme.typography.bodySmall,
                 color = DorjaColors.Gray700
             )
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                placeholder = { Text(L("common_search")) },
+                leadingIcon = {
+                    Icon(Icons.Default.Search, contentDescription = null, tint = DorjaColors.Gray500)
+                },
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = DorjaColors.White,
+                    unfocusedContainerColor = DorjaColors.White,
+                    focusedBorderColor = DorjaColors.BentoBlueIcon,
+                    unfocusedBorderColor = DorjaColors.BentoCardBorder
+                )
+            )
+            Spacer(modifier = Modifier.height(8.dp))
             Divider(color = DorjaColors.BentoCardBorder)
             Spacer(modifier = Modifier.height(8.dp))
 
-            // Language list
             LazyColumn(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 480.dp),
                 verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
-                // Priority section
-                item {
-                    Text(
-                        text = "PRIORITY",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = DorjaColors.Gray500,
-                        modifier = Modifier.padding(vertical = 6.dp)
-                    )
-                }
-                items(DorjaLocales.ALL.filter { it.priority }) { locale ->
-                    LanguageRow(
-                        nativeName = locale.nativeName,
-                        englishName = locale.englishName,
-                        tag = locale.tag,
-                        isRtl = locale.rtl,
-                        isSelected = locale.tag == currentTag,
-                        onClick = { onLanguageSelected(locale.tag) }
-                    )
-                }
-
-                item {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Divider(color = DorjaColors.BentoCardBorder)
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "ALL LANGUAGES",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = DorjaColors.Gray500,
-                        modifier = Modifier.padding(vertical = 6.dp)
-                    )
-                }
-                items(DorjaLocales.ALL.filter { !it.priority }.sortedBy { it.englishName }) { locale ->
-                    LanguageRow(
-                        nativeName = locale.nativeName,
-                        englishName = locale.englishName,
-                        tag = locale.tag,
-                        isRtl = locale.rtl,
-                        isSelected = locale.tag == currentTag,
-                        onClick = { onLanguageSelected(locale.tag) }
+                items(filtered, key = { it.iso2 }) { profile ->
+                    val isSelected = profile.iso2.equals(selectedIso2, ignoreCase = true)
+                    val languageTag = LocaleSettings.languageTagForCountry(profile.iso2)
+                    val languageName = DorjaLocales.byTag(languageTag)?.nativeName ?: languageTag
+                    val identity = CountryRegistry.identityCredential(profile.iso2)
+                    CountrySettingsRow(
+                        displayName = profile.displayName,
+                        iso2 = profile.iso2,
+                        subtitle = "${profile.currencyCode} (${profile.currencySymbol})  •  ${identity.shortName}  •  $languageName",
+                        isSelected = isSelected,
+                        onClick = { onCountrySelected(profile.iso2) }
                     )
                 }
             }
@@ -1161,11 +1151,10 @@ private fun LanguagePickerSheet(
 }
 
 @Composable
-private fun LanguageRow(
-    nativeName: String,
-    englishName: String,
-    tag: String,
-    isRtl: Boolean,
+private fun CountrySettingsRow(
+    displayName: String,
+    iso2: String,
+    subtitle: String,
     isSelected: Boolean,
     onClick: () -> Unit
 ) {
@@ -1184,17 +1173,23 @@ private fun LanguageRow(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = displayName,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (isSelected) DorjaColors.BentoBlueText else DorjaColors.Ink950
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = iso2,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = DorjaColors.Gray500
+                    )
+                }
                 Text(
-                    text = nativeName,
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = if (isSelected) DorjaColors.BentoBlueText else DorjaColors.Ink950
-                )
-                Text(
-                    text = buildString {
-                        append(englishName)
-                        if (isRtl) append(" • RTL")
-                    },
+                    text = subtitle,
                     style = MaterialTheme.typography.bodySmall,
                     color = DorjaColors.Gray500
                 )
@@ -1202,7 +1197,7 @@ private fun LanguageRow(
             if (isSelected) {
                 Icon(
                     imageVector = Icons.Default.CheckCircle,
-                    contentDescription = "Selected",
+                    contentDescription = L("common_done"),
                     tint = DorjaColors.BentoBlueIcon,
                     modifier = Modifier.size(20.dp)
                 )
@@ -1210,4 +1205,3 @@ private fun LanguageRow(
         }
     }
 }
-

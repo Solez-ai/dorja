@@ -1,5 +1,6 @@
 package com.example.ui.i18n
 
+import com.example.data.country.CountryRegistry
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -64,5 +65,59 @@ class DorjaI18nTest {
         val sorted = DorjaLocales.SORTED
         val firstFour = sorted.take(4).map { it.tag }
         assertTrue(firstFour.containsAll(listOf("bn", "hi", "ur", "it")))
+    }
+
+    @Test
+    fun testCountryDrivesLanguageTag() {
+        assertEquals("bn", LocaleSettings.languageTagForCountry("BD"))
+        assertEquals("ja", LocaleSettings.languageTagForCountry("JP"))
+        assertEquals("id", LocaleSettings.languageTagForCountry("ID"))
+        assertEquals("en", LocaleSettings.languageTagForCountry("US"))
+        assertEquals("en", LocaleSettings.languageTagForCountry("GB"))
+        assertEquals("hi", LocaleSettings.languageTagForCountry("IN"))
+        assertEquals("ar", LocaleSettings.languageTagForCountry("AE"))
+    }
+
+    @Test
+    fun testIdentityCredentialsAreCountrySpecific() {
+        assertEquals("NID", CountryRegistry.identityCredential("BD").shortName)
+        assertEquals("My Number", CountryRegistry.identityCredential("JP").shortName)
+        assertEquals("KTP", CountryRegistry.identityCredential("ID").shortName)
+        assertEquals("Social Security", CountryRegistry.identityCredential("US").shortName)
+        assertEquals("Aadhaar", CountryRegistry.identityCredential("IN").shortName)
+        assertEquals("Emirates ID", CountryRegistry.identityCredential("AE").shortName)
+    }
+
+    @Test
+    fun testJapaneseChromeOverridesAccountAndNav() {
+        val ja = DorjaStrings.forLanguageTag("ja")
+        assertEquals("物件", ja["tab_properties"])
+        assertEquals("内見", ja["tab_visits"])
+        assertEquals("メッセージ", ja["tab_inbox"])
+        assertEquals("アカウント", ja["tab_account"])
+        assertEquals("認証済みアカウント", ja["nav_verified_account"])
+        assertEquals("まだ物件が登録されていません", ja["host_empty_title"])
+        assertEquals("国を選択", ja["settings_select_country"])
+        assertEquals("%1\$s認証済", ja["account_identity_verified_fmt"])
+        assertEquals("My Number認証済", ja.format("account_identity_verified_fmt", "My Number"))
+    }
+
+    @Test
+    fun testIndonesianChromeOverridesAccountAndNav() {
+        val id = DorjaStrings.forLanguageTag("id")
+        assertEquals("Properti", id["tab_properties"])
+        assertEquals("Kunjungan", id["tab_visits"])
+        assertEquals("Pesan", id["tab_inbox"])
+        assertEquals("Akun", id["tab_account"])
+        assertEquals("Akun terverifikasi", id["nav_verified_account"])
+        assertEquals("Belum Ada Properti Terdaftar", id["host_empty_title"])
+        assertEquals("KTP Terverifikasi", id.format("account_identity_verified_fmt", "KTP"))
+    }
+
+    @Test
+    fun testFormatFallsBackToEnglishForMissingLocale() {
+        val en = DorjaStrings.forLanguageTag("en")
+        assertEquals("Social Security Verified", en.format("account_identity_verified_fmt", "Social Security"))
+        assertEquals("No properties match 'Dhaka'.", en.format("explore_empty_match", "Dhaka"))
     }
 }
