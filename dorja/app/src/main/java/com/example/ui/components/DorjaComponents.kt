@@ -46,8 +46,8 @@ fun BentoCard(
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
     shape: Shape = RoundedCornerShape(20.dp),
-    backgroundColor: Color = Color.White,
-    borderColor: Color = Color(0x0C000000),
+    backgroundColor: Color = DorjaColors.White,
+    borderColor: Color = DorjaColors.BentoCardBorder,
     borderWidth: Dp = 0.5.dp,
     border: BorderStroke? = null,
     content: @Composable ColumnScope.() -> Unit
@@ -78,8 +78,8 @@ fun DorjaCard(
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
     shape: Shape = RoundedCornerShape(20.dp),
-    backgroundColor: Color = Color.White,
-    borderColor: Color = Color(0x0C000000),
+    backgroundColor: Color = DorjaColors.White,
+    borderColor: Color = DorjaColors.BentoCardBorder,
     borderWidth: Dp = 0.5.dp,
     border: BorderStroke? = null,
     content: @Composable ColumnScope.() -> Unit
@@ -117,7 +117,7 @@ fun BentoMetricTile(
         modifier = modifier.then(clickableModifier),
         shape = RoundedCornerShape(14.dp),
         color = DorjaColors.Paper50,
-        border = BorderStroke(0.5.dp, Color(0x0C000000))
+        border = BorderStroke(0.5.dp, DorjaColors.BentoCardBorder)
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
@@ -175,7 +175,7 @@ fun BentoMetricTile(
 fun BentoHeroCard(
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
-    backgroundColor: Color = Color.White,
+    backgroundColor: Color = DorjaColors.White,
     content: @Composable ColumnScope.() -> Unit
 ) {
     BentoCard(
@@ -370,11 +370,11 @@ fun DorjaChip(
     icon: ImageVector? = null
 ) {
     val animatedBg by animateColorAsState(
-        targetValue = if (selected) DorjaColors.Jol600 else Color.White,
+        targetValue = if (selected) DorjaColors.Jol600 else DorjaColors.White,
         label = "chipBg"
     )
     val animatedFg by animateColorAsState(
-        targetValue = if (selected) Color.White else DorjaColors.Ink950,
+        targetValue = if (selected) androidx.compose.ui.graphics.Color.White else DorjaColors.Ink950,
         label = "chipFg"
     )
 
@@ -384,7 +384,7 @@ fun DorjaChip(
         color = animatedBg,
         border = BorderStroke(
             0.5.dp,
-            if (selected) Color.Transparent else Color(0x1A000000)
+            if (selected) Color.Transparent else DorjaColors.BentoCardBorder
         )
     ) {
         Row(
@@ -475,7 +475,7 @@ fun SafeAddressShield(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         color = DorjaColors.Paper50,
-        border = BorderStroke(0.5.dp, Color(0x0C000000))
+        border = BorderStroke(0.5.dp, DorjaColors.BentoCardBorder)
     ) {
         Row(
             modifier = Modifier.padding(14.dp),
@@ -549,10 +549,10 @@ fun DorjaInput(
         modifier = baseModifier.fillMaxWidth(),
         shape = RoundedCornerShape(14.dp),
         colors = OutlinedTextFieldDefaults.colors(
-            focusedContainerColor = Color.White,
-            unfocusedContainerColor = Color.White,
+            focusedContainerColor = DorjaColors.White,
+            unfocusedContainerColor = DorjaColors.White,
             focusedBorderColor = DorjaColors.Jol600,
-            unfocusedBorderColor = Color(0x1A000000)
+            unfocusedBorderColor = DorjaColors.BentoCardBorder
         )
     )
 }
@@ -655,7 +655,7 @@ fun ListingCard(
         modifier = modifier.fillMaxWidth(),
         onClick = { onSelect(listing.id) },
         shape = RoundedCornerShape(20.dp),
-        backgroundColor = Color.White
+        backgroundColor = DorjaColors.White
     ) {
         Column {
             // Image Header with Glass Badges
@@ -863,8 +863,8 @@ fun CountryPicker(
             .fillMaxWidth()
             .pressScale(onClick = { showSheet = true }),
         shape = RoundedCornerShape(16.dp),
-        color = Color.White,
-        border = BorderStroke(0.5.dp, Color(0x1A000000))
+        color = DorjaColors.White,
+        border = BorderStroke(0.5.dp, DorjaColors.BentoCardBorder)
     ) {
         Row(
             modifier = Modifier

@@ -159,7 +159,7 @@ fun Modifier.pressScale(
 fun LiquidGlassSurface(
     modifier: Modifier = Modifier,
     shape: Shape = RoundedCornerShape(20.dp),
-    tint: Color = LiquidGlassDefaults.LightGlassTint,
+    tint: Color = if (LocalDarkTheme.current) LiquidGlassDefaults.DarkGlassTint else LiquidGlassDefaults.LightGlassTint,
     blurRadius: Dp = 24.dp,
     content: @Composable BoxScope.() -> Unit
 ) {

@@ -47,6 +47,7 @@ class DorjaI18nTest {
             // Test key lookup with fallback
             assertEquals("DORJA", strings["app_name"])
             assertTrue("tab_explore should not be blank for ${locale.tag}", strings["tab_explore"].isNotBlank())
+            assertTrue("tab_settings should not be blank for ${locale.tag}", strings["tab_settings"].isNotBlank())
             assertTrue("auth_welcome should not be blank for ${locale.tag}", strings["auth_welcome"].isNotBlank())
             assertTrue("common_ok should not be blank for ${locale.tag}", strings["common_ok"].isNotBlank())
         }
@@ -95,6 +96,7 @@ class DorjaI18nTest {
         assertEquals("内見", ja["tab_visits"])
         assertEquals("メッセージ", ja["tab_inbox"])
         assertEquals("アカウント", ja["tab_account"])
+        assertEquals("設定", ja["tab_settings"])
         assertEquals("認証済みアカウント", ja["nav_verified_account"])
         assertEquals("まだ物件が登録されていません", ja["host_empty_title"])
         assertEquals("国を選択", ja["settings_select_country"])

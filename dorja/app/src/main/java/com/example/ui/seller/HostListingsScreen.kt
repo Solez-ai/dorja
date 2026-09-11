@@ -67,9 +67,7 @@ import com.example.ui.i18n.L
 import com.example.ui.i18n.Lf
 import com.example.ui.theme.DorjaColors
 import com.example.ui.util.Formatters
-import com.example.R
-import androidx.compose.foundation.Image
-import androidx.compose.ui.res.painterResource
+import com.example.ui.components.DorjaLogo
 import kotlinx.coroutines.launch
 
 @Composable
@@ -130,11 +128,7 @@ fun HostListingsScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                    Image(
-                        painter = painterResource(id = R.drawable.ic_dorja_logo),
-                        contentDescription = "Dorja Logo",
-                        modifier = Modifier.size(32.dp)
-                    )
+                    DorjaLogo(modifier = Modifier.size(32.dp))
                     Spacer(modifier = Modifier.width(10.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(

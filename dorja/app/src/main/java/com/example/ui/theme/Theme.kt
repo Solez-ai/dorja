@@ -1,68 +1,92 @@
 package com.example.ui.theme
 
-import androidx.compose.foundation.isSystemInDarkTheme
+import android.app.Activity
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.SideEffect
+import androidx.compose.ui.platform.LocalView
+import androidx.core.view.WindowCompat
 
 private val DorjaLightColorScheme = lightColorScheme(
-    primary = DorjaColors.Jol600,
-    onPrimary = DorjaColors.White,
-    primaryContainer = DorjaColors.Teal100,
-    onPrimaryContainer = DorjaColors.Teal900,
-    secondary = DorjaColors.Ink950,
-    onSecondary = DorjaColors.White,
-    secondaryContainer = DorjaColors.Sand100,
-    onSecondaryContainer = DorjaColors.Ink950,
-    tertiary = DorjaColors.Gray700,
-    onTertiary = DorjaColors.White,
-    background = DorjaColors.Paper50,
-    onBackground = DorjaColors.Ink950,
-    surface = DorjaColors.White,
-    onSurface = DorjaColors.Ink950,
-    surfaceVariant = DorjaColors.Sand100,
-    onSurfaceVariant = DorjaColors.Gray700,
-    outline = DorjaColors.Sand300,
-    outlineVariant = DorjaColors.Gray300,
-    error = DorjaColors.Error,
-    onError = DorjaColors.White,
-    errorContainer = DorjaColors.ErrorContainer,
-    onErrorContainer = DorjaColors.Error
+    primary = DorjaLightColors.Jol600,
+    onPrimary = androidx.compose.ui.graphics.Color.White,
+    primaryContainer = DorjaLightColors.Teal100,
+    onPrimaryContainer = DorjaLightColors.Teal900,
+    secondary = DorjaLightColors.Ink950,
+    onSecondary = androidx.compose.ui.graphics.Color.White,
+    secondaryContainer = DorjaLightColors.Sand100,
+    onSecondaryContainer = DorjaLightColors.Ink950,
+    tertiary = DorjaLightColors.Gray700,
+    onTertiary = androidx.compose.ui.graphics.Color.White,
+    background = DorjaLightColors.Paper50,
+    onBackground = DorjaLightColors.Ink950,
+    surface = DorjaLightColors.White,
+    onSurface = DorjaLightColors.Ink950,
+    surfaceVariant = DorjaLightColors.Sand100,
+    onSurfaceVariant = DorjaLightColors.Gray700,
+    outline = DorjaLightColors.Sand300,
+    outlineVariant = DorjaLightColors.Gray300,
+    error = DorjaLightColors.Error,
+    onError = androidx.compose.ui.graphics.Color.White,
+    errorContainer = DorjaLightColors.ErrorContainer,
+    onErrorContainer = DorjaLightColors.Error
 )
 
 private val DorjaDarkColorScheme = darkColorScheme(
-    primary = DorjaColors.Jol600,
-    onPrimary = DorjaColors.White,
-    primaryContainer = DorjaColors.Teal900,
-    onPrimaryContainer = DorjaColors.Teal100,
-    secondary = DorjaColors.Sand300,
-    onSecondary = DorjaColors.Ink950,
-    secondaryContainer = DorjaColors.Gray700,
-    onSecondaryContainer = DorjaColors.Paper50,
-    tertiary = DorjaColors.Teal100,
-    onTertiary = DorjaColors.Ink950,
-    background = DorjaColors.Ink950,
-    onBackground = DorjaColors.Paper50,
-    surface = DorjaColors.Gray700,
-    onSurface = DorjaColors.Paper50,
-    surfaceVariant = DorjaColors.Ink950,
-    onSurfaceVariant = DorjaColors.Sand300,
-    outline = DorjaColors.Gray500,
-    outlineVariant = DorjaColors.Gray700,
-    error = DorjaColors.Error,
-    onError = DorjaColors.White
+    primary = DorjaDarkColors.Jol600,
+    onPrimary = DorjaDarkColors.Ink950,
+    primaryContainer = DorjaDarkColors.Jol100,
+    onPrimaryContainer = DorjaDarkColors.Jol700,
+    secondary = DorjaDarkColors.Sand300,
+    onSecondary = DorjaDarkColors.Ink950,
+    secondaryContainer = DorjaDarkColors.Sand100,
+    onSecondaryContainer = DorjaDarkColors.Ink950,
+    tertiary = DorjaDarkColors.Teal100,
+    onTertiary = DorjaDarkColors.Ink950,
+    background = DorjaDarkColors.CanvasBg,
+    onBackground = DorjaDarkColors.Ink950,
+    surface = DorjaDarkColors.White,
+    onSurface = DorjaDarkColors.Ink950,
+    surfaceVariant = DorjaDarkColors.Sand100,
+    onSurfaceVariant = DorjaDarkColors.Gray700,
+    outline = DorjaDarkColors.BentoCardBorder,
+    outlineVariant = DorjaDarkColors.Gray300,
+    error = DorjaDarkColors.Error,
+    onError = DorjaDarkColors.CanvasBg,
+    errorContainer = DorjaDarkColors.ErrorContainer,
+    onErrorContainer = DorjaDarkColors.Error
 )
 
 @Composable
 fun DorjaTheme(
-    darkTheme: Boolean = false, // Default to clean architectural light theme for maximum readability
+    darkTheme: Boolean = false,
     content: @Composable () -> Unit
 ) {
+    val tokens = if (darkTheme) DorjaDarkColors else DorjaLightColors
     val colorScheme = if (darkTheme) DorjaDarkColorScheme else DorjaLightColorScheme
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = DorjaTypography,
-        content = content
-    )
+
+    val view = LocalView.current
+    if (!view.isInEditMode) {
+        SideEffect {
+            val window = (view.context as? Activity)?.window ?: return@SideEffect
+            WindowCompat.getInsetsController(window, view).apply {
+                isAppearanceLightStatusBars = !darkTheme
+                isAppearanceLightNavigationBars = !darkTheme
+            }
+        }
+    }
+
+    CompositionLocalProvider(
+        LocalDorjaColors provides tokens,
+        LocalDarkTheme provides darkTheme
+    ) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography = DorjaTypography,
+            content = content
+        )
+    }
 }

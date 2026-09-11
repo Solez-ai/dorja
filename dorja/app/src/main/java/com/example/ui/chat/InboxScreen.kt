@@ -46,12 +46,9 @@ import com.example.ui.components.DorjaCard
 import com.example.ui.i18n.L
 import com.example.ui.theme.DorjaColors
 import com.example.ui.util.Formatters
-import com.example.R
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.layout.size
+import com.example.ui.components.DorjaLogo
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.ui.res.painterResource
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -83,11 +80,7 @@ fun InboxScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                    Image(
-                        painter = painterResource(id = R.drawable.ic_dorja_logo),
-                        contentDescription = "Dorja Logo",
-                        modifier = Modifier.size(32.dp)
-                    )
+                    DorjaLogo(modifier = Modifier.size(32.dp))
                     Spacer(modifier = Modifier.width(10.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(

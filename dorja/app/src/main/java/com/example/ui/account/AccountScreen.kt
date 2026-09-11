@@ -1,6 +1,5 @@
 package com.example.ui.account
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -12,12 +11,10 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -26,7 +23,6 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.DataUsage
 import androidx.compose.material.icons.filled.DeleteForever
-import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.FactCheck
@@ -43,25 +39,19 @@ import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.PrivacyTip
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Divider
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -73,7 +63,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -91,17 +80,13 @@ import com.example.ui.components.DorjaBadge
 import com.example.ui.components.DorjaButton
 import com.example.ui.components.DorjaChip
 import com.example.ui.components.DorjaOutlinedButton
-import com.example.ui.i18n.DorjaLocales
 import com.example.ui.i18n.L
 import com.example.ui.i18n.Lf
-import com.example.ui.i18n.LocaleSettings
 import com.example.ui.theme.DorjaColors
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.material3.CircularProgressIndicator
-import com.example.R
-import androidx.compose.foundation.Image
-import androidx.compose.ui.res.painterResource
+import com.example.ui.components.DorjaLogo
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -112,10 +97,6 @@ fun AccountScreen(
     val repository = DorjaApp.instance.repository
     val scope = rememberCoroutineScope()
     val currentUser by repository.currentUser.collectAsState()
-    val context = LocalContext.current
-
-    var showCountrySheet by remember { mutableStateOf(false) }
-    val countrySheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     var showEditProfileDialog by remember { mutableStateOf(false) }
     var editName by remember { mutableStateOf("") }
@@ -125,9 +106,6 @@ fun AccountScreen(
     var editBio by remember { mutableStateOf("") }
     var editRole by remember { mutableStateOf("SELLER") }
     var editCountryCode by remember { mutableStateOf("BD") }
-
-    var showResetDialog by remember { mutableStateOf(false) }
-
 
     // Evidence health + privacy controls state
     var evidenceSummary by remember { mutableStateOf<EvidenceSummary?>(null) }
@@ -264,31 +242,6 @@ fun AccountScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showEditProfileDialog = false }) {
-                    Text(L("common_cancel"), color = DorjaColors.Gray700)
-                }
-            }
-        )
-    }
-
-    if (showResetDialog) {
-        AlertDialog(
-            onDismissRequest = { showResetDialog = false },
-            title = { Text(L("account_reset_title"), fontWeight = FontWeight.Bold) },
-            text = { Text(L("account_reset_body")) },
-            confirmButton = {
-                DorjaButton(
-                    text = L("account_reset_all"),
-                    onClick = {
-                        scope.launch {
-                            repository.resetAllData()
-                            showResetDialog = false
-                        }
-                    },
-                    modifier = Modifier.width(120.dp)
-                )
-            },
-            dismissButton = {
-                TextButton(onClick = { showResetDialog = false }) {
                     Text(L("common_cancel"), color = DorjaColors.Gray700)
                 }
             }
@@ -439,17 +392,13 @@ fun AccountScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(DorjaColors.CanvasBg)
-                .padding(top = 6.dp, start = 16.dp, end = 4.dp, bottom = 6.dp)
+                .padding(top = 6.dp, start = 16.dp, end = 16.dp, bottom = 6.dp)
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Image(
-                    painter = painterResource(id = R.drawable.ic_dorja_logo),
-                    contentDescription = "Dorja Logo",
-                    modifier = Modifier.size(32.dp)
-                )
+                DorjaLogo(modifier = Modifier.size(32.dp))
                 Spacer(modifier = Modifier.width(10.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
@@ -466,28 +415,7 @@ fun AccountScreen(
                         overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                     )
                 }
-                IconButton(onClick = { showCountrySheet = true }, modifier = Modifier.size(36.dp)) {
-                    Icon(
-                        imageVector = Icons.Default.Settings,
-                        contentDescription = L("account_country_settings"),
-                        tint = DorjaColors.Gray500,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
             }
-        }
-
-        if (showCountrySheet) {
-            CountrySettingsSheet(
-                sheetState = countrySheetState,
-                selectedIso2 = user.countryCode,
-                onDismiss = { showCountrySheet = false },
-                onCountrySelected = { iso ->
-                    repository.setUserCountryCode(iso)
-                    LocaleSettings.applyCountry(context, iso)
-                    showCountrySheet = false
-                }
-            )
         }
 
         LazyColumn(
@@ -672,28 +600,6 @@ fun AccountScreen(
                         )
                         SecurityRow(title = L("account_safeview_gps"), status = L("account_status_active"), icon = Icons.Default.Lock)
                         SecurityRow(title = L("account_local_persistence"), status = L("account_status_on_device"), icon = Icons.Default.CheckCircle)
-                    }
-                }
-            }
-
-            // Data Management Bento Card
-            item {
-                BentoCard(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text(
-                            text = L("account_db_management"),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = DorjaColors.Gray500,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(modifier = Modifier.height(10.dp))
-                        DorjaOutlinedButton(
-                            text = L("account_clear_data"),
-                            onClick = { showResetDialog = true },
-                            icon = Icons.Default.DeleteSweep,
-                            modifier = Modifier.fillMaxWidth()
-                        )
                     }
                 }
             }
@@ -1051,157 +957,5 @@ private fun SecurityRow(title: String, status: String, icon: ImageVector) {
             Text(title, style = MaterialTheme.typography.bodyMedium, color = DorjaColors.Ink950)
         }
         DorjaBadge(text = status, backgroundColor = DorjaColors.BentoGreenBg, textColor = DorjaColors.BentoGreenText)
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun CountrySettingsSheet(
-    sheetState: androidx.compose.material3.SheetState,
-    selectedIso2: String,
-    onDismiss: () -> Unit,
-    onCountrySelected: (String) -> Unit
-) {
-    var searchQuery by remember { mutableStateOf("") }
-    val profiles = remember { CountryRegistry.profiles.sortedBy { it.displayName } }
-    val filtered = profiles.filter {
-        searchQuery.isBlank() ||
-            it.displayName.contains(searchQuery, ignoreCase = true) ||
-            it.iso2.contains(searchQuery, ignoreCase = true)
-    }
-
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = DorjaColors.White
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp)
-                .padding(bottom = 32.dp)
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Public,
-                    contentDescription = null,
-                    tint = DorjaColors.Jol600,
-                    modifier = Modifier.size(22.dp)
-                )
-                Spacer(modifier = Modifier.width(10.dp))
-                Text(
-                    text = L("settings_select_country"),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = DorjaColors.Ink950
-                )
-            }
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = L("settings_country_subtitle"),
-                style = MaterialTheme.typography.bodySmall,
-                color = DorjaColors.Gray700
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = { searchQuery = it },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true,
-                placeholder = { Text(L("common_search")) },
-                leadingIcon = {
-                    Icon(Icons.Default.Search, contentDescription = null, tint = DorjaColors.Gray500)
-                },
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = DorjaColors.White,
-                    unfocusedContainerColor = DorjaColors.White,
-                    focusedBorderColor = DorjaColors.BentoBlueIcon,
-                    unfocusedBorderColor = DorjaColors.BentoCardBorder
-                )
-            )
-            Spacer(modifier = Modifier.height(8.dp))
-            Divider(color = DorjaColors.BentoCardBorder)
-            Spacer(modifier = Modifier.height(8.dp))
-
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 480.dp),
-                verticalArrangement = Arrangement.spacedBy(2.dp)
-            ) {
-                items(filtered, key = { it.iso2 }) { profile ->
-                    val isSelected = profile.iso2.equals(selectedIso2, ignoreCase = true)
-                    val languageTag = LocaleSettings.languageTagForCountry(profile.iso2)
-                    val languageName = DorjaLocales.byTag(languageTag)?.nativeName ?: languageTag
-                    val identity = CountryRegistry.identityCredential(profile.iso2)
-                    CountrySettingsRow(
-                        displayName = profile.displayName,
-                        iso2 = profile.iso2,
-                        subtitle = "${profile.currencyCode} (${profile.currencySymbol})  •  ${identity.shortName}  •  $languageName",
-                        isSelected = isSelected,
-                        onClick = { onCountrySelected(profile.iso2) }
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun CountrySettingsRow(
-    displayName: String,
-    iso2: String,
-    subtitle: String,
-    isSelected: Boolean,
-    onClick: () -> Unit
-) {
-    Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
-            .clickable(onClick = onClick),
-        color = if (isSelected) DorjaColors.BentoBlueBg else DorjaColors.White,
-        shape = RoundedCornerShape(10.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = displayName,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = if (isSelected) DorjaColors.BentoBlueText else DorjaColors.Ink950
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = iso2,
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = DorjaColors.Gray500
-                    )
-                }
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = DorjaColors.Gray500
-                )
-            }
-            if (isSelected) {
-                Icon(
-                    imageVector = Icons.Default.CheckCircle,
-                    contentDescription = L("common_done"),
-                    tint = DorjaColors.BentoBlueIcon,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-        }
     }
 }

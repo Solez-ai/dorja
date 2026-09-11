@@ -2,7 +2,6 @@ package com.example.ui.splash
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -22,13 +21,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.R
-import com.example.ui.theme.DorjaColors
+import androidx.compose.ui.graphics.Color
+import com.example.ui.components.DorjaLogo
+import com.example.ui.theme.DorjaLightColors
 import kotlinx.coroutines.delay
 
 @Composable
@@ -48,7 +47,7 @@ fun SplashScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(DorjaColors.Ink950)
+            .background(DorjaLightColors.Ink950)
             .testTag("splash_screen"),
         contentAlignment = Alignment.Center
     ) {
@@ -60,10 +59,11 @@ fun SplashScreen(
                 .scale(scale.value)
                 .alpha(alpha.value)
         ) {
-            Image(
-                painter = painterResource(id = R.drawable.ic_dorja_logo),
+            DorjaLogo(
+                modifier = Modifier.size(120.dp),
                 contentDescription = "DORJA Logo",
-                modifier = Modifier.size(120.dp)
+                outlined = true,
+                strokeWidth = 2.dp
             )
 
             Spacer(modifier = Modifier.height(20.dp))
@@ -71,7 +71,7 @@ fun SplashScreen(
             Text(
                 text = "DORJA",
                 style = MaterialTheme.typography.displayMedium,
-                color = DorjaColors.White,
+                color = Color.White,
                 fontWeight = FontWeight.Bold,
                 letterSpacing = 4.sp
             )
@@ -81,7 +81,7 @@ fun SplashScreen(
             Text(
                 text = "PROPERTY TRUST PLATFORM",
                 style = MaterialTheme.typography.labelMedium,
-                color = DorjaColors.Sand300,
+                color = DorjaLightColors.Sand300,
                 fontFamily = FontFamily.Monospace,
                 letterSpacing = 2.sp
             )

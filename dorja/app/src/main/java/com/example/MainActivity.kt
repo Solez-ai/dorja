@@ -17,15 +17,18 @@ import com.example.ui.i18n.LocalDorjaLocale
 import com.example.ui.i18n.LocaleSettings
 import com.example.ui.navigation.DorjaNavHost
 import com.example.ui.theme.DorjaTheme
+import com.example.ui.theme.ThemeSettings
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         LocaleSettings.init(applicationContext)
+        ThemeSettings.init(applicationContext)
         enableEdgeToEdge()
         setContent {
             val tag by LocaleSettings.languageTag.collectAsState()
             val strings = remember(tag) { DorjaStrings.forLanguageTag(tag) }
+            val darkTheme by ThemeSettings.darkMode.collectAsState()
             val currentUser by DorjaApp.instance.repository.currentUser.collectAsState()
             val context = LocalContext.current
             LaunchedEffect(currentUser?.countryCode) {
@@ -34,7 +37,7 @@ class MainActivity : ComponentActivity() {
                     LocaleSettings.applyCountry(context, code)
                 }
             }
-            DorjaTheme {
+            DorjaTheme(darkTheme = darkTheme) {
                 CompositionLocalProvider(
                     LocalDorjaLocale provides strings,
                     LocalLayoutDirection provides if (strings.rtl) LayoutDirection.Rtl else LayoutDirection.Ltr

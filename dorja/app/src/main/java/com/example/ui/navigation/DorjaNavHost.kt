@@ -3,7 +3,6 @@ package com.example.ui.navigation
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -33,6 +32,7 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.QrCode
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -55,7 +55,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -65,7 +64,6 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.DorjaApp
-import com.example.R
 import com.example.ui.account.AccountScreen
 import com.example.ui.auth.AuthScreen
 import com.example.ui.chat.ChatThreadScreen
@@ -77,7 +75,9 @@ import com.example.ui.listing.CreateListingScreen
 import com.example.ui.pass.ViewingPassScreen
 import com.example.ui.relocation.RelocationModeScreen
 import com.example.ui.seller.HostListingsScreen
+import com.example.ui.settings.SettingsScreen
 import com.example.ui.splash.SplashScreen
+import com.example.ui.components.DorjaLogo
 import com.example.ui.i18n.L
 import com.example.ui.theme.DorjaColors
 import com.example.ui.tour.TourViewerScreen
@@ -119,14 +119,16 @@ enum class HostTab(val titleKey: String, val icon: ImageVector, val tag: String)
     PROPERTIES("tab_properties", Icons.Default.Home, "nav_tab_properties"),
     VISITS("tab_visits", Icons.Default.QrCode, "nav_tab_visits"),
     INBOX("tab_inbox", Icons.AutoMirrored.Filled.Chat, "nav_tab_inbox"),
-    ACCOUNT("tab_account", Icons.Default.Person, "nav_tab_account")
+    ACCOUNT("tab_account", Icons.Default.Person, "nav_tab_account"),
+    SETTINGS("tab_settings", Icons.Default.Settings, "nav_tab_settings")
 }
 
 enum class BuyerTab(val titleKey: String, val icon: ImageVector, val tag: String) {
     EXPLORE("tab_explore", Icons.Default.Explore, "nav_tab_explore"),
     VISITS("tab_visits", Icons.Default.QrCode, "nav_tab_visits"),
     INBOX("tab_inbox", Icons.AutoMirrored.Filled.Chat, "nav_tab_inbox"),
-    ACCOUNT("tab_account", Icons.Default.Person, "nav_tab_account")
+    ACCOUNT("tab_account", Icons.Default.Person, "nav_tab_account"),
+    SETTINGS("tab_settings", Icons.Default.Settings, "nav_tab_settings")
 }
 
 /** Cubic-bezier(0.16, 1, 0.3, 1) — the smooth "expo out" easing requested for the drawer. */
@@ -448,11 +450,7 @@ fun MainContainer(
                         )
                     }
                     Spacer(modifier = Modifier.width(4.dp))
-                    Image(
-                        painter = painterResource(id = R.drawable.ic_dorja_logo),
-                        contentDescription = "Dorja Logo",
-                        modifier = Modifier.size(26.dp)
-                    )
+                    DorjaLogo(modifier = Modifier.size(26.dp))
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         text = "DORJA",
@@ -484,6 +482,7 @@ fun MainContainer(
                                 onNavigateToSellerSuite = onNavigateToCreateListing,
                                 onNavigateToRelocation = onNavigateToRelocation
                             )
+                            HostTab.SETTINGS -> SettingsScreen()
                         }
                     } else {
                         when (currentBuyerTab) {
@@ -494,6 +493,7 @@ fun MainContainer(
                                 onNavigateToSellerSuite = onNavigateToCreateListing,
                                 onNavigateToRelocation = onNavigateToRelocation
                             )
+                            BuyerTab.SETTINGS -> SettingsScreen()
                         }
                     }
                 }
@@ -554,11 +554,7 @@ private fun DrawerSidebar(
                     .background(DorjaColors.DrawerSidebarSoft),
                 contentAlignment = Alignment.Center
             ) {
-                Image(
-                    painter = painterResource(id = R.drawable.ic_dorja_logo),
-                    contentDescription = "Dorja Logo",
-                    modifier = Modifier.size(28.dp)
-                )
+                DorjaLogo(modifier = Modifier.size(28.dp), outlined = true)
             }
             Spacer(modifier = Modifier.weight(1f))
             IconButton(onClick = onClose) {
