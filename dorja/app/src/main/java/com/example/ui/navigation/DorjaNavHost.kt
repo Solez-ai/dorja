@@ -51,6 +51,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
@@ -356,7 +357,7 @@ fun MainContainer(
                     while (true) {
                         val event = awaitPointerEvent()
                         val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                        if (!change.isConsumed) {
+                        if (!event.changes.any { it.isConsumed }) {
                             totalX += change.positionChange().x
                         }
                         if (!openedThisGesture && !drawerOpen &&
@@ -367,7 +368,7 @@ fun MainContainer(
                             drawerOpen = true
                             openedThisGesture = true
                         }
-                        if (!change.pressed) break
+                        if (event.changes.none { it.pressed }) break
                     }
                 }
             }
