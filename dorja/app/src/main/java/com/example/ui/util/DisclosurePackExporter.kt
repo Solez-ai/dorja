@@ -9,6 +9,7 @@ import android.graphics.pdf.PdfDocument
 import com.example.DorjaApp
 import com.example.data.country.CountryRegistry
 import com.example.data.model.EvidenceLevel
+import com.example.data.model.LegalDocument
 import com.example.data.model.ProfessionalEndorsement
 import com.example.data.model.Viewing
 import kotlinx.coroutines.flow.first
@@ -41,7 +42,7 @@ object DisclosurePackExporter {
     suspend fun generate(context: Context, listingId: String): File? {
         val repo = DorjaApp.instance.repository
         val listing = repo.getListingById(listingId) ?: return null
-        val docs = repo.getLegalDocumentsByListing(listingId).first()
+        val docs: List<LegalDocument> = repo.getLegalDocumentsByListingSync(listingId)
         val promises = repo.getPromisesByListing(listingId).first()
         val viewings = repo.getViewingsByListing(listingId).first()
         val passport = repo.getPassportForListing(listingId)
