@@ -455,9 +455,33 @@ fun SettingsScreen() {
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    DorjaOutlinedButton(
-                                        text = "Reload / Update",
-                                        onClick = {
+            // Model file picker and load button
+            var modelUri by remember { mutableStateOf<android.net.Uri?>(null) }
+            var isLoading by remember { mutableStateOf(false) }
+            val launcher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: android.net.Uri? ->
+                modelUri = uri
+                if (uri != null) {
+                    isLoading = true
+                    // Load model asynchronously
+                    LaunchedEffect(uri) {
+                        try {
+                            DorjaApp.instance.aiEngine.loadModel(uri)
+                        } catch (e: Exception) {
+                            // Show error via Snackbar (placeholder)
+                            e.printStackTrace()
+                        } finally {
+                            isLoading = false
+                        }
+                    }
+                }
+            }
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                DorjaOutlinedButton(text = "Select Model File", onClick = { launcher.launch("*/*") })
+                if (isLoading) {
+                    CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+                }
+            }
+
                                             scope.launch {
                                                 val modelFile = aiEngine.findModelInDownloads()
                                                 if (modelFile != null) {
