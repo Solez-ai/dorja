@@ -1,0 +1,97 @@
+CI run: https://github.com/Solez-ai/dorja/actions/runs/34711310923
+Commit: a7a3bab02b446e1bdf12a4bf97d408fde2c1cfee
+
+=== Kotlin compiler errors ===
+e: file:///home/runner/work/dorja/dorja/dorja/app/src/main/java/com/example/ui/capture/CaptureScreen.kt:155:33 Unresolved reference 'navController'.
+e: file:///home/runner/work/dorja/dorja/dorja/app/src/main/java/com/example/ui/capture/CaptureScreen.kt:155:56 Unresolved reference 'Screen'.
+e: file:///home/runner/work/dorja/dorja/dorja/app/src/main/java/com/example/ui/capture/CaptureScreen.kt:155:89 Unresolved reference 'listing'.
+e: file:///home/runner/work/dorja/dorja/dorja/app/src/main/java/com/example/ui/detail/PropertyDetailScreen.kt:1130:21 Unresolved reference 'SpecPill'.
+e: file:///home/runner/work/dorja/dorja/dorja/app/src/main/java/com/example/ui/detail/PropertyDetailScreen.kt:1131:21 Unresolved reference 'SpecPill'.
+e: file:///home/runner/work/dorja/dorja/dorja/app/src/main/java/com/example/ui/detail/PropertyDetailScreen.kt:1132:21 Unresolved reference 'SpecPill'.
+e: file:///home/runner/work/dorja/dorja/dorja/app/src/main/java/com/example/ui/detail/PropertyDetailScreen.kt:1133:21 Unresolved reference 'SpecPill'.
+e: file:///home/runner/work/dorja/dorja/dorja/app/src/main/java/com/example/ui/detail/PropertyDetailScreen.kt:2043:1 Modifier 'private' is not applicable to 'local function'.
+e: file:///home/runner/work/dorja/dorja/dorja/app/src/main/java/com/example/ui/detail/PropertyDetailScreen.kt:2071:2 Syntax error: Expecting '}'.
+e: file:///home/runner/work/dorja/dorja/dorja/app/src/main/java/com/example/ui/navigation/DorjaNavHost.kt:262:13 Unresolved reference 'GuidedCaptureScreen'.
+e: file:///home/runner/work/dorja/dorja/dorja/app/src/main/java/com/example/ui/settings/SettingsScreen.kt:454:25 'when' expression must be exhaustive. Add the 'is Error', 'is Loading', 'NotLoaded', 'is Searching' branches or an 'else' branch.
+e: file:///home/runner/work/dorja/dorja/dorja/app/src/main/java/com/example/ui/settings/SettingsScreen.kt:468:21 Unresolved reference 'LaunchedEffect'.
+e: file:///home/runner/work/dorja/dorja/dorja/app/src/main/java/com/example/ui/settings/SettingsScreen.kt:470:56 Unresolved reference 'loadModel'.
+e: file:///home/runner/work/dorja/dorja/dorja/app/src/main/java/com/example/ui/settings/SettingsScreen.kt:489:102 Unresolved reference 'PackageManager'.
+e: file:///home/runner/work/dorja/dorja/dorja/app/src/main/java/com/example/ui/settings/SettingsScreen.kt:517:42 Syntax error: Unexpected tokens (use ';' to separate expressions on the same line).
+e: file:///home/runner/work/dorja/dorja/dorja/app/src/main/java/com/example/ui/settings/SettingsScreen.kt:518:41 Unresolved reference 'icon'.
+e: file:///home/runner/work/dorja/dorja/dorja/app/src/main/java/com/example/ui/settings/SettingsScreen.kt:518:69 Syntax error: Unexpected tokens (use ';' to separate expressions on the same line).
+e: file:///home/runner/work/dorja/dorja/dorja/app/src/main/java/com/example/ui/settings/SettingsScreen.kt:519:41 Unresolved reference 'modifier'.
+e: file:///home/runner/work/dorja/dorja/dorja/app/src/main/java/com/example/ui/settings/SettingsScreen.kt:520:37 Syntax error: Expecting an element.
+e: file:///home/runner/work/dorja/dorja/dorja/app/src/main/java/com/example/ui/settings/SettingsScreen.kt:531:29 Syntax error: Expecting an element.
+e: file:///home/runner/work/dorja/dorja/dorja/app/src/main/java/com/example/ui/settings/SettingsScreen.kt:531:46 Classifier 'data class Loading : AiEngineState' does not have a companion object, so it cannot be used as an expression.
+e: file:///home/runner/work/dorja/dorja/dorja/app/src/main/java/com/example/ui/settings/SettingsScreen.kt:531:54 Syntax error: Unexpected tokens (use ';' to separate expressions on the same line).
+e: file:///home/runner/work/dorja/dorja/dorja/app/src/main/java/com/example/ui/settings/SettingsScreen.kt:532:33 @Composable invocations can only happen from the context of a @Composable function
+e: file:///home/runner/work/dorja/dorja/dorja/app/src/main/java/com/example/ui/settings/SettingsScreen.kt:550:29 Syntax error: Expecting an element.
+e: file:///home/runner/work/dorja/dorja/dorja/app/src/main/java/com/example/ui/settings/SettingsScreen.kt:550:34 Syntax error: Unexpected tokens (use ';' to separate expressions on the same line).
+e: file:///home/runner/work/dorja/dorja/dorja/app/src/main/java/com/example/ui/settings/SettingsScreen.kt:551:33 @Composable invocations can only happen from the context of a @Composable function
+e: file:///home/runner/work/dorja/dorja/dorja/app/src/main/java/com/example/ui/settings/SettingsScreen.kt:577:13 Unresolved reference 'item'.
+e: file:///home/runner/work/dorja/dorja/dorja/app/src/main/java/com/example/ui/settings/SettingsScreen.kt:578:17 @Composable invocations can only happen from the context of a @Composable function
+e: file:///home/runner/work/dorja/dorja/dorja/app/src/main/java/com/example/ui/settings/SettingsScreen.kt:599:1 Syntax error: Expecting a top level declaration.
+e: file:///home/runner/work/dorja/dorja/dorja/app/src/main/java/com/example/ui/util/DisclosurePackExporter.kt:45:46 Unresolved reference 'getLegalDocumentsByListingSync'.
+> Task :app:compileDebugKotlin FAILED
+
+=== Build failure tail ===
+	at org.gradle.internal.execution.steps.legacy.MarkSnapshottingInputsStartedStep.execute(MarkSnapshottingInputsStartedStep.java:38)
+	at org.gradle.internal.execution.steps.LoadPreviousExecutionStateStep.execute(LoadPreviousExecutionStateStep.java:36)
+	at org.gradle.internal.execution.steps.LoadPreviousExecutionStateStep.execute(LoadPreviousExecutionStateStep.java:23)
+	at org.gradle.internal.execution.steps.HandleStaleOutputsStep.executeMutable(HandleStaleOutputsStep.java:77)
+	at org.gradle.internal.execution.steps.HandleStaleOutputsStep.executeMutable(HandleStaleOutputsStep.java:43)
+	at org.gradle.internal.execution.steps.MutableStep.execute(MutableStep.java:25)
+	at org.gradle.internal.execution.steps.AssignMutableWorkspaceStep.lambda$execute$0(AssignMutableWorkspaceStep.java:35)
+	at org.gradle.api.internal.tasks.execution.TaskExecution$4.withWorkspace(TaskExecution.java:305)
+	at org.gradle.internal.execution.steps.AssignMutableWorkspaceStep.execute(AssignMutableWorkspaceStep.java:31)
+	at org.gradle.internal.execution.steps.AssignMutableWorkspaceStep.execute(AssignMutableWorkspaceStep.java:22)
+	at org.gradle.internal.execution.steps.ChoosePipelineStep.execute(ChoosePipelineStep.java:40)
+	at org.gradle.internal.execution.steps.ChoosePipelineStep.execute(ChoosePipelineStep.java:23)
+	at org.gradle.internal.execution.steps.ExecuteWorkBuildOperationFiringStep.lambda$execute$2(ExecuteWorkBuildOperationFiringStep.java:67)
+	at org.gradle.internal.execution.steps.ExecuteWorkBuildOperationFiringStep.execute(ExecuteWorkBuildOperationFiringStep.java:67)
+	at org.gradle.internal.execution.steps.ExecuteWorkBuildOperationFiringStep.execute(ExecuteWorkBuildOperationFiringStep.java:39)
+	at org.gradle.internal.execution.steps.IdentityCacheStep.execute(IdentityCacheStep.java:46)
+	at org.gradle.internal.execution.steps.IdentityCacheStep.execute(IdentityCacheStep.java:34)
+	at org.gradle.internal.execution.steps.IdentifyStep.execute(IdentifyStep.java:44)
+	at org.gradle.internal.execution.steps.IdentifyStep.execute(IdentifyStep.java:31)
+	at org.gradle.internal.execution.impl.DefaultExecutionEngine$1.execute(DefaultExecutionEngine.java:68)
+	at org.gradle.api.internal.tasks.execution.ExecuteActionsTaskExecuter.executeIfValid(ExecuteActionsTaskExecuter.java:132)
+	... 30 more
+Caused by: org.jetbrains.kotlin.gradle.tasks.CompilationErrorException: Compilation error. See log for more details
+	at org.jetbrains.kotlin.gradle.tasks.TasksUtilsKt.throwExceptionIfCompilationFailed(tasksUtils.kt:21)
+	at org.jetbrains.kotlin.compilerRunner.GradleKotlinCompilerWork.run(GradleKotlinCompilerWork.kt:119)
+	at org.jetbrains.kotlin.compilerRunner.GradleCompilerRunnerWithWorkers$GradleKotlinCompilerWorkAction.execute(GradleCompilerRunnerWithWorkers.kt:74)
+	at org.gradle.workers.internal.DefaultWorkerServer.execute(DefaultWorkerServer.java:68)
+	at org.gradle.workers.internal.NoIsolationWorkerFactory$1$1.create(NoIsolationWorkerFactory.java:64)
+	at org.gradle.workers.internal.NoIsolationWorkerFactory$1$1.create(NoIsolationWorkerFactory.java:61)
+	at org.gradle.internal.classloader.ClassLoaderUtils.executeInClassloader(ClassLoaderUtils.java:102)
+	at org.gradle.workers.internal.NoIsolationWorkerFactory$1.lambda$execute$0(NoIsolationWorkerFactory.java:61)
+	at org.gradle.workers.internal.AbstractWorker$1.call(AbstractWorker.java:44)
+	at org.gradle.workers.internal.AbstractWorker$1.call(AbstractWorker.java:41)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:209)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$CallableBuildOperationWorker.execute(DefaultBuildOperationRunner.java:204)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:66)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner$2.execute(DefaultBuildOperationRunner.java:59)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:166)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.execute(DefaultBuildOperationRunner.java:59)
+	at org.gradle.internal.operations.DefaultBuildOperationRunner.call(DefaultBuildOperationRunner.java:53)
+	at org.gradle.workers.internal.AbstractWorker.executeWrappedInBuildOperation(AbstractWorker.java:41)
+	at org.gradle.workers.internal.NoIsolationWorkerFactory$1.execute(NoIsolationWorkerFactory.java:58)
+	at org.gradle.workers.internal.DefaultWorkerExecutor.lambda$submitWork$0(DefaultWorkerExecutor.java:176)
+	at org.gradle.internal.work.DefaultConditionalExecutionQueue$ExecutionRunner.runExecution(DefaultConditionalExecutionQueue.java:194)
+	at org.gradle.internal.work.DefaultConditionalExecutionQueue$ExecutionRunner.access$700(DefaultConditionalExecutionQueue.java:127)
+	at org.gradle.internal.work.DefaultConditionalExecutionQueue$ExecutionRunner$1.run(DefaultConditionalExecutionQueue.java:169)
+	at org.gradle.internal.Factories$1.create(Factories.java:30)
+	at org.gradle.internal.work.DefaultWorkerLeaseService.lambda$withLocksAcquired$0(DefaultWorkerLeaseService.java:269)
+	at org.gradle.internal.work.ResourceLockStatistics$1.measure(ResourceLockStatistics.java:42)
+	at org.gradle.internal.work.DefaultWorkerLeaseService.withLocksAcquired(DefaultWorkerLeaseService.java:267)
+	at org.gradle.internal.work.DefaultWorkerLeaseService.withLocks(DefaultWorkerLeaseService.java:259)
+	at org.gradle.internal.work.DefaultWorkerLeaseService.runAsWorkerThread(DefaultWorkerLeaseService.java:127)
+	at org.gradle.internal.work.DefaultWorkerLeaseService.runAsWorkerThread(DefaultWorkerLeaseService.java:132)
+	at org.gradle.internal.work.DefaultConditionalExecutionQueue$ExecutionRunner.runBatch(DefaultConditionalExecutionQueue.java:164)
+	at org.gradle.internal.work.DefaultConditionalExecutionQueue$ExecutionRunner.run(DefaultConditionalExecutionQueue.java:133)
+	... 2 more
+
+
+BUILD FAILED in 36s
+32 actionable tasks: 13 executed, 19 from cache
