@@ -110,6 +110,8 @@ dependencies {
   implementation(libs.androidx.camera.view)
   implementation(libs.coil.compose)
   implementation(libs.converter.moshi)
+  implementation(libs.tensorflow.lite)
+  implementation(libs.tensorflow.lite.gpu)
 
   // Uncomment to use Firestore:
   // implementation(libs.firebase.firestore)

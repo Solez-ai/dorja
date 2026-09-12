@@ -462,6 +462,7 @@ class DorjaRepository(private val database: DorjaDatabase) {
             )
         }
     }
+    fun getLegalDocumentsByListing(listingId: String): Flow<List<LegalDocument>> = legalDocumentDao.getLegalDocumentsByListing(listingId)
     suspend fun getLegalDocumentsByListingSync(listingId: String): List<LegalDocument> = legalDocumentDao.getLegalDocumentsByListingSync(listingId)
     suspend fun addLegalDocument(doc: LegalDocument) {
         legalDocumentDao.insertLegalDocument(doc)

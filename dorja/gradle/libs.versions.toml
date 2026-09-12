@@ -46,6 +46,7 @@ googleid = "1.1.1"
 
 zxing = "3.5.3"
 arcore = "1.47.0"
+tensorflowLite = "2.16.1"
 
 [libraries]
 zxing-core = { group = "com.google.zxing", name = "core", version.ref = "zxing" }
@@ -103,6 +104,8 @@ firebase-auth = { group = "com.google.firebase", name = "firebase-auth" }
 androidx-credentials = { group = "androidx.credentials", name = "credentials", version.ref = "credentials" }
 androidx-credentials-play-services = { group = "androidx.credentials", name = "credentials-play-services-auth", version.ref = "credentials" }
 googleid = { group = "com.google.android.libraries.identity.googleid", name = "googleid", version.ref = "googleid" }
+tensorflow-lite = { group = "org.tensorflow", name = "tensorflow-lite", version.ref = "tensorflowLite" }
+tensorflow-lite-gpu = { group = "org.tensorflow", name = "tensorflow-lite-gpu", version.ref = "tensorflowLite" }
 
 
 [plugins]

@@ -8,6 +8,7 @@ import com.example.data.work.EvidenceRetentionWorker
 class DorjaApp : Application() {
     val database by lazy { DorjaDatabase.getDatabase(this) }
     val repository by lazy { DorjaRepository(database) }
+    val aiEngine by lazy { com.example.ai.DorjaAiEngine.getInstance(this) }
 
     override fun onCreate() {
         super.onCreate()

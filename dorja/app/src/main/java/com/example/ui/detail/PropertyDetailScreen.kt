@@ -108,6 +108,19 @@ import com.example.ui.components.DorjaOutlinedButton
 import com.example.ui.components.SafeAddressShield
 import com.example.data.model.ReportReason
 import com.example.ui.negotiation.ConflictCard
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.material.icons.filled.Mic
+import com.example.ai.PropertyAiContext
+import com.example.ai.VoiceAssistantHelper
+import com.example.ui.ai.HeyDorjaAssistantSheet
+import com.example.ui.components.DorjaLogo
+import com.example.ui.theme.pressScale
 import com.example.ui.theme.DorjaColors
 import com.example.ui.util.Formatters
 import kotlinx.coroutines.launch
@@ -137,6 +150,8 @@ fun PropertyDetailScreen(
     val rooms by repository.getRoomsByListing(listingId).collectAsState(initial = emptyList())
     val passport by repository.observePassportForListing(listingId).collectAsState(initial = null)
     val endorsements by repository.observeEndorsementsForListing(listingId).collectAsState(initial = emptyList())
+    val legalDocs by repository.getLegalDocumentsByListing(listingId).collectAsState(initial = emptyList())
+    val promises by repository.getPromisesByListing(listingId).collectAsState(initial = emptyList())
     val listingReports by repository.observeReportsForListing(listingId).collectAsState(initial = emptyList<Report>())
     val reportResponsesById = listingReports.associate { report ->
         report.id to repository.observeResponsesForReport(report.id).collectAsState(initial = emptyList<ReportResponse>()).value
@@ -145,6 +160,60 @@ fun PropertyDetailScreen(
         report.id to repository.observeAppealsForReport(report.id).collectAsState(initial = emptyList<AppealRecord>()).value
     }
     val currentUser by repository.currentUser.collectAsState()
+
+    var showHeyDorjaSheet by remember { mutableStateOf(false) }
+
+    val propertyAiContext = remember(listing, rooms, passport, legalDocs, promises, endorsements) {
+        listing?.let {
+            PropertyAiContext.from(
+                listing = it,
+                rooms = rooms,
+                passport = passport,
+                documents = legalDocs,
+                promises = promises,
+                endorsements = endorsements
+            )
+        }
+    }
+
+    // "Hey Dorja" Hotword and Voice Trigger
+    val voiceHelper = remember { VoiceAssistantHelper(context) }
+    var hasAudioPermission by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.RECORD_AUDIO
+            ) == PackageManager.PERMISSION_GRANTED
+        )
+    }
+
+    val audioPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        hasAudioPermission = granted
+        if (granted) {
+            voiceHelper.startListening(onResult = { recognized ->
+                val lower = recognized.lowercase()
+                if (lower.contains("dorja") || lower.contains("hey")) {
+                    showHeyDorjaSheet = true
+                }
+            })
+        }
+    }
+
+    DisposableEffect(hasAudioPermission) {
+        if (hasAudioPermission && voiceHelper.isAvailable()) {
+            voiceHelper.startListening(onResult = { recognized ->
+                val lower = recognized.lowercase()
+                if (lower.contains("dorja") || lower.contains("hey")) {
+                    showHeyDorjaSheet = true
+                }
+            })
+        }
+        onDispose {
+            voiceHelper.stopListening()
+        }
+    }
 
     var showVisitRequestDialog by remember { mutableStateOf(false) }
     var visitScheduledSuccess by remember { mutableStateOf(false) }
@@ -1859,6 +1928,60 @@ fun PropertyDetailScreen(
                 }
             }
         }
+
+        // Floating "Hey Dorja" Assistant Button
+        Surface(
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = 16.dp, bottom = 86.dp)
+                .pressScale(onClick = {
+                    if (!hasAudioPermission) {
+                        audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                    }
+                    showHeyDorjaSheet = true
+                }),
+            shape = RoundedCornerShape(24.dp),
+            color = DorjaColors.White,
+            shadowElevation = 8.dp,
+            border = BorderStroke(1.2.dp, DorjaColors.Jol600.copy(alpha = 0.6f))
+        ) {
+            Row(
+                modifier = Modifier
+                    .background(
+                        Brush.horizontalGradient(
+                            listOf(
+                                DorjaColors.Jol600.copy(alpha = 0.08f),
+                                DorjaColors.White
+                            )
+                        )
+                    )
+                    .padding(horizontal = 14.dp, vertical = 9.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                DorjaLogo(modifier = Modifier.size(20.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Hey Dorja",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = DorjaColors.Jol600
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Icon(
+                    imageVector = Icons.Default.Mic,
+                    contentDescription = null,
+                    tint = DorjaColors.Jol600,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+        }
+    }
+
+    if (showHeyDorjaSheet) {
+        HeyDorjaAssistantSheet(
+            propertyContext = propertyAiContext,
+            onDismiss = { showHeyDorjaSheet = false }
+        )
     }
 }
 
