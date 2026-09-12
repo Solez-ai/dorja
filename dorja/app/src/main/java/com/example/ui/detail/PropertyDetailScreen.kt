@@ -60,9 +60,11 @@ import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.SquareFoot
 import androidx.compose.material.icons.filled.ViewInAr
 import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -70,6 +72,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -188,8 +191,8 @@ fun PropertyDetailScreen(
     }
 
     val audioPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { granted ->
+    contract = ActivityResultContracts.RequestPermission()
+) { granted ->
         hasAudioPermission = granted
         if (granted) {
             voiceHelper.startListening(onResult = { recognized ->
@@ -200,6 +203,12 @@ fun PropertyDetailScreen(
             })
         }
     }
+
+val legalDocPicker = rememberLauncherForActivityResult(
+    contract = ActivityResultContracts.GetContent()
+) { uri: Uri? ->
+    uri?.let { scope.launch { repository.addLegalDocument(listingId, it) } }
+}
 
     DisposableEffect(hasAudioPermission) {
         if (hasAudioPermission && voiceHelper.isAvailable()) {
@@ -1574,7 +1583,38 @@ fun PropertyDetailScreen(
                 }
 
                 }
-            // Professional Handoff (Phase 4, atlas §8) — a licensed professional
+            // Legal Documents List
+            item {
+                if (legalDocs.isNotEmpty()) {
+                    Column(modifier = Modifier.padding(vertical = 8.dp, horizontal = 12.dp)) {
+                        Text(
+                            text = "Legal Documents",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = DorjaColors.Ink950,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        legalDocs.forEach { doc ->
+                            ListItem(
+                                headlineContent = { Text(doc.documentTitle) },
+                                supportingContent = { Text("Type: ${doc.documentType}") },
+                                leadingContent = {
+                                    Icon(imageVector = Icons.Default.Description, contentDescription = null)
+                                }
+                            )
+                            HorizontalDivider()
+                        }
+                    }
+                } else {
+                    Text(
+                        text = "No legal documents attached.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = DorjaColors.Gray500,
+                        modifier = Modifier.padding(horizontal = 12.dp)
+                    )
+                }
+            }
+// Professional Handoff (Phase 4, atlas §8) — a licensed professional
             // signs for one section of the listing's evidence.
             item {
                 BentoCard(modifier = Modifier.fillMaxWidth()) {
@@ -1973,7 +2013,21 @@ fun PropertyDetailScreen(
                     tint = DorjaColors.Jol600,
                     modifier = Modifier.size(16.dp)
                 )
-            }
+        }
+
+        // FAB to add Legal Document
+        FloatingActionButton(
+            onClick = { legalDocPicker.launch("*/*") },
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(start = 16.dp, bottom = 86.dp),
+            containerColor = DorjaColors.Jol600,
+            contentColor = DorjaColors.White
+        ) {
+            Icon(
+                imageVector = Icons.Default.AttachFile,
+                contentDescription = "Add Legal Document"
+            )
         }
     }
 

@@ -27,6 +27,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import android.net.Uri
 import java.util.UUID
 
 class DorjaRepository(private val database: DorjaDatabase) {
@@ -463,9 +464,32 @@ class DorjaRepository(private val database: DorjaDatabase) {
         }
     }
 // Removed unused sync method – keep async Flow version only
+    // Removed unused sync method – keep async Flow version only
     suspend fun addLegalDocument(doc: LegalDocument) {
         legalDocumentDao.insertLegalDocument(doc)
     }
+
+    // Helper to add captured photo (placeholder implementation)
+    suspend fun addCapturedPhoto(listingId: String, uri: Uri): Result<Unit> {
+        // TODO: Persist captured photo reference (e.g., in a Photo table)
+        // Placeholder returns success to satisfy compilation
+        return Result.success(Unit)
+    }
+
+    // Helper to add a legal document from a Uri (placeholder implementation)
+    suspend fun addLegalDocument(listingId: String, uri: Uri): Result<Unit> {
+        val doc = LegalDocument(
+            id = "ld_" + UUID.randomUUID().toString().take(8),
+            listingId = listingId,
+            documentType = "UNKNOWN",
+            documentTitle = uri.lastPathSegment ?: "Document",
+            documentNumber = "",
+            issuingAuthority = ""
+        )
+        legalDocumentDao.insertLegalDocument(doc)
+        return Result.success(Unit)
+    }
+
     suspend fun deleteLegalDocument(docId: String) {
         legalDocumentDao.deleteLegalDocumentById(docId)
     }
