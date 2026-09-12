@@ -93,6 +93,7 @@ import com.example.ui.theme.LiquidGlassDefaults
 import com.example.ui.theme.LocalDarkTheme
 import com.example.ui.theme.liquidGlass
 import com.example.ui.theme.pressScale
+import com.example.ui.components.MicButton
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -273,6 +274,11 @@ fun HeyDorjaAssistantSheet(
                         modifier = Modifier.size(20.dp)
                     )
                 }
+                MicButton(
+                    isListening = isListening,
+                    onToggle = { toggleVoice() },
+                    modifier = Modifier.size(32.dp)
+                )
             }
 
             // Property Context Strip

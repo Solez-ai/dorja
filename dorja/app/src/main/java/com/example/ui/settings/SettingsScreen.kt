@@ -41,8 +41,10 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.sp
+import android.Manifest
 import com.example.ai.AiEngineState
 import com.example.ai.DorjaAiEngine
+import androidx.core.content.ContextCompat
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -475,12 +477,33 @@ fun SettingsScreen() {
                     }
                 }
             }
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                DorjaOutlinedButton(text = "Select Model File", onClick = { launcher.launch("*/*") })
-                if (isLoading) {
-                    CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
-                }
-            }
+Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+    // Permission request for external storage
+    val storagePermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        // Permission result handled on button click
+    }
+    val hasStoragePermission = remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(context, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
+        )
+    }
+    DorjaOutlinedButton(text = "Select Model File", onClick = {
+        if (hasStoragePermission.value) {
+            launcher.launch("*/*")
+        } else {
+            storagePermissionLauncher.launch(Manifest.permission.READ_EXTERNAL_STORAGE)
+        }
+    })
+    if (isLoading) {
+        CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
+    }
+    DorjaOutlinedButton(text = "Download Model", onClick = {
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(DorjaAiEngine.MODEL_DOWNLOAD_URL))
+        context.startActivity(intent)
+    })
+}
 
                                             scope.launch {
                                                 val modelFile = aiEngine.findModelInDownloads()

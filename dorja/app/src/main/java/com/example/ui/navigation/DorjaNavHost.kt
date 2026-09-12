@@ -110,6 +110,9 @@ sealed class Screen(val route: String) {
     object RoomScanner : Screen("room_scanner/{listingId}") {
         fun createRoute(listingId: String) = "room_scanner/$listingId"
     }
+    object GuidedCapture : Screen("guided_capture/{listingId}") {
+        fun createRoute(listingId: String) = "guided_capture/$listingId"
+    }
     object RelocationMode : Screen("relocation_mode?origin={origin}&dest={dest}") {
         fun createRoute(origin: String, destination: String) = "relocation_mode?origin=$origin&dest=$destination"
     }
@@ -248,6 +251,17 @@ fun DorjaNavHost() {
                 onScanComplete = { _, _ ->
                     navController.popBackStack()
                 }
+            )
+        }
+
+        composable(
+            route = Screen.GuidedCapture.route,
+            arguments = listOf(navArgument("listingId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val listingId = backStackEntry.arguments?.getString("listingId") ?: "l1"
+            GuidedCaptureScreen(
+                listingId = listingId,
+                onBack = { navController.popBackStack() }
             )
         }
 

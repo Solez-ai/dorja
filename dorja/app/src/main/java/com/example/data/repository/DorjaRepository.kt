@@ -462,7 +462,7 @@ class DorjaRepository(private val database: DorjaDatabase) {
             )
         }
     }
-    suspend fun getLegalDocumentsByListingSync(listingId: String): List<LegalDocument> = legalDocumentDao.getLegalDocumentsByListingSync(listingId)
+// Removed unused sync method – keep async Flow version only
     suspend fun addLegalDocument(doc: LegalDocument) {
         legalDocumentDao.insertLegalDocument(doc)
     }
