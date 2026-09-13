@@ -42,7 +42,7 @@ import kotlinx.coroutines.launch
         ReportResponse::class,
         AppealRecord::class
     ],
-    version = 12,
+    version = 13,
     exportSchema = false
 )
 @TypeConverters(Converters::class)

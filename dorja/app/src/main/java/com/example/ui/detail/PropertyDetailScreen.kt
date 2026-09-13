@@ -143,6 +143,8 @@ fun PropertyDetailScreen(
     onOpenScanner: (String) -> Unit = {},
     onChatWithSeller: (String, String, String) -> Unit,
     onViewHandoverPassport: (String) -> Unit,
+    /** Invoked when the AI sheet's "Go to Settings" asks for the Settings tab. */
+    onOpenSettingsTab: () -> Unit = {},
 
 ) {
     val repository = DorjaApp.instance.repository
@@ -209,6 +211,21 @@ val legalDocPicker = rememberLauncherForActivityResult(
 ) { uri: Uri? ->
     uri?.let { scope.launch { repository.addLegalDocument(listingId, it) } }
 }
+
+    // Guided optical capture: real camera via FileProvider, persisted to the listing gallery
+    var pendingCaptureFile by remember { mutableStateOf<java.io.File?>(null) }
+    val cameraCaptureLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicture()
+    ) { success ->
+        val file = pendingCaptureFile
+        if (success && file != null) {
+            val uri = FileProvider.getUriForFile(context, context.packageName + ".fileprovider", file)
+            scope.launch { repository.addCapturedPhoto(listingId, uri.toString()) }
+        } else {
+            file?.takeIf { it.length() == 0L }?.delete()
+        }
+        pendingCaptureFile = null
+    }
 
     DisposableEffect(hasAudioPermission) {
         if (hasAudioPermission && voiceHelper.isAvailable()) {
@@ -1331,6 +1348,85 @@ val legalDocPicker = rememberLauncherForActivityResult(
                     }
                 }
 
+                // HOST: Guided optical capture card (owner only)
+                if (isOwner) {
+                    BentoCard(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                val captureFile = java.io.File(
+                                    java.io.File(context.filesDir, "captures").apply { mkdirs() },
+                                    "capture_${System.currentTimeMillis()}.jpg"
+                                )
+                                pendingCaptureFile = captureFile
+                                cameraCaptureLauncher.launch(
+                                    FileProvider.getUriForFile(context, context.packageName + ".fileprovider", captureFile)
+                                )
+                            }
+                            .testTag("host_guided_capture_card")
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(38.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(DorjaColors.Gray700.copy(alpha = 0.12f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.CameraAlt,
+                                        contentDescription = "Guided Capture",
+                                        tint = DorjaColors.Gray700,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Column {
+                                    Text(
+                                        text = "Guided Optical Capture",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        color = DorjaColors.Ink950,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = "Camera photos for structural verification",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = DorjaColors.Gray700,
+                                        fontSize = 11.sp
+                                    )
+                                }
+                            }
+
+                            DorjaButton(
+                                text = "Capture",
+                                onClick = {
+                                    val captureFile = java.io.File(
+                                        java.io.File(context.filesDir, "captures").apply { mkdirs() }
+                                        , "capture_${System.currentTimeMillis()}.jpg"
+                                    )
+                                    pendingCaptureFile = captureFile
+                                    cameraCaptureLauncher.launch(
+                                        FileProvider.getUriForFile(context, context.packageName + ".fileprovider", captureFile)
+                                    )
+                                },
+                                icon = Icons.Default.CameraAlt,
+                                modifier = Modifier.height(34.dp),
+                                testTag = "host_guided_capture_button"
+                            )
+                        }
+                    }
+                }
+
                 // Rooms Showcase Bento Card with Photos
                 BentoCard(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(12.dp)) {
@@ -2035,7 +2131,8 @@ val legalDocPicker = rememberLauncherForActivityResult(
     if (showHeyDorjaSheet) {
         HeyDorjaAssistantSheet(
             propertyContext = propertyAiContext,
-            onDismiss = { showHeyDorjaSheet = false }
+            onDismiss = { showHeyDorjaSheet = false },
+            onNavigateToSettings = onOpenSettingsTab
         )
     }
 }

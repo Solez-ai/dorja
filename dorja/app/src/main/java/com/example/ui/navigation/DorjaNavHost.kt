@@ -38,6 +38,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -147,6 +148,9 @@ fun DorjaNavHost() {
     val navController = rememberNavController()
     val repository = DorjaApp.instance.repository
     val currentUser by repository.currentUser.collectAsState()
+    // Bumped when a stacked screen (e.g. Hey Dorja AI sheet) asks to open the
+    // Settings tab inside MainContainer's drawer navigation.
+    var settingsTabRequest by remember { mutableStateOf(0) }
 
     NavHost(
         navController = navController,
@@ -203,7 +207,8 @@ fun DorjaNavHost() {
                     navController.navigate(Screen.Auth.route) {
                         popUpTo(0) { inclusive = true }
                     }
-                }
+                },
+                settingsTabRequest = settingsTabRequest
             )
         }
 
@@ -226,7 +231,11 @@ fun DorjaNavHost() {
                         }
                     }
                 },
-                onViewHandoverPassport = { id -> navController.navigate(Screen.HandoverPassport.createRoute(id)) }
+                onViewHandoverPassport = { id -> navController.navigate(Screen.HandoverPassport.createRoute(id)) },
+                onOpenSettingsTab = {
+                    settingsTabRequest++
+                    navController.popBackStack()
+                }
             )
         }
 
@@ -341,7 +350,9 @@ fun MainContainer(
     onNavigateToPass: (String) -> Unit,
     onNavigateToHandover: (String) -> Unit,
     onNavigateToRelocation: (String, String) -> Unit = { _, _ -> },
-    onLogout: () -> Unit = {}
+    onLogout: () -> Unit = {},
+    /** Incremented by outside screens (e.g. AI sheet) to request the Settings tab. */
+    settingsTabRequest: Int = 0
 ) {
     val repository = DorjaApp.instance.repository
     val currentUser by repository.currentUser.collectAsState()
@@ -351,6 +362,13 @@ fun MainContainer(
     var currentBuyerTab by remember { mutableStateOf(BuyerTab.EXPLORE) }
     var drawerOpen by remember { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
+
+    // Honor Settings-tab requests coming from stacked destinations (Hey Dorja sheet)
+    LaunchedEffect(settingsTabRequest) {
+        if (settingsTabRequest > 0) {
+            if (isHost) currentHostTab = HostTab.SETTINGS else currentBuyerTab = BuyerTab.SETTINGS
+        }
+    }
 
     val progress by animateFloatAsState(
         targetValue = if (drawerOpen) 1f else 0f,

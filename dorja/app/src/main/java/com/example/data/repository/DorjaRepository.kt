@@ -469,14 +469,25 @@ class DorjaRepository(private val database: DorjaDatabase) {
         legalDocumentDao.insertLegalDocument(doc)
     }
 
-    // Helper to add captured photo (placeholder implementation)
-    suspend fun addCapturedPhoto(listingId: String, uri: Uri): Result<Unit> {
-        // TODO: Persist captured photo reference (e.g., in a Photo table)
-        // Placeholder returns success to satisfy compilation
-        return Result.success(Unit)
+    /**
+     * Appends a captured verification photo to the listing's gallery.
+     * Photos are stored as newline-separated content Uris on the listing row.
+     */
+    suspend fun addCapturedPhoto(listingId: String, uri: String): Result<Unit> {
+        return try {
+            val listing = listingDao.getListingById(listingId) ?: return Result.failure(
+                IllegalStateException("Listing not found: $listingId")
+            )
+            val updated = if (listing.galleryUris.isBlank()) uri
+            else listing.galleryUris + "\n" + uri
+            listingDao.updateListing(listing.copy(galleryUris = updated))
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
     }
 
-    // Helper to add a legal document from a Uri (placeholder implementation)
+    // Helper to add a legal document picked from a Uri
     suspend fun addLegalDocument(listingId: String, uri: Uri): Result<Unit> {
         val doc = LegalDocument(
             id = "ld_" + UUID.randomUUID().toString().take(8),
