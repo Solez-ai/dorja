@@ -366,6 +366,7 @@ fun ExploreScreen(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ExploreListingCard(
     listing: Listing,
