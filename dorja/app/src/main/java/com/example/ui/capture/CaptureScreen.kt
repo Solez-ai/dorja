@@ -152,7 +152,7 @@ fun CaptureScreen(
                     description = "Anti-distortion wide-angle photo sequencing for structural verification.",
                     icon = Icons.Default.CameraAlt,
                     accentColor = DorjaColors.Gray700,
-                    onClick = { navController.navigate(Screen.GuidedCapture.createRoute(listing.id)) },
+                    onClick = { /* TODO: wire GuidedCapture route via nav callback */ },
                     testTag = "action_photo_capture"
                 )
             }

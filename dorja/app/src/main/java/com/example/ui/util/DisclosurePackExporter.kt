@@ -42,7 +42,7 @@ object DisclosurePackExporter {
     suspend fun generate(context: Context, listingId: String): File? {
         val repo = DorjaApp.instance.repository
         val listing = repo.getListingById(listingId) ?: return null
-        val docs: List<LegalDocument> = repo.getLegalDocumentsByListingSync(listingId)
+        val docs: List<LegalDocument> = repo.getLegalDocumentsByListing(listingId).first()
         val promises = repo.getPromisesByListing(listingId).first()
         val viewings = repo.getViewingsByListing(listingId).first()
         val passport = repo.getPassportForListing(listingId)

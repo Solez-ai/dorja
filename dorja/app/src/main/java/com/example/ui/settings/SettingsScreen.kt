@@ -41,10 +41,8 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.sp
-import android.Manifest
 import com.example.ai.AiEngineState
 import com.example.ai.DorjaAiEngine
-import androidx.core.content.ContextCompat
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -457,53 +455,9 @@ fun SettingsScreen() {
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-            // Model file picker and load button
-            var modelUri by remember { mutableStateOf<android.net.Uri?>(null) }
-            var isLoading by remember { mutableStateOf(false) }
-            val launcher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: android.net.Uri? ->
-                modelUri = uri
-                if (uri != null) {
-                    isLoading = true
-                    // Load model asynchronously
-                    LaunchedEffect(uri) {
-                        try {
-                            DorjaApp.instance.aiEngine.loadModel(uri)
-                        } catch (e: Exception) {
-                            // Show error via Snackbar (placeholder)
-                            e.printStackTrace()
-                        } finally {
-                            isLoading = false
-                        }
-                    }
-                }
-            }
-Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-    // Permission request for external storage
-    val storagePermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        // Permission result handled on button click
-    }
-    val hasStoragePermission = remember {
-        mutableStateOf(
-            ContextCompat.checkSelfPermission(context, Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED
-        )
-    }
-    DorjaOutlinedButton(text = "Select Model File", onClick = {
-        if (hasStoragePermission.value) {
-            launcher.launch("*/*")
-        } else {
-            storagePermissionLauncher.launch(Manifest.permission.READ_EXTERNAL_STORAGE)
-        }
-    })
-    if (isLoading) {
-        CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
-    }
-    DorjaOutlinedButton(text = "Download Model", onClick = {
-        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(DorjaAiEngine.MODEL_DOWNLOAD_URL))
-        context.startActivity(intent)
-    })
-}
+                                    DorjaOutlinedButton(
+                                        text = "Reload / Update",
+                                        onClick = {
 
                                             scope.launch {
                                                 val modelFile = aiEngine.findModelInDownloads()

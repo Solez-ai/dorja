@@ -2013,6 +2013,7 @@ val legalDocPicker = rememberLauncherForActivityResult(
                     tint = DorjaColors.Jol600,
                     modifier = Modifier.size(16.dp)
                 )
+            }
         }
 
         // FAB to add Legal Document

@@ -66,6 +66,7 @@ import androidx.navigation.navArgument
 import com.example.DorjaApp
 import com.example.ui.account.AccountScreen
 import com.example.ui.auth.AuthScreen
+import com.example.ui.capture.GuidedCaptureScreen
 import com.example.ui.chat.ChatThreadScreen
 import com.example.ui.chat.InboxScreen
 import com.example.ui.detail.PropertyDetailScreen
