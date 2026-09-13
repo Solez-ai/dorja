@@ -18,14 +18,13 @@ import android.os.Vibrator
 import android.os.VibratorManager
 import android.util.Log
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -60,8 +59,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.ChevronLeft
-import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.MeetingRoom
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Badge
@@ -87,9 +84,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -130,13 +125,9 @@ private enum class Phase { SELECT, PREVIEW, CAPTURING, DONE }
 private const val TOTAL_SHOTS = 12
 private val Accent = Color(0xFF00BCD4)
 private val Green = Color(0xFF4CAF50)
-private val RailYellow = Color(0xFFFFC107)
 
 data class FrameData(val path: String, val heading: Float)
 private const val CAMERA_HFOV_DEG = 63.0 // typical phone horizontal FOV
-// On-target windows: shutter locks green only inside both tolerances
-private const val HEADING_TOLERANCE_DEG = 10f
-private const val TILT_TOLERANCE_DEG = 12f
 
 // ═════════════════════════════════════════════════════════════
 //  MAIN SCREEN
@@ -283,7 +274,7 @@ private fun SelectRoom(rooms: List<RoomItem>, onSelect: (RoomItem) -> Unit, onBa
             Column(Modifier.padding(14.dp)) {
                 Text("How it works", color = DorjaColors.White, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(4.dp))
-                Text("Follow the yellow dot: pan slowly until it locks green in the center, then tap the shutter.\n$TOTAL_SHOTS photos blend into a 360° panorama — no need to tilt or move more than guided.", color = DorjaColors.Sand300, fontSize = 12.sp, lineHeight = 16.sp)
+                Text("Capture $TOTAL_SHOTS overlapping photos around the room.\nThey are blended into a 360° panorama.", color = DorjaColors.Sand300, fontSize = 12.sp, lineHeight = 16.sp)
             }
         }
         Spacer(Modifier.height(16.dp))
@@ -354,22 +345,12 @@ private fun PreviewPhase(imageCapture: ImageCapture?, onCaptureReady: (ImageCapt
 @Composable
 private fun CapturingPhase(imageCapture: ImageCapture?, onCaptureReady: (ImageCapture) -> Unit, hasCamera: Boolean, heading: Float, currentPitch: Float, targetIndex: Int, totalShots: Int, capturedCount: Int, frames: SnapshotStateList<FrameData>, gyroOn: Boolean, onToggleGyro: () -> Unit, onCapture: () -> Unit, onStop: () -> Unit, onBack: () -> Unit, lifecycleOwner: androidx.lifecycle.LifecycleOwner) {
     val targetAngle = targetIndex * (360 / totalShots)
-    // Ideal vertical tilt for this shot (matches the elevation profile)
-    val idealPitch = when (targetIndex % 6) {
-        1, 5 -> -15f  // tilt up (phone tilted back)
-        3 -> 15f      // tilt down (phone tilted forward)
-        else -> 0f    // level
-    }
-    // On-target = heading AND tilt both inside tolerance
-    val headingDelta = angularDeltaDeg(heading, targetAngle.toFloat())
-    val tiltDelta = abs(currentPitch - idealPitch)
-    val aligned = headingDelta <= HEADING_TOLERANCE_DEG && tiltDelta <= TILT_TOLERANCE_DEG
     Box(Modifier.fillMaxSize()) {
         CameraPreview(imageCapture, onCaptureReady, hasCamera, lifecycleOwner)
-        TargetRailOverlay(heading, targetIndex, totalShots, capturedCount)
+        CompassOverlay(heading, targetIndex, totalShots, capturedCount)
         Box(Modifier.fillMaxWidth().height(60.dp).background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.5f), Color.Transparent))).align(Alignment.TopCenter))
-        Surface(shape = RoundedCornerShape(20.dp), color = Color.Black.copy(alpha = 0.65f), border = androidx.compose.foundation.BorderStroke(1.dp, if (aligned) Green.copy(alpha = 0.6f) else Color.Transparent), modifier = Modifier.align(Alignment.TopCenter).padding(top = 50.dp)) {
-            Text("TARGET: ${targetAngle}°  •  ${capturedCount}/$totalShots CAPTURED", color = if (aligned) Green else Accent, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, fontSize = 11.sp, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+        Surface(shape = RoundedCornerShape(20.dp), color = Color.Black.copy(alpha = 0.65f), modifier = Modifier.align(Alignment.TopCenter).padding(top = 50.dp)) {
+            Text("TARGET: ${targetAngle}°  •  ${capturedCount}/$totalShots CAPTURED", color = Accent, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace, fontSize = 11.sp, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
         }
         Box(Modifier.fillMaxWidth().height(140.dp).background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.7f)))).align(Alignment.BottomCenter))
         // Elevation chart — shows ideal phone height for each shot
@@ -379,30 +360,25 @@ private fun CapturingPhase(imageCapture: ImageCapture?, onCaptureReady: (ImageCa
             capturedCount = capturedCount,
             modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 120.dp, start = 24.dp, end = 24.dp).fillMaxWidth()
         )
-        // Shutter — turns green with a lock buzz when heading + tilt are on-target
-        val ctx = LocalContext.current
-        var lockBuzzed by remember(targetIndex) { mutableStateOf(false) }
-        LaunchedEffect(aligned) {
-            if (aligned && !lockBuzzed) { vibrateTiltChange(ctx); lockBuzzed = true }
-        }
-        val shutterRim by animateDpAsState(if (aligned) 5.dp else 3.dp, label = "shutterRim")
-        val shutterInner by animateDpAsState(if (aligned) 54.dp else 46.dp, label = "shutterInner")
         Row(Modifier.fillMaxWidth().align(Alignment.BottomCenter).padding(bottom = 20.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
             LastShotThumbnail(frames, capturedCount, Modifier.align(Alignment.CenterVertically))
             Spacer(Modifier.width(18.dp))
-            Box(Modifier.size(72.dp).clip(CircleShape).background(Color.Black.copy(alpha = 0.35f)).border(shutterRim, if (aligned) Green else Color.White, CircleShape).clickable { onCapture() }, contentAlignment = Alignment.Center) { Box(Modifier.size(shutterInner).clip(CircleShape).background(if (aligned) Green else Color.White.copy(alpha = 0.9f))) }
+            Box(Modifier.size(64.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.15f)).border(3.dp, Color.White, CircleShape).clickable { onCapture() }, contentAlignment = Alignment.Center) { Box(Modifier.size(48.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.9f))) }
             Spacer(Modifier.width(18.dp))
             Box(Modifier.size(48.dp).clip(CircleShape).background(Color(0xFFE53935)).border(2.dp, Color.White, CircleShape).clickable { onStop() }, contentAlignment = Alignment.Center) { Box(Modifier.size(16.dp).clip(RoundedCornerShape(3.dp)).background(Color.White)) }
         }
         Box(Modifier.align(Alignment.BottomStart).padding(start = 16.dp, bottom = 130.dp)) { GyroChip(gyroOn, onToggleGyro) }
-        Text(
-            if (aligned) "LOCKED — HOLD STEADY & TAP SHUTTER" else "Pan toward the yellow dot",
-            color = if (aligned) Green else Color.White.copy(alpha = 0.6f),
-            fontWeight = if (aligned) FontWeight.Bold else FontWeight.Normal,
-            fontSize = 10.sp,
-            fontFamily = FontFamily.Monospace,
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 110.dp)
-        )
+        Text("Point at ${targetAngle}° and tap shutter", color = Color.White.copy(alpha = 0.6f), fontSize = 10.sp, fontFamily = FontFamily.Monospace, modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 110.dp))
+        // Vertical tilt guidance — derived from real gyroscope pitch, not hardcoded
+        // Each shot has an ideal tilt angle:
+        //   level shots: idealPitch = 0
+        //   up shots: idealPitch = -15 (tilted back)
+        //   down shots: idealPitch = +15 (tilted forward)
+        val idealPitch = when (targetIndex % 6) {
+            1, 5 -> -15f  // tilt up (phone tilted back)
+            3 -> 15f      // tilt down (phone tilted forward)
+            else -> 0f    // level
+        }
         // Tilt guidance state derived from real pitch vs ideal pitch
         val pitchError = currentPitch - idealPitch
         // pitchError > 0: actual pitch is higher (more forward/down) than ideal → tilt backward/up
@@ -483,10 +459,26 @@ private fun ScopeOverlay() {
     }
 }
 
+@Composable
+private fun CompassOverlay(heading: Float, targetIndex: Int, totalShots: Int, capturedCount: Int) {
+    Canvas(Modifier.fillMaxSize()) {
+        val cx = size.width / 2; val cy = size.height / 2; val radius = size.width * 0.35f
+        drawCircle(Accent.copy(alpha = 0.15f), radius, Offset(cx, cy), style = Stroke(2.dp.toPx()))
+        repeat(totalShots) { i ->
+            val angle = i * (360 / totalShots); val rad = Math.toRadians((angle - 90).toDouble())
+            val nx = cx + radius * cos(rad).toFloat(); val ny = cy + radius * sin(rad).toFloat()
+            val isCaptured = i < capturedCount; val isCurrent = i == targetIndex
+            val nodeColor = when { isCaptured -> Green; isCurrent -> Accent; else -> Color.White.copy(alpha = 0.25f) }
+            drawCircle(nodeColor, if (isCurrent) 8.dp.toPx() else 5.dp.toPx(), Offset(nx, ny))
+        }
+        val headRad = Math.toRadians((heading - 90).toDouble()); val hx = cx + radius * cos(headRad).toFloat(); val hy = cy + radius * sin(headRad).toFloat()
+        drawCircle(Accent, 4.dp.toPx(), Offset(hx, hy)); drawLine(Accent.copy(alpha = 0.3f), Offset(cx, cy), Offset(hx, hy), 1.dp.toPx())
+    }
+}
+
 /**
  * Mini preview of the most recently captured frame, with a count badge.
- * Pops (scale + settle) each time a new frame lands so the user gets
- * immediate visual confirmation of what was just captured.
+ * Pops (scale + settle) each time a new frame lands for instant feedback.
  */
 @Composable
 private fun LastShotThumbnail(
@@ -495,7 +487,6 @@ private fun LastShotThumbnail(
     modifier: Modifier = Modifier
 ) {
     val popScale = remember { Animatable(1f) }
-    // Re-trigger the pop whenever a new frame is added
     LaunchedEffect(frames.size) {
         if (frames.isNotEmpty()) {
             popScale.snapTo(1.35f)
@@ -516,7 +507,6 @@ private fun LastShotThumbnail(
             if (frames.isEmpty()) {
                 Box(contentAlignment = Alignment.Center) {
                     Text("0", color = Color.White.copy(alpha = 0.5f), fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                    
                 }
             } else {
                 AsyncImage(
@@ -528,7 +518,6 @@ private fun LastShotThumbnail(
             }
         }
         if (frames.isNotEmpty()) {
-            // Green count badge — matches the "green = captured" rail language
             Box(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
@@ -548,135 +537,6 @@ private fun LastShotThumbnail(
             }
         }
     }
-}
-
-/**
- * UX overlay (v2) — matches the paper wireframe:
- *  • Green viewfinder frame recessed from the screen edges
- *  • Horizontal rail with 12 stops; yellow dot = current target,
- *    white marker = where the phone is pointing right now
- *  • Cyan arrow from the yellow dot toward the NEXT stop + edge chevrons
- *    showing which way to pan
- *  • Green lock ring appears on the yellow dot when heading + tilt align
- */
-@Composable
-private fun TargetRailOverlay(
-    heading: Float,
-    targetIndex: Int,
-    totalShots: Int,
-    capturedCount: Int
-) {
-    val infiniteTransition = rememberInfiniteTransition(label = "railPulse")
-    val pulse by infiniteTransition.animateFloat(
-        initialValue = 0.7f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(500, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "railPulseAlpha"
-    )
-
-    val targetAngleDeg = targetIndex * (360f / totalShots)
-    // Signed shortest delta: >0 → target is clockwise → pan right; <0 → pan left
-    val signedDelta = ((targetAngleDeg - heading + 540.0) % 360.0) - 180.0
-    val aligned = abs(signedDelta) <= HEADING_TOLERANCE_DEG
-
-    Canvas(Modifier.fillMaxSize()) {
-        val w = size.width
-        val h = size.height
-
-        // ── Green viewfinder frame, recessed from screen edges ──
-        val inset = 14.dp.toPx()
-        val corner = 26.dp.toPx()
-        drawRoundRect(
-            color = Green.copy(alpha = 0.85f),
-            topLeft = Offset(inset, inset),
-            size = Size(w - inset * 2f, h - inset * 2f),
-            cornerRadius = CornerRadius(corner, corner),
-            style = Stroke(3.dp.toPx())
-        )
-
-        // ── Target rail near the top, inside the frame ──
-        val railY = inset + 58.dp.toPx()
-        val railStart = inset + 36.dp.toPx()
-        val railEnd = w - inset - 36.dp.toPx()
-        val railW = railEnd - railStart
-
-        drawLine(
-            Color.White.copy(alpha = 0.22f),
-            Offset(railStart, railY),
-            Offset(railEnd, railY),
-            2.dp.toPx(),
-            cap = androidx.compose.ui.graphics.StrokeCap.Round
-        )
-
-        // Stops along the rail
-        val stopGap = railW / (totalShots - 1).coerceAtLeast(1)
-        repeat(totalShots) { i ->
-            val x = railStart + i * stopGap
-            val isCaptured = i < capturedCount
-            val isCurrent = i == targetIndex
-            when {
-                isCurrent -> {
-                    // Yellow current-target dot with pulsing glow
-                    drawCircle(RailYellow.copy(alpha = 0.30f * pulse), 15.dp.toPx(), Offset(x, railY))
-                    drawCircle(RailYellow, 8.dp.toPx(), Offset(x, railY))
-                    if (aligned) {
-                        // Green lock ring — hold steady & tap the (now green) shutter
-                        drawCircle(Green, 11.dp.toPx(), Offset(x, railY), style = Stroke(2.5.dp.toPx()))
-                    }
-                }
-                isCaptured -> drawCircle(Green.copy(alpha = 0.95f), 5.dp.toPx(), Offset(x, railY))
-                else -> drawCircle(Color.White.copy(alpha = 0.30f), 4.dp.toPx(), Offset(x, railY))
-            }
-        }
-
-        // ── Live heading marker sliding along the rail ──
-        val markerX = railStart + (heading / 360f) * railW
-        drawLine(
-            Color.White.copy(alpha = 0.85f),
-            Offset(markerX, railY - 12.dp.toPx()),
-            Offset(markerX, railY + 12.dp.toPx()),
-            2.5.dp.toPx(),
-            cap = androidx.compose.ui.graphics.StrokeCap.Round
-        )
-
-        // ── Cyan arrow from current dot toward the NEXT stop ──
-        if (!aligned && targetIndex < totalShots - 1) {
-            val nextX = railStart + (targetIndex + 1) * stopGap
-            val arrowColor = Color(0xFF26C6DA)
-            val dir = if (nextX > markerX) 1f else -1f
-            val ax0 = markerX + dir * 18.dp.toPx()
-            val ax1 = ax0 + dir * 26.dp.toPx() * pulse
-            val midY = railY
-            drawLine(arrowColor.copy(alpha = 0.5f + 0.5f * pulse), Offset(ax0, midY), Offset(ax1, midY), 3.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round)
-            // Arrow head
-            drawLine(arrowColor, Offset(ax1, midY), Offset(ax1 - dir * 7.dp.toPx(), midY - 6.dp.toPx()), 3.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round)
-            drawLine(arrowColor, Offset(ax1, midY), Offset(ax1 - dir * 7.dp.toPx(), midY + 6.dp.toPx()), 3.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round)
-        }
-
-        // ── Edge chevrons: which way to pan (fade as you approach target) ──
-        val chevAlpha = (min(1.0, abs(signedDelta) / 25.0)).toFloat() * pulse
-        if (!aligned && chevAlpha > 0.05f) {
-            val chevColor = Color(0xFF26C6DA).copy(alpha = chevAlpha)
-            val cy = h * 0.5f
-            val panRight = signedDelta > 0
-            val baseX = if (panRight) w - inset - 26.dp.toPx() else inset + 26.dp.toPx()
-            val dir = if (panRight) 1f else -1f
-            for (k in 0..1) {
-                val kx = baseX - dir * k * 14.dp.toPx()
-                drawLine(chevColor, Offset(kx - dir * 10.dp.toPx(), cy - 16.dp.toPx()), Offset(kx, cy), 4.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round)
-                drawLine(chevColor, Offset(kx, cy), Offset(kx - dir * 10.dp.toPx(), cy + 16.dp.toPx()), 4.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round)
-            }
-        }
-    }
-}
-
-/** Signed shortest angular distance between two headings in degrees, [-180, 180]. */
-private fun angularDeltaDeg(a: Float, b: Float): Float {
-    val d = ((b - a + 540.0) % 360.0) - 180.0
-    return abs(d).toFloat()
 }
 
 @Composable

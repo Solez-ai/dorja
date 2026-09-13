@@ -60,6 +60,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.DorjaApp
@@ -378,8 +379,8 @@ private fun ExploreListingCard(
             .clickable(onClick = onClick)
             .testTag("explore_listing_card_${listing.id}")
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            // Header Badges
+        Column(modifier = Modifier.padding(14.dp)) {
+            // Row 1: intent badge (left) + evidence status (right, compact icon pill)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -390,30 +391,46 @@ private fun ExploreListingCard(
                     backgroundColor = if (listing.intent == "RENT") DorjaColors.BentoBlueBg else DorjaColors.BentoPurpleBg,
                     textColor = if (listing.intent == "RENT") DorjaColors.BentoBlueText else DorjaColors.BentoPurpleText
                 )
-                // Evidence status — amber "pending" unless a confirmed, unexpired
-                // document backs the listing (never implied by an upload alone).
+                // Evidence status — compact icon-led pill, never competes with title
                 if (repository.hasVerifiedEvidence(docsByListing[listing.id].orEmpty())) {
-                    DorjaBadge(
-                        text = "EVIDENCE VERIFIED",
-                        icon = Icons.Default.VerifiedUser,
-                        backgroundColor = DorjaColors.Teal100,
-                        textColor = DorjaColors.Teal900
-                    )
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = DorjaColors.Teal100
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.VerifiedUser,
+                                contentDescription = "Evidence verified",
+                                tint = DorjaColors.Teal900,
+                                modifier = Modifier.size(11.dp)
+                            )
+                            Spacer(modifier = Modifier.width(3.dp))
+                            Text(
+                                text = "VERIFIED",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = DorjaColors.Teal900,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
                 } else {
-                    DorjaBadge(
-                        text = "EVIDENCE PENDING",
-                        backgroundColor = DorjaColors.BentoAmberBg,
-                        textColor = DorjaColors.BentoAmberText
-                    )
-                }
-
-                if (listing.hasScan || !listing.virtualTourUrl.isNullOrBlank()) {
-                    DorjaBadge(
-                        text = "3D TOUR AVAILABLE",
-                        icon = Icons.Default.ViewInAr,
-                        backgroundColor = DorjaColors.Jol600,
-                        textColor = DorjaColors.White
-                    )
+                    Surface(
+                        shape = RoundedCornerShape(6.dp),
+                        color = DorjaColors.BentoAmberBg
+                    ) {
+                        Text(
+                            text = "PENDING",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = DorjaColors.BentoAmberText,
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
+                        )
+                    }
                 }
             }
 
@@ -424,10 +441,12 @@ private fun ExploreListingCard(
                 text = listing.title,
                 style = MaterialTheme.typography.titleMedium,
                 color = DorjaColors.Ink950,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
 
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(3.dp))
 
             // Public Area
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -435,47 +454,54 @@ private fun ExploreListingCard(
                     imageVector = Icons.Default.LocationOn,
                     contentDescription = null,
                     tint = DorjaColors.Gray500,
-                    modifier = Modifier.size(14.dp)
+                    modifier = Modifier.size(13.dp)
                 )
-                Spacer(modifier = Modifier.width(4.dp))
+                Spacer(modifier = Modifier.width(3.dp))
                 Text(
                     text = listing.publicArea,
                     style = MaterialTheme.typography.bodySmall,
-                    color = DorjaColors.Gray700
+                    color = DorjaColors.Gray700,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
-            // Price & Specs
+            // Specs strip — evenly divided icon+value tiles, never truncated
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                Text(
-                    text = Formatters.formatPrice(listing.priceAmount, listing.currency, listing.intent),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = DorjaColors.Jol600,
-                    fontWeight = FontWeight.Bold
-                )
-
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        text = "${listing.bedrooms} Beds • ${listing.bathrooms} Baths • ${listing.sqft} sqft",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = DorjaColors.Gray500,
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 11.sp
+                SpecChip(modifier = Modifier.weight(1f), icon = Icons.Default.Bed, label = "${listing.bedrooms} Beds")
+                SpecChip(modifier = Modifier.weight(1f), icon = Icons.Default.Bathtub, label = "${listing.bathrooms} Baths")
+                SpecChip(modifier = Modifier.weight(1f), icon = Icons.Default.SquareFoot, label = "${listing.sqft} sqft")
+                if (listing.hasScan || !listing.virtualTourUrl.isNullOrBlank()) {
+                    SpecChip(
+                        modifier = Modifier.weight(1.35f),
+                        icon = Icons.Default.ViewInAr,
+                        label = "3D Tour",
+                        highlighted = true
                     )
                 }
             }
 
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Price row — always its own full-width line, no competition
+            Text(
+                text = Formatters.formatPrice(listing.priceAmount, listing.currency, listing.intent),
+                style = MaterialTheme.typography.titleMedium,
+                color = DorjaColors.Jol600,
+                fontWeight = FontWeight.Bold
+            )
+
+            // Tag chips wrap instead of clipping
             if (listing.tags.isNotBlank()) {
-                Spacer(modifier = Modifier.height(10.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                Spacer(modifier = Modifier.height(8.dp))
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(5.dp),
+                    verticalArrangement = Arrangement.spacedBy(5.dp)
                 ) {
                     listing.tags.split(",").take(3).forEach { tag ->
                         if (tag.isNotBlank()) {
@@ -489,13 +515,51 @@ private fun ExploreListingCard(
                                     style = MaterialTheme.typography.labelSmall,
                                     color = DorjaColors.Ink950,
                                     fontSize = 10.sp,
-                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
                                 )
                             }
                         }
                     }
                 }
             }
+        }
+    }
+}
+
+/** Compact icon+label spec tile used in listing cards. */
+@Composable
+private fun SpecChip(
+    icon: ImageVector,
+    label: String,
+    modifier: Modifier = Modifier,
+    highlighted: Boolean = false
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(8.dp),
+        color = if (highlighted) DorjaColors.Jol600.copy(alpha = 0.12f) else DorjaColors.Paper50,
+        border = BorderStroke(1.dp, if (highlighted) DorjaColors.Jol600.copy(alpha = 0.4f) else DorjaColors.Sand300.copy(alpha = 0.6f))
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = if (highlighted) DorjaColors.Jol600 else DorjaColors.Gray500,
+                modifier = Modifier.size(13.dp)
+            )
+            Spacer(modifier = Modifier.width(4.dp))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = if (highlighted) DorjaColors.Jol600 else DorjaColors.Gray700,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 1
+            )
         }
     }
 }

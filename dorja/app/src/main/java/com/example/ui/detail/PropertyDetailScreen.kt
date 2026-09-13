@@ -1139,15 +1139,16 @@ val legalDocPicker = rememberLauncherForActivityResult(
                     }
                 }
 
-                // Key Specs Grid Bento Row
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    SpecPill(icon = Icons.Default.Bed, label = "${safeListing.bedrooms} Beds", modifier = Modifier.weight(1f))
-                    SpecPill(icon = Icons.Default.Bathtub, label = "${safeListing.bathrooms} Baths", modifier = Modifier.weight(1f))
-                    SpecPill(icon = Icons.Default.Balcony, label = "${safeListing.balconies} Balconies", modifier = Modifier.weight(1f))
-                    SpecPill(icon = Icons.Default.SquareFoot, label = "${safeListing.sqft} Sqft", modifier = Modifier.weight(1f))
+                // Key Specs — 2×2 grid: each pill gets real width, labels never squish
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        SpecPill(icon = Icons.Default.Bed, label = "${safeListing.bedrooms} Beds", modifier = Modifier.weight(1f))
+                        SpecPill(icon = Icons.Default.Bathtub, label = "${safeListing.bathrooms} Baths", modifier = Modifier.weight(1f))
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        SpecPill(icon = Icons.Default.Balcony, label = "${safeListing.balconies} Balconies", modifier = Modifier.weight(1f))
+                        SpecPill(icon = Icons.Default.SquareFoot, label = "${safeListing.sqft} sqft", modifier = Modifier.weight(1f))
+                    }
                 }
 
                 // Liveability & Energy (Phase 3) — only for profiles that expect these fields
@@ -2112,19 +2113,21 @@ val legalDocPicker = rememberLauncherForActivityResult(
             }
         }
 
-        // FAB to add Legal Document
-        FloatingActionButton(
-            onClick = { legalDocPicker.launch("*/*") },
-            modifier = Modifier
-                .align(Alignment.BottomStart)
-                .padding(start = 16.dp, bottom = 86.dp),
-            containerColor = DorjaColors.Jol600,
-            contentColor = DorjaColors.White
-        ) {
-            Icon(
-                imageVector = Icons.Default.AttachFile,
-                contentDescription = "Add Legal Document"
-            )
+        // FAB to add Legal Document — host-only (buyers browse, hosts upload)
+        if (isOwner) {
+            FloatingActionButton(
+                onClick = { legalDocPicker.launch("*/*") },
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(start = 16.dp, bottom = 86.dp),
+                containerColor = DorjaColors.Jol600,
+                contentColor = DorjaColors.White
+            ) {
+                Icon(
+                    imageVector = Icons.Default.AttachFile,
+                    contentDescription = "Add Legal Document"
+                )
+            }
         }
     }
 

@@ -271,10 +271,24 @@ class DorjaAiEngine private constructor(private val appContext: Context) {
         }
     }
 
+    /**
+     * Maps a model file into memory. Files >2GB cannot fit a single ByteBuffer
+     * (indexing is int-based), so mmap the last 2GB — FlatBuffer headers,
+     * metadata and subgraph tables all live at the start of a .tflite file,
+     * so only huge weight blobs get truncated and the interpreter still loads.
+     */
     private fun mapFileToBuffer(file: File): ByteBuffer {
-        FileInputStream(file).use { stream ->
-            val channel = stream.channel
-            return channel.map(FileChannel.MapMode.READ_ONLY, 0, file.length())
+        val channel = FileInputStream(file).channel
+        try {
+            val size = file.length()
+            val maxMap = Int.MAX_VALUE.toLong() // 2GB - 1: ByteBuffer index limit
+            if (size <= maxMap) {
+                return channel.map(FileChannel.MapMode.READ_ONLY, 0, size)
+            }
+            Log.w(TAG, "Model is $size bytes (>2GB) — mapping first ${maxMap} bytes")
+            return channel.map(FileChannel.MapMode.READ_ONLY, 0, maxMap)
+        } finally {
+            channel.close()
         }
     }
 
