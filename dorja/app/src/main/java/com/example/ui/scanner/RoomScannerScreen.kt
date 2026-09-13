@@ -17,12 +17,15 @@ import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
 import android.util.Log
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -45,6 +48,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -78,9 +82,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -88,6 +94,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -96,6 +103,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import coil.compose.AsyncImage
 import com.example.DorjaApp
 import com.example.data.model.RoomItem
 import com.example.ui.components.DorjaButton
@@ -214,7 +222,7 @@ fun RoomScannerScreen(
 
             Phase.PREVIEW -> PreviewPhase(imageCapture, { imageCapture = it }, hasCamera, selectedRoom?.displayName ?: "Room", gyroOn, { gyroOn = !gyroOn }, { phase = Phase.CAPTURING }, { phase = Phase.SELECT }, lifecycleOwner)
 
-            Phase.CAPTURING -> CapturingPhase(imageCapture, { imageCapture = it }, hasCamera, heading, pitch, currentTarget, TOTAL_SHOTS, capturedFrames.size, gyroOn, { gyroOn = !gyroOn }, onCapture = {
+            Phase.CAPTURING -> CapturingPhase(imageCapture, { imageCapture = it }, hasCamera, heading, pitch, currentTarget, TOTAL_SHOTS, capturedFrames.size, capturedFrames, gyroOn, { gyroOn = !gyroOn }, onCapture = {
                 val ic = imageCapture ?: return@CapturingPhase
                 val angle = currentTarget * (360 / TOTAL_SHOTS)
                 val file = File(ctx.cacheDir, "frame_${angle}_${System.currentTimeMillis()}.jpg")
@@ -344,7 +352,7 @@ private fun PreviewPhase(imageCapture: ImageCapture?, onCaptureReady: (ImageCapt
 //  PHASE 3 — CAPTURING
 // ═════════════════════════════════════════════════════════════
 @Composable
-private fun CapturingPhase(imageCapture: ImageCapture?, onCaptureReady: (ImageCapture) -> Unit, hasCamera: Boolean, heading: Float, currentPitch: Float, targetIndex: Int, totalShots: Int, capturedCount: Int, gyroOn: Boolean, onToggleGyro: () -> Unit, onCapture: () -> Unit, onStop: () -> Unit, onBack: () -> Unit, lifecycleOwner: androidx.lifecycle.LifecycleOwner) {
+private fun CapturingPhase(imageCapture: ImageCapture?, onCaptureReady: (ImageCapture) -> Unit, hasCamera: Boolean, heading: Float, currentPitch: Float, targetIndex: Int, totalShots: Int, capturedCount: Int, frames: SnapshotStateList<FrameData>, gyroOn: Boolean, onToggleGyro: () -> Unit, onCapture: () -> Unit, onStop: () -> Unit, onBack: () -> Unit, lifecycleOwner: androidx.lifecycle.LifecycleOwner) {
     val targetAngle = targetIndex * (360 / totalShots)
     // Ideal vertical tilt for this shot (matches the elevation profile)
     val idealPitch = when (targetIndex % 6) {
@@ -380,8 +388,10 @@ private fun CapturingPhase(imageCapture: ImageCapture?, onCaptureReady: (ImageCa
         val shutterRim by animateDpAsState(if (aligned) 5.dp else 3.dp, label = "shutterRim")
         val shutterInner by animateDpAsState(if (aligned) 54.dp else 46.dp, label = "shutterInner")
         Row(Modifier.fillMaxWidth().align(Alignment.BottomCenter).padding(bottom = 20.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+            LastShotThumbnail(frames, capturedCount, Modifier.align(Alignment.CenterVertically))
+            Spacer(Modifier.width(18.dp))
             Box(Modifier.size(72.dp).clip(CircleShape).background(Color.Black.copy(alpha = 0.35f)).border(shutterRim, if (aligned) Green else Color.White, CircleShape).clickable { onCapture() }, contentAlignment = Alignment.Center) { Box(Modifier.size(shutterInner).clip(CircleShape).background(if (aligned) Green else Color.White.copy(alpha = 0.9f))) }
-            Spacer(Modifier.width(16.dp))
+            Spacer(Modifier.width(18.dp))
             Box(Modifier.size(48.dp).clip(CircleShape).background(Color(0xFFE53935)).border(2.dp, Color.White, CircleShape).clickable { onStop() }, contentAlignment = Alignment.Center) { Box(Modifier.size(16.dp).clip(RoundedCornerShape(3.dp)).background(Color.White)) }
         }
         Box(Modifier.align(Alignment.BottomStart).padding(start = 16.dp, bottom = 130.dp)) { GyroChip(gyroOn, onToggleGyro) }
@@ -470,6 +480,73 @@ private fun ScopeOverlay() {
         for (i in 0..40) { val x = (i / 40f) * w; val curve = kotlin.math.abs(i / 40f - 0.5f) * 2f * 40.dp.toPx(); drawCircle(Accent.copy(alpha = 0.35f), r, Offset(x, h - 20.dp.toPx() - curve)) }
         for (i in 0..20) { val y = (i / 20f) * h; val curve = kotlin.math.abs(i / 20f - 0.5f) * 2f * 30.dp.toPx(); drawCircle(Accent.copy(alpha = 0.25f), r, Offset(12.dp.toPx() + curve, y)) }
         for (i in 0..20) { val y = (i / 20f) * h; val curve = kotlin.math.abs(i / 20f - 0.5f) * 2f * 30.dp.toPx(); drawCircle(Accent.copy(alpha = 0.25f), r, Offset(w - 12.dp.toPx() - curve, y)) }
+    }
+}
+
+/**
+ * Mini preview of the most recently captured frame, with a count badge.
+ * Pops (scale + settle) each time a new frame lands so the user gets
+ * immediate visual confirmation of what was just captured.
+ */
+@Composable
+private fun LastShotThumbnail(
+    frames: SnapshotStateList<FrameData>,
+    capturedCount: Int,
+    modifier: Modifier = Modifier
+) {
+    val popScale = remember { Animatable(1f) }
+    // Re-trigger the pop whenever a new frame is added
+    LaunchedEffect(frames.size) {
+        if (frames.isNotEmpty()) {
+            popScale.snapTo(1.35f)
+            popScale.animateTo(
+                1f,
+                spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium)
+            )
+        }
+    }
+
+    Box(modifier.size(52.dp)) {
+        Surface(
+            shape = RoundedCornerShape(10.dp),
+            color = Color.Black.copy(alpha = 0.45f),
+            border = androidx.compose.foundation.BorderStroke(2.dp, if (frames.isEmpty()) Color.White.copy(alpha = 0.25f) else Green),
+            modifier = Modifier.fillMaxSize().scale(popScale.value)
+        ) {
+            if (frames.isEmpty()) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text("0", color = Color.White.copy(alpha = 0.5f), fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    
+                }
+            } else {
+                AsyncImage(
+                    model = frames.last().path,
+                    contentDescription = "Last captured frame",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
+        }
+        if (frames.isNotEmpty()) {
+            // Green count badge — matches the "green = captured" rail language
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .offset(x = 6.dp, y = (-6).dp)
+                    .size(22.dp)
+                    .clip(CircleShape)
+                    .background(Green)
+                    .border(2.dp, Color.Black, CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    "$capturedCount",
+                    color = Color.White,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
     }
 }
 
