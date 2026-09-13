@@ -25,7 +25,6 @@ import java.io.File
 import java.io.FileOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
-import java.security.MessageDigest
 
 /**
  * Real on-device LLM engine for the Hey Dorja assistant, built on LiteRT-LM
@@ -90,6 +89,17 @@ object DorjaLlmEngine {
 
     private var engine: Engine? = null
     private var initJob: Job? = null
+
+    // ── Answer cache ─────────────────────────────────────────────────────
+    // Prompt-keyed LRU: an identical question about identical property data
+    // replays instantly instead of re-running inference. Keying on the full
+    // prompt means any change to the listing data naturally invalidates the
+    // cached entry (the prompt changes with it).
+    private const val ANSWER_CACHE_MAX = 32
+    private val answerCache = object : LinkedHashMap<String, String>(16, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, String>): Boolean =
+            size > ANSWER_CACHE_MAX
+    }
 
     private lateinit var appContext: Context
 
@@ -241,6 +251,7 @@ object DorjaLlmEngine {
     fun deleteModel() {
         cancelDownload()
         closeEngine()
+        synchronized(answerCache) { answerCache.clear() }
         val dir = File(appContext.filesDir, "llm")
         dir.listFiles()?.forEach { it.delete() }
         refreshStateFromDisk()
@@ -299,24 +310,43 @@ object DorjaLlmEngine {
      * The sheet collects this flow to render text as it arrives.
      */
     fun sendMessage(question: String, property: PropertyAiContext?): Flow<String> = callbackFlow {
+        val prompt = buildPrompt(question, property)
+
+        // Cache hit → replay the stored answer, skip inference entirely
+        val cached = synchronized(answerCache) { answerCache[prompt] }
+        if (cached != null) {
+            Log.i(TAG, "Answer cache hit — skipping inference")
+            trySend(cached)
+            close()
+            return@callbackFlow
+        }
+
         val eng = engine
         if (eng == null) {
             trySend("Gemma is still loading — quick answers are active meanwhile.")
             close()
             return@callbackFlow
         }
-        val prompt = buildPrompt(question, property)
         val job = scope.launch {
             var conv: Conversation? = null
             try {
                 // Stateless Q&A: fresh conversation per question so context from a
                 // previously opened property can't leak into the next answer.
                 conv = eng.createConversation()
+                val full = StringBuilder()
                 conv.sendMessageAsync(prompt).collect { message ->
                     val text = message.contents.contents
                         .filterIsInstance<Content.Text>()
                         .joinToString("") { it.text }
-                    if (text.isNotEmpty()) trySend(text)
+                    if (text.isNotEmpty()) {
+                        full.append(text)
+                        trySend(text)
+                    }
+                }
+                // Stream completed successfully → remember the full answer
+                val answer = full.toString().trim()
+                if (answer.isNotEmpty()) {
+                    synchronized(answerCache) { answerCache[prompt] = answer }
                 }
                 close()
             } catch (t: Throwable) {
