@@ -45,15 +45,18 @@ import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DirectionsCar
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Keyboard
 import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -74,6 +77,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontFamily
@@ -82,8 +86,8 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
-import com.example.ai.AiEngineState
 import com.example.ai.DorjaAiEngine
+import com.example.ai.DorjaLlmEngine
 import com.example.ai.PropertyAiContext
 import com.example.ai.VoiceAssistantHelper
 import com.example.ui.components.DorjaButton
@@ -110,7 +114,6 @@ fun HeyDorjaAssistantSheet(
     val keyboardController = LocalSoftwareKeyboardController.current
 
     val aiEngine = remember { DorjaAiEngine.getInstance(context) }
-    val engineState by aiEngine.engineState.collectAsState()
 
     val voiceHelper = remember { VoiceAssistantHelper(context) }
     val isListening by voiceHelper.isListening.collectAsState()
@@ -124,20 +127,56 @@ fun HeyDorjaAssistantSheet(
     var isKeyboardMode by remember { mutableStateOf(false) }
     var textInput by remember { mutableStateOf("") }
 
+    // ── LiteRT-LM state (real Gemma inference + chunked download) ──
+    val llmState by DorjaLlmEngine.llmState.collectAsState()
+    val downloadState by DorjaLlmEngine.downloadState.collectAsState()
+    val llm = DorjaLlmEngine // local alias so askDorja's `when` can reference the singleton
+    var streamedAnswer by remember { mutableStateOf("") }
+
+    // Boot the engine singleton (restores download/init state); one init retry per sheet open
+    LaunchedEffect(Unit) {
+        DorjaLlmEngine.init(context)
+        val s = DorjaLlmEngine.llmState.value
+        if (s is DorjaLlmEngine.LlmState.Error && DorjaLlmEngine.isModelDownloaded()) {
+            DorjaLlmEngine.initializeInBackground()
+        }
+    }
+
+    // Route each question: real LLM when ready, rule-based engine otherwise
+    fun askDorja(query: String) {
+        userQuery = query
+        isThinking = true
+        aiAnswer = null
+        streamedAnswer = ""
+        keyboardController?.hide()
+        scope.launch {
+            when (llmState) {
+                is DorjaLlmEngine.LlmState.Ready -> {
+                    try {
+                        llm.sendMessage(query, propertyContext).collect { token ->
+                            streamedAnswer += token
+                            aiAnswer = streamedAnswer
+                        }
+                        // Flow closed = answer complete
+                        aiAnswer = streamedAnswer.ifBlank { "(empty response)" }
+                    } catch (t: Throwable) {
+                        // Inference failed mid-stream — degrade to the rule-based engine
+                        aiAnswer = aiEngine.answerQuestion(query, propertyContext)
+                    }
+                }
+                else -> {
+                    aiAnswer = aiEngine.answerQuestion(query, propertyContext)
+                    isThinking = false
+                }
+            }
+        }
+    }
+
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { granted ->
         if (granted) {
-            voiceHelper.startListening(
-                onResult = { result ->
-                    userQuery = result
-                    isThinking = true
-                    scope.launch {
-                        aiAnswer = aiEngine.answerQuestion(result, propertyContext)
-                        isThinking = false
-                    }
-                }
-            )
+            voiceHelper.startListening(onResult = { result -> askDorja(result) })
         }
     }
 
@@ -149,13 +188,7 @@ fun HeyDorjaAssistantSheet(
 
     fun submitQuestion(query: String) {
         if (query.isBlank()) return
-        userQuery = query
-        isThinking = true
-        keyboardController?.hide()
-        scope.launch {
-            aiAnswer = aiEngine.answerQuestion(query, propertyContext)
-            isThinking = false
-        }
+        askDorja(query)
     }
 
     fun toggleVoice() {
@@ -168,16 +201,7 @@ fun HeyDorjaAssistantSheet(
             ) == PackageManager.PERMISSION_GRANTED
 
             if (hasPermission) {
-                voiceHelper.startListening(
-                    onResult = { result ->
-                        userQuery = result
-                        isThinking = true
-                        scope.launch {
-                            aiAnswer = aiEngine.answerQuestion(result, propertyContext)
-                            isThinking = false
-                        }
-                    }
-                )
+                voiceHelper.startListening(onResult = { result -> askDorja(result) })
             } else {
                 permissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
             }
@@ -242,13 +266,13 @@ fun HeyDorjaAssistantSheet(
                         // NPU accelerator badge
                         Surface(
                             shape = RoundedCornerShape(6.dp),
-                            color = if (engineState is AiEngineState.Ready) Color(0x1F0061A4) else Color(0x1F888888),
-                            border = BorderStroke(0.8.dp, if (engineState is AiEngineState.Ready) DorjaColors.Jol600.copy(alpha = 0.5f) else Color.Gray.copy(alpha = 0.3f))
+                            color = if (llmState is DorjaLlmEngine.LlmState.Ready) Color(0x1F0061A4) else Color(0x1F888888),
+                            border = BorderStroke(0.8.dp, if (llmState is DorjaLlmEngine.LlmState.Ready) DorjaColors.Jol600.copy(alpha = 0.5f) else Color.Gray.copy(alpha = 0.3f))
                         ) {
                             Text(
-                                text = if (engineState is AiEngineState.Ready) "LITERT • NPU ACTIVE" else "LITERT OFFLINE",
+                                text = if (llmState is DorjaLlmEngine.LlmState.Ready) "GEMMA • ON-DEVICE" else "QUICK ANSWERS",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = if (engineState is AiEngineState.Ready) DorjaColors.Jol600 else DorjaColors.Gray700,
+                                color = if (llmState is DorjaLlmEngine.LlmState.Ready) DorjaColors.Jol600 else DorjaColors.Gray700,
                                 fontSize = 9.sp,
                                 fontWeight = FontWeight.Bold,
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
@@ -256,7 +280,7 @@ fun HeyDorjaAssistantSheet(
                         }
                     }
                     Text(
-                        text = if (engineState is AiEngineState.Ready) "On-Device Neural Hardware Accelerated" else "Load model in settings to activate",
+                        text = if (llmState is DorjaLlmEngine.LlmState.Ready) "Gemma 4 E2B • Private on-device inference" else "Instant rule-based answers • Add Gemma for full AI",
                         style = MaterialTheme.typography.labelSmall,
                         color = DorjaColors.Gray600,
                         fontSize = 11.sp
@@ -336,79 +360,90 @@ fun HeyDorjaAssistantSheet(
                     .verticalScroll(scrollState)
                     .padding(horizontal = 20.dp, vertical = 8.dp)
             ) {
-                when (engineState) {
-                    is AiEngineState.NotLoaded -> {
-                        Surface(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
-                            shape = RoundedCornerShape(16.dp),
-                            color = if (isDark) Color(0x332B1E12) else Color(0xFFFFF4E5),
-                            border = BorderStroke(1.dp, Color(0xFFFFA000).copy(alpha = 0.4f))
-                        ) {
-                            Column(modifier = Modifier.padding(16.dp)) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        imageVector = Icons.Default.Memory,
-                                        contentDescription = null,
-                                        tint = Color(0xFFD97706),
-                                        modifier = Modifier.size(24.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(10.dp))
-                                    Text(
-                                        text = "Model Not Loaded Yet",
-                                        style = MaterialTheme.typography.titleSmall,
-                                        fontWeight = FontWeight.Bold,
-                                        color = DorjaColors.Ink950
-                                    )
-                                }
-                                Spacer(modifier = Modifier.height(6.dp))
-                                Text(
-                                    text = "To preserve your privacy and enable instant on-device responses, Dorja runs locally using LiteRT on your phone's NPU/GPU. Go to Settings and tap 'Load Up Model' to initialize.",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = DorjaColors.Gray700,
-                                    fontSize = 12.sp
-                                )
-                                Spacer(modifier = Modifier.height(12.dp))
-                                DorjaButton(
-                                    text = "Go to Settings",
-                                    onClick = {
-                                        onDismiss()
-                                        onNavigateToSettings?.invoke()
-                                    },
-                                    icon = Icons.Default.Settings,
-                                    modifier = Modifier.fillMaxWidth()
-                                )
-                            }
-                        }
+                when {
+                    downloadState is DorjaLlmEngine.DownloadState.Downloading -> {
+                        val ds = downloadState as DorjaLlmEngine.DownloadState.Downloading
+                        ModelStatusCard(
+                            title = "Downloading Gemma…",
+                            body = "You can close this sheet — the download keeps going and resumes automatically if interrupted.",
+                            ctaText = null,
+                            ctaIcon = Icons.Default.Download,
+                            onCta = null,
+                            accent = Color(0xFF0061A4),
+                            container = if (isDark) Color(0x1A0061A4) else Color(0xFFEAF2FB),
+                            progress = ds.fraction,
+                            progressLabel = "Chunk ${ds.chunkIndex}/${ds.totalChunks}  •  ${ds.downloadedBytes / (1024 * 1024)} / ${ds.totalBytes / (1024 * 1024)} MB"
+                        )
+                    }
+                    downloadState is DorjaLlmEngine.DownloadState.Finalizing -> {
+                        ModelStatusCard(
+                            title = "Finalizing model…",
+                            body = "Assembling the downloaded chunks into the final model file.",
+                            ctaText = null,
+                            ctaIcon = Icons.Default.Download,
+                            onCta = null,
+                            accent = Color(0xFF0061A4),
+                            container = if (isDark) Color(0x1A0061A4) else Color(0xFFEAF2FB),
+                            progress = 0.99f
+                        )
+                    }
+                    downloadState is DorjaLlmEngine.DownloadState.Failed -> {
+                        ModelStatusCard(
+                            title = "Download failed",
+                            body = (downloadState as DorjaLlmEngine.DownloadState.Failed).message +
+                            ". Partial progress is kept — retrying resumes where it stopped.",
+                            ctaText = "Retry download",
+                            ctaIcon = Icons.Default.Refresh,
+                            onCta = { DorjaLlmEngine.startDownload() },
+                            accent = Color(0xFFD32F2F),
+                            container = if (isDark) Color(0x332B1E12) else Color(0xFFFDECEA)
+                        )
+                    }
+                    llmState is DorjaLlmEngine.LlmState.NoModel -> {
+                        ModelStatusCard(
+                            title = "Private on-device AI — Gemma 4 E2B",
+                            body = "Download the official model once (2.58 GB, chunked & resumable). Every question then runs locally — nothing leaves your phone. Instant quick answers stay active meanwhile.",
+                            ctaText = "Download model (2.58 GB)",
+                            ctaIcon = Icons.Default.Download,
+                            onCta = { DorjaLlmEngine.startDownload() },
+                            accent = Color(0xFFD97706),
+                            container = if (isDark) Color(0x332B1E12) else Color(0xFFFFF4E5)
+                        )
+                    }
+                    llmState is DorjaLlmEngine.LlmState.Initializing -> {
+                        ModelStatusCard(
+                            title = "Preparing Gemma…",
+                            body = (llmState as DorjaLlmEngine.LlmState.Initializing).message,
+                            ctaText = null,
+                            ctaIcon = Icons.Default.Memory,
+                            onCta = null,
+                            accent = Color(0xFF0061A4),
+                            container = if (isDark) Color(0x1A0061A4) else Color(0xFFEAF2FB)
+                        )
                     }
 
-                    is AiEngineState.Loading -> {
-                        val state = engineState as AiEngineState.Loading
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 24.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            CircularProgressIndicator(
-                                color = DorjaColors.Jol600,
-                                modifier = Modifier.size(36.dp),
-                                strokeWidth = 3.dp
-                            )
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Text(
-                                text = state.message,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = DorjaColors.Gray700,
-                                fontWeight = FontWeight.Medium
-                            )
-                        }
+                    llmState is DorjaLlmEngine.LlmState.Error -> {
+                        val err = llmState as DorjaLlmEngine.LlmState.Error
+                        val downloaded = DorjaLlmEngine.isModelDownloaded()
+                        ModelStatusCard(
+                            title = if (downloaded) "Couldn't start Gemma" else "Model engine unavailable",
+                            body = err.message,
+                            ctaText = if (downloaded) "Try again" else null,
+                            ctaIcon = Icons.Default.Refresh,
+                            onCta = if (downloaded) {
+                                { DorjaLlmEngine.initializeInBackground() }
+                            } else null,
+                            accent = Color(0xFFD32F2F),
+                            container = if (isDark) Color(0x332B1E12) else Color(0xFFFDECEA)
+                        )
                     }
 
                     else -> {
                         // If no question asked yet, display quick suggestion chips
                         if (userQuery.isEmpty()) {
                             Text(
-                                text = "Ask anything about this property:",
+                                text = if (llmState is DorjaLlmEngine.LlmState.Ready) "Ask anything — Gemma answers locally:"
+                                       else "Ask anything about this property:",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = DorjaColors.Gray600,
                                 fontWeight = FontWeight.SemiBold,
@@ -475,7 +510,8 @@ fun HeyDorjaAssistantSheet(
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(
-                                        text = "Computing on NPU / LiteRT...",
+                                        text = if (llmState is DorjaLlmEngine.LlmState.Ready) "Gemma thinking locally…"
+                                               else "Quick answer…",
                                         style = MaterialTheme.typography.labelSmall,
                                         color = DorjaColors.Gray600,
                                         fontFamily = FontFamily.Monospace
@@ -496,7 +532,8 @@ fun HeyDorjaAssistantSheet(
                                             DorjaLogo(modifier = Modifier.size(18.dp))
                                             Spacer(modifier = Modifier.width(6.dp))
                                             Text(
-                                                text = "Dorja Verified Intelligence",
+                                                text = if (llmState is DorjaLlmEngine.LlmState.Ready) "Dorja Verified Intelligence • Gemma local"
+                                                       else "Dorja Verified Intelligence",
                                                 style = MaterialTheme.typography.labelSmall,
                                                 fontWeight = FontWeight.Bold,
                                                 color = DorjaColors.Jol600
@@ -674,6 +711,85 @@ fun HeyDorjaAssistantSheet(
                     color = if (isListening) DorjaColors.Jol600 else DorjaColors.Gray600,
                     fontSize = 11.sp,
                     fontWeight = if (isListening) FontWeight.Bold else FontWeight.Normal
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Status card shown where the AI body would be, per runtime state:
+ *  - NoModel: prominent download CTA (2.58GB, chunked + resumable)
+ *  - Downloading: chunk progress + LiveDownloads-style progress bar
+ *  - Initializing / Error / Ready(fallback chip): guidance or confirmation
+ */
+@Composable
+private fun ModelStatusCard(
+    title: String,
+    body: String,
+    ctaText: String?,
+    ctaIcon: ImageVector,
+    onCta: (() -> Unit)?,
+    accent: Color,
+    container: Color,
+    progress: Float? = null,
+    progressLabel: String? = null
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+        shape = RoundedCornerShape(16.dp),
+        color = container,
+        border = BorderStroke(1.dp, accent.copy(alpha = 0.4f))
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    imageVector = ctaIcon,
+                    contentDescription = null,
+                    tint = accent,
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = DorjaColors.Ink950
+                )
+            }
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = body,
+                style = MaterialTheme.typography.bodySmall,
+                color = DorjaColors.Gray700,
+                fontSize = 12.sp
+            )
+            if (progress != null) {
+                Spacer(modifier = Modifier.height(10.dp))
+                LinearProgressIndicator(
+                    progress = { progress.coerceIn(0f, 1f) },
+                    modifier = Modifier.fillMaxWidth(),
+                    color = accent,
+                    trackColor = accent.copy(alpha = 0.15f)
+                )
+                progressLabel?.let {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = it,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = DorjaColors.Gray600,
+                        fontSize = 10.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
+                }
+            }
+            if (ctaText != null && onCta != null) {
+                Spacer(modifier = Modifier.height(12.dp))
+                DorjaButton(
+                    text = ctaText,
+                    onClick = onCta,
+                    icon = ctaIcon,
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
         }

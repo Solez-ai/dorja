@@ -32,6 +32,9 @@
         <meta-data
             android:name="com.google.ar.core"
             android:value="optional" />
+        <!-- LiteRT-LM GPU backend native libraries -->
+        <uses-native-library android:name="libvndksupport.so" android:required="false" />
+        <uses-native-library android:name="libOpenCL.so" android:required="false" />
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

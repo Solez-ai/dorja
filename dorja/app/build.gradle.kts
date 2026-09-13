@@ -109,6 +109,7 @@ dependencies {
   implementation(libs.androidx.camera.lifecycle)
   implementation(libs.androidx.camera.view)
   implementation(libs.coil.compose)
+  implementation(libs.litertlm.android)
   implementation(libs.converter.moshi)
   implementation(libs.tensorflow.lite)
   implementation(libs.tensorflow.lite.gpu)
