@@ -127,7 +127,7 @@ fun HeyDorjaAssistantSheet(
     var isKeyboardMode by remember { mutableStateOf(false) }
     var textInput by remember { mutableStateOf("") }
 
-    // ── LiteRT-LM state (real Gemma inference + chunked download) ──
+    // ── LiteRT-LM state (real Qwen3 inference + chunked download) ──
     val llmState by DorjaLlmEngine.llmState.collectAsState()
     val downloadState by DorjaLlmEngine.downloadState.collectAsState()
     val llm = DorjaLlmEngine // local alias so askDorja's `when` can reference the singleton
@@ -270,7 +270,7 @@ fun HeyDorjaAssistantSheet(
                             border = BorderStroke(0.8.dp, if (llmState is DorjaLlmEngine.LlmState.Ready) DorjaColors.Jol600.copy(alpha = 0.5f) else Color.Gray.copy(alpha = 0.3f))
                         ) {
                             Text(
-                                text = if (llmState is DorjaLlmEngine.LlmState.Ready) "GEMMA • ON-DEVICE" else "QUICK ANSWERS",
+                                text = if (llmState is DorjaLlmEngine.LlmState.Ready) "QWEN3 • ON-DEVICE" else "QUICK ANSWERS",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = if (llmState is DorjaLlmEngine.LlmState.Ready) DorjaColors.Jol600 else DorjaColors.Gray700,
                                 fontSize = 9.sp,
@@ -280,7 +280,7 @@ fun HeyDorjaAssistantSheet(
                         }
                     }
                     Text(
-                        text = if (llmState is DorjaLlmEngine.LlmState.Ready) "Gemma 4 E2B • Private on-device inference" else "Instant rule-based answers • Add Gemma for full AI",
+                        text = if (llmState is DorjaLlmEngine.LlmState.Ready) "Qwen3 1.7B • Private on-device inference" else "Instant rule-based answers • Add Qwen3 for full AI",
                         style = MaterialTheme.typography.labelSmall,
                         color = DorjaColors.Gray600,
                         fontSize = 11.sp
@@ -364,7 +364,7 @@ fun HeyDorjaAssistantSheet(
                     downloadState is DorjaLlmEngine.DownloadState.Downloading -> {
                         val ds = downloadState as DorjaLlmEngine.DownloadState.Downloading
                         ModelStatusCard(
-                            title = "Downloading Gemma…",
+                            title = "Downloading Qwen3…",
                             body = "You can close this sheet — the download keeps going and resumes automatically if interrupted.",
                             ctaText = null,
                             ctaIcon = Icons.Default.Download,
@@ -401,9 +401,9 @@ fun HeyDorjaAssistantSheet(
                     }
                     llmState is DorjaLlmEngine.LlmState.NoModel -> {
                         ModelStatusCard(
-                            title = "Private on-device AI — Gemma 4 E2B",
-                            body = "Download the official model once (2.58 GB, chunked & resumable). Every question then runs locally — nothing leaves your phone. Instant quick answers stay active meanwhile.",
-                            ctaText = "Download model (2.58 GB)",
+                            title = "Private on-device AI — Qwen3 1.7B",
+                            body = "Download the official model once (977 MB, chunked & resumable). Every question then runs locally — nothing leaves your phone. Instant quick answers stay active meanwhile.",
+                            ctaText = "Download model (977 MB)",
                             ctaIcon = Icons.Default.Download,
                             onCta = { DorjaLlmEngine.startDownload() },
                             accent = Color(0xFFD97706),
@@ -412,7 +412,7 @@ fun HeyDorjaAssistantSheet(
                     }
                     llmState is DorjaLlmEngine.LlmState.Initializing -> {
                         ModelStatusCard(
-                            title = "Preparing Gemma…",
+                            title = "Preparing Qwen3…",
                             body = (llmState as DorjaLlmEngine.LlmState.Initializing).message,
                             ctaText = null,
                             ctaIcon = Icons.Default.Memory,
@@ -426,7 +426,7 @@ fun HeyDorjaAssistantSheet(
                         val err = llmState as DorjaLlmEngine.LlmState.Error
                         val downloaded = DorjaLlmEngine.isModelDownloaded()
                         ModelStatusCard(
-                            title = if (downloaded) "Couldn't start Gemma" else "Model engine unavailable",
+                            title = if (downloaded) "Couldn't start Qwen3" else "Model engine unavailable",
                             body = err.message,
                             ctaText = if (downloaded) "Try again" else null,
                             ctaIcon = Icons.Default.Refresh,
@@ -442,7 +442,7 @@ fun HeyDorjaAssistantSheet(
                         // If no question asked yet, display quick suggestion chips
                         if (userQuery.isEmpty()) {
                             Text(
-                                text = if (llmState is DorjaLlmEngine.LlmState.Ready) "Ask anything — Gemma answers locally:"
+                                text = if (llmState is DorjaLlmEngine.LlmState.Ready) "Ask anything — Qwen3 answers locally:"
                                        else "Ask anything about this property:",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = DorjaColors.Gray600,
@@ -510,7 +510,7 @@ fun HeyDorjaAssistantSheet(
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(
-                                        text = if (llmState is DorjaLlmEngine.LlmState.Ready) "Gemma thinking locally…"
+                                        text = if (llmState is DorjaLlmEngine.LlmState.Ready) "Qwen3 thinking locally…"
                                                else "Quick answer…",
                                         style = MaterialTheme.typography.labelSmall,
                                         color = DorjaColors.Gray600,
@@ -532,7 +532,7 @@ fun HeyDorjaAssistantSheet(
                                             DorjaLogo(modifier = Modifier.size(18.dp))
                                             Spacer(modifier = Modifier.width(6.dp))
                                             Text(
-                                                text = if (llmState is DorjaLlmEngine.LlmState.Ready) "Dorja Verified Intelligence • Gemma local"
+                                                text = if (llmState is DorjaLlmEngine.LlmState.Ready) "Dorja Verified Intelligence • Qwen3 local"
                                                        else "Dorja Verified Intelligence",
                                                 style = MaterialTheme.typography.labelSmall,
                                                 fontWeight = FontWeight.Bold,
@@ -719,7 +719,7 @@ fun HeyDorjaAssistantSheet(
 
 /**
  * Status card shown where the AI body would be, per runtime state:
- *  - NoModel: prominent download CTA (2.58GB, chunked + resumable)
+ *  - NoModel: prominent download CTA (977MB, chunked + resumable)
  *  - Downloading: chunk progress + LiveDownloads-style progress bar
  *  - Initializing / Error / Ready(fallback chip): guidance or confirmation
  */

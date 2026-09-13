@@ -37,6 +37,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
@@ -63,7 +64,13 @@ fun AuthScreen(
     var password by remember { mutableStateOf("") }
     var isSignUpMode by remember { mutableStateOf(false) }
     var displayName by remember { mutableStateOf("") }
-    var countryCode by remember { mutableStateOf(repository.currentUser.value?.countryCode ?: "BD") }
+    val context = LocalContext.current
+    var countryCode by remember {
+        mutableStateOf(
+            if (com.example.ui.i18n.LocaleSettings.isLanguagePinned()) com.example.ui.i18n.LocaleSettings.countryCode.value
+            else repository.currentUser.value?.countryCode ?: "BD"
+        )
+    }
 
     Box(
         modifier = Modifier
@@ -176,6 +183,7 @@ fun AuthScreen(
                             onSelect = { code ->
                                 countryCode = code
                                 repository.setUserCountryCode(code)
+                                com.example.ui.i18n.LocaleSettings.applyCountry(context, code)
                             },
                             modifier = Modifier.fillMaxWidth()
                         )

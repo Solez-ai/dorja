@@ -28,10 +28,10 @@ import java.net.URL
 
 /**
  * Real on-device LLM engine for the Hey Dorja assistant, built on LiteRT-LM
- * (Gemma-4-E2B, official .litertlm from litert-community).
+ * (Qwen3-1.7B, official .litertlm from litert-community).
  *
  * Responsibilities:
- *  - Download the 2.58GB model in resumable 256MB chunks (notification of
+ *  - Download the 977MB model in resumable 256MB chunks (notification of
  *    progress via [downloadState]); survives app kills via .part state files
  *  - Initialize the LiteRT-LM engine on GPU (fallback CPU)
  *  - Stream answers to property questions via [sendMessage]
@@ -43,11 +43,11 @@ object DorjaLlmEngine {
 
     private const val TAG = "DorjaLlmEngine"
 
-    /** Official Gemma-4-E2B-it in .litertlm format (litert-community). */
+    /** Official Qwen3-1.7B (dynamic 4-bit weights, 977MB) in .litertlm format. */
     const val MODEL_URL: String =
-        "https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/main/gemma-4-E2B-it.litertlm"
+        "https://huggingface.co/litert-community/Qwen3-1.7B/resolve/main/Qwen3-1.7B_dynamic_wi4b32_afp32.litertlm"
 
-    const val MODEL_FILE_NAME: String = "gemma-4-E2B-it.litertlm"
+    const val MODEL_FILE_NAME: String = "Qwen3-1.7B.litertlm"
 
     /** 256MB chunks — resumable; each part flushed to disk before continuing. */
     private const val CHUNK_SIZE_BYTES: Long = 256L * 1024 * 1024
@@ -121,7 +121,7 @@ object DorjaLlmEngine {
     private fun refreshStateFromDisk() {
         if (isModelDownloaded()) {
             // Set synchronously so the sheet never flashes the download CTA
-            _llmState.value = LlmState.Initializing("Loading Gemma onto accelerator…")
+            _llmState.value = LlmState.Initializing("Loading Qwen3 onto accelerator…")
             initializeInBackground()
         } else {
             _llmState.value = LlmState.NoModel
@@ -266,7 +266,7 @@ object DorjaLlmEngine {
     }
 
     private suspend fun initialize(modelFile: File) {
-        _llmState.value = LlmState.Initializing("Loading Gemma onto accelerator…")
+        _llmState.value = LlmState.Initializing("Loading Qwen3 onto accelerator…")
         try {
             withContext(Dispatchers.IO) {
                 closeEngineQuiet()
@@ -323,7 +323,7 @@ object DorjaLlmEngine {
 
         val eng = engine
         if (eng == null) {
-            trySend("Gemma is still loading — quick answers are active meanwhile.")
+            trySend("Qwen3 is still loading — quick answers are active meanwhile.")
             close()
             return@callbackFlow
         }

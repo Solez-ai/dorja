@@ -27,6 +27,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -203,7 +204,7 @@ fun DorjaButton(
         onClick = onClick,
         enabled = enabled,
         modifier = finalModifier
-            .height(50.dp)
+            .heightIn(min = 50.dp)
             .pressScale(),
         shape = RoundedCornerShape(16.dp),
         colors = ButtonDefaults.buttonColors(
@@ -228,7 +229,11 @@ fun DorjaButton(
             Text(
                 text = text,
                 style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                lineHeight = 18.sp,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
             )
         }
     }
@@ -247,7 +252,7 @@ fun StainedLiquidGlassButton(
     val finalModifier = if (testTag != null) modifier.testTag(testTag) else modifier
     Box(
         modifier = finalModifier
-            .height(52.dp)
+            .heightIn(min = 52.dp)
             .liquidGlass(
                 blurRadius = LiquidGlassDefaults.BlurMedium,
                 glassColor = stainedColor.copy(alpha = 0.85f),
@@ -275,7 +280,11 @@ fun StainedLiquidGlassButton(
                 text = text,
                 style = MaterialTheme.typography.titleMedium,
                 color = Color.White,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                lineHeight = 18.sp,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
             )
         }
     }
@@ -297,7 +306,7 @@ fun DorjaOutlinedButton(
         onClick = onClick,
         enabled = enabled,
         modifier = finalModifier
-            .height(48.dp)
+            .heightIn(min = 48.dp)
             .pressScale(),
         shape = RoundedCornerShape(16.dp),
         border = BorderStroke(1.dp, if (enabled) borderColor else borderColor.copy(alpha = 0.4f)),
@@ -320,7 +329,11 @@ fun DorjaOutlinedButton(
             Text(
                 text = text,
                 style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Medium
+                fontWeight = FontWeight.Medium,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                lineHeight = 18.sp,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center
             )
         }
     }
@@ -563,7 +576,8 @@ fun LiquidGlassSearchBar(
     onQueryChange: (String) -> Unit,
     onFilterClick: () -> Unit,
     modifier: Modifier = Modifier,
-    placeholderText: String = "Search location, property, ID..."
+    placeholderText: String = "Search location, property, ID...",
+    showFilterButton: Boolean = true
 ) {
     Box(
         modifier = modifier
@@ -624,20 +638,22 @@ fun LiquidGlassSearchBar(
                     )
                 }
             }
-            Spacer(modifier = Modifier.width(4.dp))
-            IconButton(
-                onClick = onFilterClick,
-                modifier = Modifier
-                    .size(36.dp)
-                    .clip(CircleShape)
-                    .background(DorjaColors.DrawerSidebarSoft)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Tune,
-                    contentDescription = "Filter",
-                    tint = DorjaColors.DrawerAccent,
-                    modifier = Modifier.size(18.dp)
-                )
+            if (showFilterButton) {
+                Spacer(modifier = Modifier.width(4.dp))
+                IconButton(
+                    onClick = onFilterClick,
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(DorjaColors.DrawerSidebarSoft)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Tune,
+                        contentDescription = "Filter",
+                        tint = DorjaColors.DrawerAccent,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
             }
         }
     }
@@ -918,16 +934,9 @@ fun CountryPicker(
                     .navigationBarsPadding()
                     .padding(horizontal = 20.dp, vertical = 12.dp)
             ) {
-                // Grab handle
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.CenterHorizontally)
-                        .width(36.dp)
-                        .height(4.dp)
-                        .clip(CircleShape)
-                        .background(DorjaColors.DrawerSidebarSoft)
-                )
-                Spacer(modifier = Modifier.height(16.dp))
+                // NOTE: no custom grab handle here — ModalBottomSheet already
+                // draws its own drag handle; a second one rendered as "two sliders".
+                Spacer(modifier = Modifier.height(4.dp))
 
                 Text(
                     text = "Select Country",
@@ -946,6 +955,7 @@ fun CountryPicker(
                     query = searchQuery,
                     onQueryChange = { searchQuery = it },
                     onFilterClick = {},
+                    showFilterButton = false,
                     placeholderText = "Search by country name or code..."
                 )
                 Spacer(modifier = Modifier.height(16.dp))

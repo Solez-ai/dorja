@@ -31,10 +31,18 @@ class MainActivity : ComponentActivity() {
             val darkTheme by ThemeSettings.darkMode.collectAsState()
             val currentUser by DorjaApp.instance.repository.currentUser.collectAsState()
             val context = LocalContext.current
+            // Keep the app language/country pinned to the user's explicit Settings
+            // choice. Switching demo accounts must NOT re-seed the locale from the
+            // freshly-loaded profile row (whose countryCode is stale seed data).
+            LaunchedEffect(Unit) {
+                LocaleSettings.setPinnedLanguageTag(LocaleSettings.languageTag.value)
+            }
             LaunchedEffect(currentUser?.countryCode) {
-                val code = currentUser?.countryCode
-                if (!code.isNullOrBlank()) {
-                    LocaleSettings.applyCountry(context, code)
+                if (!LocaleSettings.isLanguagePinned()) {
+                    val code = currentUser?.countryCode
+                    if (!code.isNullOrBlank()) {
+                        LocaleSettings.applyCountry(context, code)
+                    }
                 }
             }
             DorjaTheme(darkTheme = darkTheme) {

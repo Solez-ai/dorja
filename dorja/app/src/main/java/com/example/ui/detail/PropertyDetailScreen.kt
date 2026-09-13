@@ -60,7 +60,7 @@ import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.SquareFoot
 import androidx.compose.material.icons.filled.ViewInAr
 import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.AttachFile
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
@@ -72,7 +72,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -1684,12 +1683,30 @@ val legalDocPicker = rememberLauncherForActivityResult(
             item {
                 if (legalDocs.isNotEmpty()) {
                     Column(modifier = Modifier.padding(vertical = 8.dp, horizontal = 12.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
                         Text(
-                            text = "Legal Documents",
+                            text = "Legal Documents (${legalDocs.size})",
                             style = MaterialTheme.typography.titleSmall,
                             color = DorjaColors.Ink950,
                             fontWeight = FontWeight.Bold
                         )
+                        if (isOwner) {
+                            TextButton(onClick = { legalDocPicker.launch("*/*") }) {
+                                Icon(
+                                    imageVector = Icons.Default.Add,
+                                    contentDescription = null,
+                                    tint = DorjaColors.Jol600,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Add", color = DorjaColors.Jol600, fontWeight = FontWeight.SemiBold)
+                            }
+                        }
+                    }
                         Spacer(modifier = Modifier.height(4.dp))
                         legalDocs.forEach { doc ->
                             ListItem(
@@ -1703,12 +1720,31 @@ val legalDocPicker = rememberLauncherForActivityResult(
                         }
                     }
                 } else {
-                    Text(
-                        text = "No legal documents attached.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = DorjaColors.Gray500,
-                        modifier = Modifier.padding(horizontal = 12.dp)
-                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "No legal documents attached.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = DorjaColors.Gray500
+                        )
+                        if (isOwner) {
+                            TextButton(onClick = { legalDocPicker.launch("*/*") }) {
+                                Icon(
+                                    imageVector = Icons.Default.Add,
+                                    contentDescription = null,
+                                    tint = DorjaColors.Jol600,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Add", color = DorjaColors.Jol600, fontWeight = FontWeight.SemiBold)
+                            }
+                        }
+                    }
                 }
             }
 // Professional Handoff (Phase 4, atlas §8) — a licensed professional
@@ -2113,22 +2149,7 @@ val legalDocPicker = rememberLauncherForActivityResult(
             }
         }
 
-        // FAB to add Legal Document — host-only (buyers browse, hosts upload)
-        if (isOwner) {
-            FloatingActionButton(
-                onClick = { legalDocPicker.launch("*/*") },
-                modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(start = 16.dp, bottom = 86.dp),
-                containerColor = DorjaColors.Jol600,
-                contentColor = DorjaColors.White
-            ) {
-                Icon(
-                    imageVector = Icons.Default.AttachFile,
-                    contentDescription = "Add Legal Document"
-                )
-            }
-        }
+        // FAB removed — legal documents are added from the "Legal Documents" section below.
     }
 
     if (showHeyDorjaSheet) {

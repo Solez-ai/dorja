@@ -25,6 +25,19 @@ object LocaleSettings {
 
     @Volatile private var initialized = false
 
+    /**
+     * When non-null, the user has explicitly chosen a language/country, so the
+     * app locale is "pinned": switching accounts (whose seed profile rows carry
+     * stale country codes) must not overwrite the choice.
+     */
+    @Volatile private var pinnedLanguageTag: String? = null
+
+    fun isLanguagePinned(): Boolean = pinnedLanguageTag != null
+
+    fun setPinnedLanguageTag(tag: String?) {
+        pinnedLanguageTag = tag
+    }
+
     fun init(context: Context) {
         if (initialized) return
         synchronized(this) {
@@ -46,6 +59,7 @@ object LocaleSettings {
     fun save(context: Context, tag: String) {
         init(context)
         language.value = tag
+        pinnedLanguageTag = tag
         persist(context)
     }
 
@@ -59,6 +73,7 @@ object LocaleSettings {
         if (country.value.equals(iso2, ignoreCase = true) && language.value == tag) return
         country.value = iso2.uppercase()
         language.value = tag
+        pinnedLanguageTag = tag
         persist(context)
     }
 
