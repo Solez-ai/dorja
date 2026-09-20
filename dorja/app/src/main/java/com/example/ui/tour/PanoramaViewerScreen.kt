@@ -74,6 +74,7 @@ import kotlin.math.atan
 import kotlin.math.cos
 import kotlin.math.roundToInt
 import kotlin.math.sin
+import kotlin.math.tan
 
 private val Accent = Color(0xFF00BCD4)
 
