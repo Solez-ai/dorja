@@ -238,6 +238,7 @@ fun RoomScannerScreen(
                 capturedFrames = capturedFrames,
                 gyroOn = gyroOn,
                 onToggleGyro = { gyroOn = !gyroOn },
+                onRetakeTarget = { targetIndex -> currentTargetIdx = targetIndex },
                 onCapture = {
                     val ic = imageCapture ?: return@CapturingPhase
                     val target = scanTargets.getOrNull(currentTargetIdx) ?: return@CapturingPhase
