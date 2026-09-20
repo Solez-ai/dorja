@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -198,7 +199,7 @@ fun PropertyDetailScreen(
         if (granted) {
             voiceHelper.startListening(onResult = { recognized ->
                 val lower = recognized.lowercase()
-                if (lower.contains("dorja") || lower.contains("hey")) {
+                if (matchesWakeWord(lower)) {
                     showHeyDorjaSheet = true
                 }
             })
@@ -230,7 +231,7 @@ val legalDocPicker = rememberLauncherForActivityResult(
         if (hasAudioPermission && voiceHelper.isAvailable()) {
             voiceHelper.startListening(onResult = { recognized ->
                 val lower = recognized.lowercase()
-                if (lower.contains("dorja") || lower.contains("hey")) {
+                if (matchesWakeWord(lower)) {
                     showHeyDorjaSheet = true
                 }
             })
@@ -726,7 +727,7 @@ val legalDocPicker = rememberLauncherForActivityResult(
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                     BentoCard(modifier = Modifier.fillMaxWidth()) {
-                        Column(modifier = Modifier.padding(12.dp)) {
+                        Column(modifier = Modifier.padding(16.dp)) {
                             Text(
                                 text = "PROPOSED INSPECTION WINDOW",
                                 style = MaterialTheme.typography.labelSmall,
@@ -834,7 +835,7 @@ val legalDocPicker = rememberLauncherForActivityResult(
                         .fillMaxWidth()
                         .aspectRatio(4f / 5f)
                         .clip(RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp))
-                        .background(DorjaColors.Ink950)
+                        .background(DorjaColors.CanvasBg)
                 ) {
                     // Swipeable / Scrollable High-Res Photo Gallery (full 4:5 display)
                     HorizontalPager(
@@ -865,7 +866,8 @@ val legalDocPicker = rememberLauncherForActivityResult(
                     IconButton(
                         onClick = onBack,
                         modifier = Modifier
-                            .padding(top = 40.dp, start = 12.dp)
+                            .statusBarsPadding()
+                            .padding(top = 6.dp, start = 12.dp)
                             .size(38.dp)
                             .clip(CircleShape)
                             .background(DorjaColors.White.copy(alpha = 0.9f))
@@ -883,7 +885,8 @@ val legalDocPicker = rememberLauncherForActivityResult(
                     val currentPhoto = galleryPhotos.getOrNull(pagerState.currentPage)
                     Surface(
                         modifier = Modifier
-                            .padding(top = 40.dp, end = 12.dp)
+                            .statusBarsPadding()
+                            .padding(top = 6.dp, end = 12.dp)
                             .align(Alignment.TopEnd),
                         shape = RoundedCornerShape(16.dp),
                         color = DorjaColors.Ink950.copy(alpha = 0.75f),
@@ -977,8 +980,9 @@ val legalDocPicker = rememberLauncherForActivityResult(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(DorjaColors.Ink950)
-                        .padding(top = 40.dp, start = 12.dp, end = 12.dp, bottom = 12.dp)
+                        .background(DorjaColors.CanvasBg)
+                        .statusBarsPadding()
+                        .padding(start = 12.dp, end = 12.dp, bottom = 12.dp, top = 6.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -991,13 +995,13 @@ val legalDocPicker = rememberLauncherForActivityResult(
                                 modifier = Modifier
                                     .size(38.dp)
                                     .clip(CircleShape)
-                                    .background(DorjaColors.White.copy(alpha = 0.15f))
+                                    .background(DorjaColors.Paper50)
                                     .testTag("detail_back_button")
                             ) {
                                 Icon(
                                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                                     contentDescription = "Back",
-                                    tint = DorjaColors.White
+                                    tint = DorjaColors.Ink950
                                 )
                             }
                             Spacer(modifier = Modifier.width(10.dp))
@@ -1005,14 +1009,14 @@ val legalDocPicker = rememberLauncherForActivityResult(
                                 Text(
                                     text = safeListing.title,
                                     style = MaterialTheme.typography.titleMedium,
-                                    color = DorjaColors.White,
+                                    color = DorjaColors.Ink950,
                                     fontWeight = FontWeight.Bold,
                                     maxLines = 1
                                 )
                                 Text(
                                     text = safeListing.publicArea,
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = DorjaColors.Sand300
+                                    color = DorjaColors.Gray600
                                 )
                             }
                         }
@@ -1034,13 +1038,13 @@ val legalDocPicker = rememberLauncherForActivityResult(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
             ) {
                 item {
                 // Title and Price Bento Card
                 BentoCard(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(12.dp)) {
+                    Column(modifier = Modifier.padding(16.dp)) {
                         Text(
                             text = safeListing.title,
                             style = MaterialTheme.typography.titleLarge,
@@ -1138,15 +1142,17 @@ val legalDocPicker = rememberLauncherForActivityResult(
                     }
                 }
 
-                // Key Specs — 2×2 grid: each pill gets real width, labels never squish
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                // Key Specs — primary stats first (sqft + beds carry the decision),
+                // secondary below; sqft gets extra weight so it never competes
+                // visually with a "0 Balconies".
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        SpecPill(icon = Icons.Default.SquareFoot, label = "${safeListing.sqft} sqft", modifier = Modifier.weight(1.2f))
                         SpecPill(icon = Icons.Default.Bed, label = "${safeListing.bedrooms} Beds", modifier = Modifier.weight(1f))
-                        SpecPill(icon = Icons.Default.Bathtub, label = "${safeListing.bathrooms} Baths", modifier = Modifier.weight(1f))
                     }
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        SpecPill(icon = Icons.Default.Bathtub, label = "${safeListing.bathrooms} Baths", modifier = Modifier.weight(1f))
                         SpecPill(icon = Icons.Default.Balcony, label = "${safeListing.balconies} Balconies", modifier = Modifier.weight(1f))
-                        SpecPill(icon = Icons.Default.SquareFoot, label = "${safeListing.sqft} sqft", modifier = Modifier.weight(1f))
                     }
                 }
 
@@ -1178,13 +1184,13 @@ val legalDocPicker = rememberLauncherForActivityResult(
                 if (energyRows.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(10.dp))
                     BentoCard(modifier = Modifier.fillMaxWidth()) {
-                        Column(modifier = Modifier.padding(12.dp)) {
+                        Column(modifier = Modifier.padding(16.dp)) {
                             Text(
                                 text = "LIVEABILITY & ENERGY",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = DorjaColors.Gray500,
-                                fontFamily = FontFamily.Monospace,
-                                fontWeight = FontWeight.Bold
+                                color = DorjaColors.Gray600,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 1.sp
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                             energyRows.forEach { (label, value) ->
@@ -1429,7 +1435,7 @@ val legalDocPicker = rememberLauncherForActivityResult(
 
                 // Rooms Showcase Bento Card with Photos
                 BentoCard(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(12.dp)) {
+                    Column(modifier = Modifier.padding(16.dp)) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -1567,7 +1573,7 @@ val legalDocPicker = rememberLauncherForActivityResult(
 
                 // About Property Bento Card
                 BentoCard(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(12.dp)) {
+                    Column(modifier = Modifier.padding(16.dp)) {
                         Text(
                             text = "About this property",
                             style = MaterialTheme.typography.titleSmall,
@@ -1588,7 +1594,7 @@ val legalDocPicker = rememberLauncherForActivityResult(
                 // Amenities & Features Bento Card
                 if (safeListing.tags.isNotBlank()) {
                     BentoCard(modifier = Modifier.fillMaxWidth()) {
-                        Column(modifier = Modifier.padding(12.dp)) {
+                        Column(modifier = Modifier.padding(16.dp)) {
                             Text(
                                 text = "Amenities & Features",
                                 style = MaterialTheme.typography.titleSmall,
@@ -1630,7 +1636,7 @@ val legalDocPicker = rememberLauncherForActivityResult(
                         .clickable { onViewHandoverPassport(safeListing.id) }
                 ) {
                     Row(
-                        modifier = Modifier.padding(12.dp),
+                        modifier = Modifier.padding(16.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Box(
@@ -1752,7 +1758,7 @@ val legalDocPicker = rememberLauncherForActivityResult(
             // signs for one section of the listing's evidence.
             item {
                 BentoCard(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(12.dp)) {
+                    Column(modifier = Modifier.padding(16.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(
                                 Icons.Default.WorkspacePremium,
@@ -1935,13 +1941,13 @@ val legalDocPicker = rememberLauncherForActivityResult(
             if (listingReports.isNotEmpty()) {
                 item {
                     BentoCard(modifier = Modifier.fillMaxWidth()) {
-                        Column(modifier = Modifier.padding(12.dp)) {
+                        Column(modifier = Modifier.padding(16.dp)) {
                             Text(
                                 text = "DISPUTES & CONFLICT VIEW",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = DorjaColors.Gray500,
-                                fontFamily = FontFamily.Monospace,
-                                fontWeight = FontWeight.Bold
+                                color = DorjaColors.Gray600,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 1.sp
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                             listingReports.forEach { report ->
@@ -2162,32 +2168,58 @@ val legalDocPicker = rememberLauncherForActivityResult(
     }
 }
 
+/**
+ * Wake-word matcher for the "Hey Dorja" voice trigger.
+ *
+ * Speech recognizers transliterate the brand name inconsistently depending on
+ * the speaker's accent and the recognizer locale ("dorja", "doria", "dhaka"…),
+ * and some users just say "Dorja" without "Hey" (or vice versa). This accepts:
+ *  - the standalone word "hey"
+ *  - "dorja" or any close phonetic rendering (j/g/y soft-g variants)
+ *  - any combination of the two, in any order
+ */
+private fun matchesWakeWord(lower: String): Boolean {
+    if (lower.contains("hey")) return true
+    // d + o + (r | l) + soft consonant + final vowel — covers dorja/doria/dorga/dolja…
+    // without false-positives on everyday words like "dog".
+    if (Regex("\\bd[o0]r?[ljgyzi][ae]\\b") in lower) return true
+    return false
+}
+
 @Composable
 private fun SpecPill(icon: ImageVector, label: String, modifier: Modifier = Modifier) {
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(10.dp),
+        shape = RoundedCornerShape(12.dp),
         color = DorjaColors.White,
         border = BorderStroke(1.dp, DorjaColors.BentoCardBorder)
     ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 6.dp, vertical = 8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = DorjaColors.BentoBlueIcon,
-                modifier = Modifier.size(16.dp)
-            )
-            Spacer(modifier = Modifier.height(4.dp))
+            Box(
+                modifier = Modifier
+                    .size(30.dp)
+                    .clip(CircleShape)
+                    .background(DorjaColors.BentoBlueBg),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = DorjaColors.BentoBlueIcon,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+            Spacer(modifier = Modifier.width(8.dp))
             Text(
                 text = label,
-                style = MaterialTheme.typography.labelSmall,
+                style = MaterialTheme.typography.titleSmall,
                 color = DorjaColors.Ink950,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 11.sp
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
             )
         }
     }

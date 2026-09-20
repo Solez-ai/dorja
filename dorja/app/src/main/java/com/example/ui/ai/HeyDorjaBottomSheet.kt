@@ -4,7 +4,6 @@ import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -48,7 +47,6 @@ import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Keyboard
-import androidx.compose.material.icons.filled.Memory
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Security
@@ -56,7 +54,6 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -77,7 +74,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontFamily
@@ -87,10 +83,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.example.ai.DorjaAiEngine
-import com.example.ai.DorjaLlmEngine
 import com.example.ai.PropertyAiContext
 import com.example.ai.VoiceAssistantHelper
-import com.example.ui.components.DorjaButton
 import com.example.ui.components.DorjaLogo
 import com.example.ui.theme.DorjaColors
 import com.example.ui.theme.LiquidGlassDefaults
@@ -127,48 +121,16 @@ fun HeyDorjaAssistantSheet(
     var isKeyboardMode by remember { mutableStateOf(false) }
     var textInput by remember { mutableStateOf("") }
 
-    // ── LiteRT-LM state (real Qwen3 inference + chunked download) ──
-    val llmState by DorjaLlmEngine.llmState.collectAsState()
-    val downloadState by DorjaLlmEngine.downloadState.collectAsState()
-    val llm = DorjaLlmEngine // local alias so askDorja's `when` can reference the singleton
-    var streamedAnswer by remember { mutableStateOf("") }
-
-    // Boot the engine singleton (restores download/init state); one init retry per sheet open
-    LaunchedEffect(Unit) {
-        DorjaLlmEngine.init(context)
-        val s = DorjaLlmEngine.llmState.value
-        if (s is DorjaLlmEngine.LlmState.Error && DorjaLlmEngine.isModelDownloaded()) {
-            DorjaLlmEngine.initializeInBackground()
-        }
-    }
-
-    // Route each question: real LLM when ready, rule-based engine otherwise
+    // Instant rule-based answers from verified listing data — no model,
+    // no loading, no inference lag. Responds in ~0 ms.
     fun askDorja(query: String) {
         userQuery = query
         isThinking = true
         aiAnswer = null
-        streamedAnswer = ""
         keyboardController?.hide()
         scope.launch {
-            when (llmState) {
-                is DorjaLlmEngine.LlmState.Ready -> {
-                    try {
-                        llm.sendMessage(query, propertyContext).collect { token ->
-                            streamedAnswer += token
-                            aiAnswer = streamedAnswer
-                        }
-                        // Flow closed = answer complete
-                        aiAnswer = streamedAnswer.ifBlank { "(empty response)" }
-                    } catch (t: Throwable) {
-                        // Inference failed mid-stream — degrade to the rule-based engine
-                        aiAnswer = aiEngine.answerQuestion(query, propertyContext)
-                    }
-                }
-                else -> {
-                    aiAnswer = aiEngine.answerQuestion(query, propertyContext)
-                    isThinking = false
-                }
-            }
+            aiAnswer = aiEngine.answerQuestion(query, propertyContext)
+            isThinking = false
         }
     }
 
@@ -263,16 +225,16 @@ fun HeyDorjaAssistantSheet(
                             letterSpacing = 0.4.sp
                         )
                         Spacer(modifier = Modifier.width(8.dp))
-                        // NPU accelerator badge
+                        // Assistant badge — honest: instant rule-based intelligence
                         Surface(
                             shape = RoundedCornerShape(6.dp),
-                            color = if (llmState is DorjaLlmEngine.LlmState.Ready) Color(0x1F0061A4) else Color(0x1F888888),
-                            border = BorderStroke(0.8.dp, if (llmState is DorjaLlmEngine.LlmState.Ready) DorjaColors.Jol600.copy(alpha = 0.5f) else Color.Gray.copy(alpha = 0.3f))
+                            color = Color(0x1F00875A),
+                            border = BorderStroke(0.8.dp, DorjaColors.BentoGreenIcon.copy(alpha = 0.5f))
                         ) {
                             Text(
-                                text = if (llmState is DorjaLlmEngine.LlmState.Ready) "QWEN3 • ON-DEVICE" else "QUICK ANSWERS",
+                                text = "INSTANT • VERIFIED DATA",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = if (llmState is DorjaLlmEngine.LlmState.Ready) DorjaColors.Jol600 else DorjaColors.Gray700,
+                                color = DorjaColors.BentoGreenIcon,
                                 fontSize = 9.sp,
                                 fontWeight = FontWeight.Bold,
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
@@ -280,7 +242,7 @@ fun HeyDorjaAssistantSheet(
                         }
                     }
                     Text(
-                        text = if (llmState is DorjaLlmEngine.LlmState.Ready) "Qwen3 1.7B • Private on-device inference" else "Instant rule-based answers • Add Qwen3 for full AI",
+                        text = "Instant answers built from verified listing data",
                         style = MaterialTheme.typography.labelSmall,
                         color = DorjaColors.Gray600,
                         fontSize = 11.sp
@@ -361,89 +323,11 @@ fun HeyDorjaAssistantSheet(
                     .padding(horizontal = 20.dp, vertical = 8.dp)
             ) {
                 when {
-                    downloadState is DorjaLlmEngine.DownloadState.Downloading -> {
-                        val ds = downloadState as DorjaLlmEngine.DownloadState.Downloading
-                        ModelStatusCard(
-                            title = "Downloading Qwen3…",
-                            body = "You can close this sheet — the download keeps going and resumes automatically if interrupted.",
-                            ctaText = null,
-                            ctaIcon = Icons.Default.Download,
-                            onCta = null,
-                            accent = Color(0xFF0061A4),
-                            container = if (isDark) Color(0x1A0061A4) else Color(0xFFEAF2FB),
-                            progress = ds.fraction,
-                            progressLabel = "Chunk ${ds.chunkIndex}/${ds.totalChunks}  •  ${ds.downloadedBytes / (1024 * 1024)} / ${ds.totalBytes / (1024 * 1024)} MB"
-                        )
-                    }
-                    downloadState is DorjaLlmEngine.DownloadState.Finalizing -> {
-                        ModelStatusCard(
-                            title = "Finalizing model…",
-                            body = "Assembling the downloaded chunks into the final model file.",
-                            ctaText = null,
-                            ctaIcon = Icons.Default.Download,
-                            onCta = null,
-                            accent = Color(0xFF0061A4),
-                            container = if (isDark) Color(0x1A0061A4) else Color(0xFFEAF2FB),
-                            progress = 0.99f
-                        )
-                    }
-                    downloadState is DorjaLlmEngine.DownloadState.Failed -> {
-                        ModelStatusCard(
-                            title = "Download failed",
-                            body = (downloadState as DorjaLlmEngine.DownloadState.Failed).message +
-                            ". Partial progress is kept — retrying resumes where it stopped.",
-                            ctaText = "Retry download",
-                            ctaIcon = Icons.Default.Refresh,
-                            onCta = { DorjaLlmEngine.startDownload() },
-                            accent = Color(0xFFD32F2F),
-                            container = if (isDark) Color(0x332B1E12) else Color(0xFFFDECEA)
-                        )
-                    }
-                    llmState is DorjaLlmEngine.LlmState.NoModel -> {
-                        ModelStatusCard(
-                            title = "Private on-device AI — Qwen3 1.7B",
-                            body = "Download the official model once (977 MB, chunked & resumable). Every question then runs locally — nothing leaves your phone. Instant quick answers stay active meanwhile.",
-                            ctaText = "Download model (977 MB)",
-                            ctaIcon = Icons.Default.Download,
-                            onCta = { DorjaLlmEngine.startDownload() },
-                            accent = Color(0xFFD97706),
-                            container = if (isDark) Color(0x332B1E12) else Color(0xFFFFF4E5)
-                        )
-                    }
-                    llmState is DorjaLlmEngine.LlmState.Initializing -> {
-                        ModelStatusCard(
-                            title = "Preparing Qwen3…",
-                            body = (llmState as DorjaLlmEngine.LlmState.Initializing).message,
-                            ctaText = null,
-                            ctaIcon = Icons.Default.Memory,
-                            onCta = null,
-                            accent = Color(0xFF0061A4),
-                            container = if (isDark) Color(0x1A0061A4) else Color(0xFFEAF2FB)
-                        )
-                    }
-
-                    llmState is DorjaLlmEngine.LlmState.Error -> {
-                        val err = llmState as DorjaLlmEngine.LlmState.Error
-                        val downloaded = DorjaLlmEngine.isModelDownloaded()
-                        ModelStatusCard(
-                            title = if (downloaded) "Couldn't start Qwen3" else "Model engine unavailable",
-                            body = err.message,
-                            ctaText = if (downloaded) "Try again" else null,
-                            ctaIcon = Icons.Default.Refresh,
-                            onCta = if (downloaded) {
-                                { DorjaLlmEngine.initializeInBackground() }
-                            } else null,
-                            accent = Color(0xFFD32F2F),
-                            container = if (isDark) Color(0x332B1E12) else Color(0xFFFDECEA)
-                        )
-                    }
-
                     else -> {
                         // If no question asked yet, display quick suggestion chips
                         if (userQuery.isEmpty()) {
                             Text(
-                                text = if (llmState is DorjaLlmEngine.LlmState.Ready) "Ask anything — Qwen3 answers locally:"
-                                       else "Ask anything about this property:",
+                                text = "Ask anything about this property:",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = DorjaColors.Gray600,
                                 fontWeight = FontWeight.SemiBold,
@@ -510,8 +394,7 @@ fun HeyDorjaAssistantSheet(
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(
-                                        text = if (llmState is DorjaLlmEngine.LlmState.Ready) "Qwen3 thinking locally…"
-                                               else "Quick answer…",
+                                        text = "Quick answer…",
                                         style = MaterialTheme.typography.labelSmall,
                                         color = DorjaColors.Gray600,
                                         fontFamily = FontFamily.Monospace
@@ -532,8 +415,7 @@ fun HeyDorjaAssistantSheet(
                                             DorjaLogo(modifier = Modifier.size(18.dp))
                                             Spacer(modifier = Modifier.width(6.dp))
                                             Text(
-                                                text = if (llmState is DorjaLlmEngine.LlmState.Ready) "Dorja Verified Intelligence • Qwen3 local"
-                                                       else "Dorja Verified Intelligence",
+                                                text = "Dorja Verified Intelligence",
                                                 style = MaterialTheme.typography.labelSmall,
                                                 fontWeight = FontWeight.Bold,
                                                 color = DorjaColors.Jol600
@@ -718,85 +600,6 @@ fun HeyDorjaAssistantSheet(
 }
 
 /**
- * Status card shown where the AI body would be, per runtime state:
- *  - NoModel: prominent download CTA (977MB, chunked + resumable)
- *  - Downloading: chunk progress + LiveDownloads-style progress bar
- *  - Initializing / Error / Ready(fallback chip): guidance or confirmation
- */
-@Composable
-private fun ModelStatusCard(
-    title: String,
-    body: String,
-    ctaText: String?,
-    ctaIcon: ImageVector,
-    onCta: (() -> Unit)?,
-    accent: Color,
-    container: Color,
-    progress: Float? = null,
-    progressLabel: String? = null
-) {
-    Surface(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
-        shape = RoundedCornerShape(16.dp),
-        color = container,
-        border = BorderStroke(1.dp, accent.copy(alpha = 0.4f))
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = ctaIcon,
-                    contentDescription = null,
-                    tint = accent,
-                    modifier = Modifier.size(24.dp)
-                )
-                Spacer(modifier = Modifier.width(10.dp))
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = DorjaColors.Ink950
-                )
-            }
-            Spacer(modifier = Modifier.height(6.dp))
-            Text(
-                text = body,
-                style = MaterialTheme.typography.bodySmall,
-                color = DorjaColors.Gray700,
-                fontSize = 12.sp
-            )
-            if (progress != null) {
-                Spacer(modifier = Modifier.height(10.dp))
-                LinearProgressIndicator(
-                    progress = { progress.coerceIn(0f, 1f) },
-                    modifier = Modifier.fillMaxWidth(),
-                    color = accent,
-                    trackColor = accent.copy(alpha = 0.15f)
-                )
-                progressLabel?.let {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = it,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = DorjaColors.Gray600,
-                        fontSize = 10.sp,
-                        fontFamily = FontFamily.Monospace
-                    )
-                }
-            }
-            if (ctaText != null && onCta != null) {
-                Spacer(modifier = Modifier.height(12.dp))
-                DorjaButton(
-                    text = ctaText,
-                    onClick = onCta,
-                    icon = ctaIcon,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-        }
-    }
-}
-
-@Composable
 private fun SuggestionPill(
     text: String,
     onClick: () -> Unit

@@ -1,5 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <style name="Theme.MyApplication" parent="android:Theme.DeviceDefault.NoActionBar" />
+    <!--
+      Light launch theme. The windowBackground covers the pre-Compose frame;
+      edge-to-edge + Compose's SideEffect (DorjaTheme) draw the real bars.
+      statusBarColor must be defined here too — on API 35 the platform rejects
+      a theme whose values-night counterpart declares it but this one doesn't.
+    -->
+    <style name="Theme.MyApplication" parent="android:Theme.DeviceDefault.NoActionBar">
+        <item name="android:windowBackground">#FDFBFF</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
 </resources>

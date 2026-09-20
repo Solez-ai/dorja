@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!--
+      Dark variant of the launch theme. The base theme (values/themes.xml)
+      inherits the platform light DeviceDefault window background, which is what
+      painted the pre-Compose window (and the system bar backdrop) white while
+      the app was loading in dark mode. Values-night fixes the mismatch.
+    -->
+    <style name="Theme.MyApplication" parent="android:Theme.DeviceDefault.NoActionBar">
+        <item name="android:windowBackground">#0F1419</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>

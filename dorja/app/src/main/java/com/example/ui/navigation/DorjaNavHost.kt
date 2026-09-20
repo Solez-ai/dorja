@@ -496,7 +496,7 @@ fun MainContainer(
                     Text(
                         text = activeTabTitle,
                         style = MaterialTheme.typography.labelMedium,
-                        color = DorjaColors.Gray500,
+                        color = DorjaColors.Gray600,
                         fontWeight = FontWeight.SemiBold
                     )
                 }

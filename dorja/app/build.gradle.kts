@@ -109,10 +109,9 @@ dependencies {
   implementation(libs.androidx.camera.lifecycle)
   implementation(libs.androidx.camera.view)
   implementation(libs.coil.compose)
-  implementation(libs.litertlm.android)
   implementation(libs.converter.moshi)
-  implementation(libs.tensorflow.lite)
-  implementation(libs.tensorflow.lite.gpu)
+  // TensorFlow/LiteRT model runtime removed — Dorja AI is instant rule-based,
+  // keeping the app light and lag-free (no model loading, no NPU/GPU warm-up).
 
   // Uncomment to use Firestore:
   // implementation(libs.firebase.firestore)
