@@ -2,6 +2,7 @@ package com.example.ui.scanner
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.hardware.Sensor
 import android.hardware.SensorEvent
@@ -31,6 +32,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -39,7 +41,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -85,6 +86,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
@@ -111,13 +113,16 @@ import org.json.JSONObject
 import java.io.File
 import kotlin.math.PI
 import kotlin.math.abs
+import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.sin
+import kotlin.math.tan
 
 private enum class Phase { SELECT, PREVIEW, CAPTURING, DONE }
 
 private val Accent = Color(0xFF00BCD4)
 private val Green = Color(0xFF4CAF50)
+private val TargetYellow = Color(0xFFFFC107)
 
 data class FrameData(
     val path: String,
@@ -161,8 +166,9 @@ fun RoomScannerScreen(
 
     val scanTargets = remember(scanMode) { ScanGeometry.generateScanTargets(scanMode) }
 
-    // Stitching progress status state
+    // Stitching progress & live preview states
     var stitchingStatus by remember { mutableStateOf<String?>(null) }
+    var stitchingPreviewBmp by remember { mutableStateOf<Bitmap?>(null) }
 
     val sensorMgr = remember { ctx.getSystemService(SensorManager::class.java) }
     val rotVec = remember { sensorMgr?.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR) }
@@ -232,7 +238,6 @@ fun RoomScannerScreen(
                 capturedFrames = capturedFrames,
                 gyroOn = gyroOn,
                 onToggleGyro = { gyroOn = !gyroOn },
-                onRetakeTarget = { targetIndex -> currentTargetIdx = targetIndex },
                 onCapture = {
                     val ic = imageCapture ?: return@CapturingPhase
                     val target = scanTargets.getOrNull(currentTargetIdx) ?: return@CapturingPhase
@@ -255,7 +260,6 @@ fun RoomScannerScreen(
                                     capType = target.capType
                                 )
 
-                                // Check if replacing a retaken frame
                                 val existingIdx = capturedFrames.indexOfFirst { it.col == target.targetIndex }
                                 if (existingIdx >= 0) {
                                     capturedFrames[existingIdx] = frame
@@ -286,13 +290,15 @@ fun RoomScannerScreen(
                 scanMode = scanMode,
                 capturedFrames = capturedFrames,
                 stitchingStatus = stitchingStatus,
+                stitchingPreviewBmp = stitchingPreviewBmp,
                 onSave = {
                     scope.launch {
                         try {
                             val frames = capturedFrames.toList()
                             val stitched = withContext(Dispatchers.IO) {
-                                SphericalStitcher.stitch(ctx, frames, scanMode) { statusMsg ->
+                                SphericalStitcher.stitch(ctx, frames, scanMode) { statusMsg, liveBmp ->
                                     stitchingStatus = statusMsg
+                                    stitchingPreviewBmp = liveBmp
                                 }
                             }
                             if (stitched != null) {
@@ -302,7 +308,7 @@ fun RoomScannerScreen(
                                 }
                                 onScanComplete(selectedRoom?.id ?: "", json)
                             } else {
-                                Log.e("Scanner", "360 Stitching returned null — panorama not saved")
+                                Log.e("Scanner", "360 Stitching returned null")
                                 stitchingStatus = "Stitching failed. Retake frames."
                             }
                         } catch (e: Exception) {
@@ -315,12 +321,14 @@ fun RoomScannerScreen(
                     capturedFrames.clear()
                     currentTargetIdx = 0
                     stitchingStatus = null
+                    stitchingPreviewBmp = null
                     phase = Phase.PREVIEW
                 },
                 onDiscard = {
                     capturedFrames.clear()
                     currentTargetIdx = 0
                     stitchingStatus = null
+                    stitchingPreviewBmp = null
                     phase = Phase.SELECT
                 }
             )
@@ -352,7 +360,6 @@ private fun SelectRoom(
         }
         Spacer(Modifier.height(14.dp))
 
-        // Mode Selector Card
         Surface(
             shape = RoundedCornerShape(12.dp),
             color = DorjaColors.Gray700.copy(alpha = 0.6f),
@@ -461,7 +468,7 @@ private fun ModeOptionChip(
 }
 
 // ═════════════════════════════════════════════════════════════
-//  PHASE 2 — PREVIEW
+//  PHASE 2 — PREVIEW & TUTORIAL
 // ═════════════════════════════════════════════════════════════
 @Composable
 private fun PreviewPhase(
@@ -491,20 +498,17 @@ private fun PreviewPhase(
             Spacer(Modifier.size(38.dp))
         }
 
-        Box(Modifier.align(Alignment.Center).padding(32.dp), contentAlignment = Alignment.Center) {
-            Surface(shape = RoundedCornerShape(16.dp), color = Color.Black.copy(alpha = 0.65f), border = androidx.compose.foundation.BorderStroke(1.dp, Accent.copy(alpha = 0.3f))) {
+        // Clear 3-Step Visual Guidance Card
+        Box(Modifier.align(Alignment.Center).padding(24.dp), contentAlignment = Alignment.Center) {
+            Surface(shape = RoundedCornerShape(16.dp), color = Color.Black.copy(alpha = 0.75f), border = androidx.compose.foundation.BorderStroke(1.dp, Accent.copy(alpha = 0.4f))) {
                 Column(Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("📷", fontSize = 28.sp)
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        if (scanMode == ScanGeometry.ScanMode.FULL_SPHERE)
-                            "Full 360° × 180° Sphere Scan\nFollow vertical rings from ceiling to floor"
-                        else
-                            "Quick 3-Ring Scan\nFast 24-photo capture",
-                        color = Color.White,
-                        textAlign = TextAlign.Center,
-                        fontSize = 13.sp
-                    )
+                    Text("HOW TO CAPTURE A SPHERE", color = Accent, fontSize = 11.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(10.dp))
+                    Text("1. Stand in middle of room (pivot like a tripod)", color = Color.White, fontSize = 12.sp)
+                    Spacer(Modifier.height(4.dp))
+                    Text("2. Move phone to align center into green AR target ring", color = Color.White, fontSize = 12.sp)
+                    Spacer(Modifier.height(4.dp))
+                    Text("3. Follow 3D arrows from ceiling down to floor", color = Color.White, fontSize = 12.sp)
                 }
             }
         }
@@ -523,7 +527,7 @@ private fun PreviewPhase(
 }
 
 // ═════════════════════════════════════════════════════════════
-//  PHASE 3 — CAPTURING (RING GRID UX)
+//  PHASE 3 — CAPTURING (INTERACTIVE 3D AR GUIDANCE)
 // ═════════════════════════════════════════════════════════════
 @Composable
 private fun CapturingPhase(
@@ -546,7 +550,6 @@ private fun CapturingPhase(
 ) {
     val target = scanTargets.getOrNull(currentTargetIdx) ?: scanTargets.last()
 
-    // Guidance logic
     val pitchError = currentPitch - target.pitchDeg
     val headingError = ((heading - target.headingDeg + 540) % 360) - 180
 
@@ -554,18 +557,14 @@ private fun CapturingPhase(
     val onHeadingTarget = target.isCap || abs(headingError) <= 12f
     val isLocked = onPitchTarget && onHeadingTarget
 
-    val tiltLabel = when {
-        target.isCap && target.capType == "zenith" -> if (currentPitch > 75f) "POINT STRAIGHT UP" else "TILT UP TO CEILING"
-        target.isCap && target.capType == "nadir" -> if (currentPitch < -75f) "POINT STRAIGHT DOWN" else "TILT DOWN TO FLOOR"
-        pitchError < -10f -> "TILT UP"
-        pitchError > 10f -> "TILT DOWN"
-        else -> "LEVEL PITCH"
-    }
-
-    val tiltDirection = when {
-        pitchError < -10f -> -1f
-        pitchError > 10f -> 1f
-        else -> 0f
+    val guidanceText = when {
+        target.isCap && target.capType == "zenith" -> if (currentPitch > 75f) "LOCK AT CEILING" else "POINT AT CEILING (+90°)"
+        target.isCap && target.capType == "nadir" -> if (currentPitch < -75f) "LOCK AT NADIR" else "POINT AT FLOOR (-90°)"
+        pitchError < -12f -> "TILT UP ${"%.0f".format(abs(pitchError))}°"
+        pitchError > 12f -> "TILT DOWN ${"%.0f".format(abs(pitchError))}°"
+        headingError > 12f -> "TURN LEFT ${"%.0f".format(abs(headingError))}°"
+        headingError < -12f -> "TURN RIGHT ${"%.0f".format(abs(headingError))}°"
+        else -> "ALIGNED — TAP SHUTTER"
     }
 
     val coveragePercent = remember(capturedFrames.size) {
@@ -574,14 +573,23 @@ private fun CapturingPhase(
 
     Box(Modifier.fillMaxSize()) {
         CameraPreview(imageCapture, onCaptureReady, hasCamera, lifecycleOwner)
-        CompassOverlay(heading, target.headingDeg, target.targetIndex, scanTargets.size, capturedFrames.size)
+
+        // INTERACTIVE 3D AR TARGET RETICLE & DIRECTIONAL ARROWS OVERLAY
+        ArTargetOverlay(
+            heading = heading,
+            currentPitch = currentPitch,
+            targetHeading = target.headingDeg,
+            targetPitch = target.pitchDeg,
+            isLocked = isLocked,
+            isCap = target.isCap
+        )
 
         // Top Status Header
         Box(Modifier.fillMaxWidth().height(65.dp).background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.6f), Color.Transparent))).align(Alignment.TopCenter))
         Surface(shape = RoundedCornerShape(20.dp), color = Color.Black.copy(alpha = 0.65f), modifier = Modifier.align(Alignment.TopCenter).padding(top = 45.dp)) {
             Row(Modifier.padding(horizontal = 14.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    "SHOT ${currentTargetIdx + 1}/${scanTargets.size} • RING ${target.ringIndex} • ${"%.0f".format(coveragePercent)}% COVERAGE",
+                    "SHOT ${currentTargetIdx + 1}/${scanTargets.size} • RING ${target.ringIndex} • ${"%.0f".format(coveragePercent)}% SPHERE",
                     color = if (isLocked) Green else Accent,
                     fontWeight = FontWeight.Bold,
                     fontFamily = FontFamily.Monospace,
@@ -623,20 +631,112 @@ private fun CapturingPhase(
             GyroChip(gyroOn, onToggleGyro)
         }
 
-        Text(
-            "Point at target (${"%.0f".format(target.headingDeg)}°, ${"%.0f".format(target.pitchDeg)}°) and tap shutter",
-            color = Color.White.copy(alpha = 0.7f),
-            fontSize = 10.sp,
-            fontFamily = FontFamily.Monospace,
-            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 110.dp)
-        )
+        // Guidance Badge Banner
+        Surface(
+            shape = RoundedCornerShape(20.dp),
+            color = Color.Black.copy(alpha = 0.75f),
+            border = androidx.compose.foundation.BorderStroke(1.5.dp, if (isLocked) Green else TargetYellow),
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 95.dp)
+        ) {
+            Text(
+                guidanceText,
+                color = if (isLocked) Green else TargetYellow,
+                fontSize = 11.sp,
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+            )
+        }
+    }
+}
 
-        TiltIndicator(tiltDirection, tiltLabel, currentPitch, target.pitchDeg, Modifier.align(Alignment.BottomCenter).padding(bottom = 82.dp))
+/**
+ * Interactive 3D AR Target Overlay:
+ * Projects the target sphere angle (heading, pitch) onto the 2D camera preview.
+ * Draws an AR target ring that smoothly glides into center crosshair as phone aligns,
+ * plus a 3D directional arrow pointing toward off-screen targets!
+ */
+@Composable
+private fun ArTargetOverlay(
+    heading: Float,
+    currentPitch: Float,
+    targetHeading: Float,
+    targetPitch: Float,
+    isLocked: Boolean,
+    isCap: Boolean
+) {
+    Canvas(Modifier.fillMaxSize()) {
+        val cx = size.width / 2f
+        val cy = size.height / 2f
+
+        // Projection scale mapping degrees to preview pixels (assuming ~60° hFOV)
+        val pxPerDeg = size.width / 60f
+
+        val relHeading = ((targetHeading - heading + 540) % 360) - 180
+        val relPitch = targetPitch - currentPitch
+
+        val targetX = cx - (relHeading * pxPerDeg)
+        val targetY = cy - (relPitch * pxPerDeg)
+
+        val isTargetOnScreen = targetX in 0f..size.width && targetY in 0f..size.height
+
+        val ringColor = if (isLocked) Green else TargetYellow
+        val ringRadius = if (isLocked) 34.dp.toPx() else 28.dp.toPx()
+
+        // 1. Center Screen Crosshair
+        drawCircle(Color.White.copy(alpha = 0.3f), 40.dp.toPx(), Offset(cx, cy), style = Stroke(1.5.dp.toPx()))
+        drawCircle(if (isLocked) Green else Color.White, 4.dp.toPx(), Offset(cx, cy))
+
+        if (isTargetOnScreen || isCap) {
+            // 2. Projected 3D AR Target Ring
+            val drawX = if (isCap) cx else targetX
+            val drawY = if (isCap) (cy - relPitch * pxPerDeg).coerceIn(40.dp.toPx(), size.height - 40.dp.toPx()) else targetY
+
+            // Outer ring
+            drawCircle(ringColor.copy(alpha = 0.3f), ringRadius * 1.4f, Offset(drawX, drawY))
+            drawCircle(ringColor, ringRadius, Offset(drawX, drawY), style = Stroke(2.5.dp.toPx()))
+            drawCircle(ringColor, 6.dp.toPx(), Offset(drawX, drawY))
+
+            // Line connecting center to target
+            if (!isLocked) {
+                drawLine(ringColor.copy(alpha = 0.5f), Offset(cx, cy), Offset(drawX, drawY), 1.5.dp.toPx())
+            }
+        } else {
+            // 3. 3D Directional AR Arrow pointing off-screen toward target
+            val dx = targetX - cx
+            val dy = targetY - cy
+            val angle = atan2(dy, dx)
+
+            val arrowDist = size.width * 0.38f
+            val arrowX = cx + arrowDist * cos(angle)
+            val arrowY = cy + arrowDist * sin(angle)
+
+            val arrowSize = 16.dp.toPx()
+
+            // Pointer Arrow head
+            drawContext.canvas.save()
+            drawContext.canvas.translate(arrowX, arrowY)
+            drawContext.canvas.rotate(Math.toDegrees(angle.toDouble()).toFloat() + 90f)
+
+            val p1 = Offset(0f, -arrowSize)
+            val p2 = Offset(-arrowSize * 0.6f, arrowSize * 0.6f)
+            val p3 = Offset(arrowSize * 0.6f, arrowSize * 0.6f)
+
+            drawLine(TargetYellow, p1, p2, 3.dp.toPx())
+            drawLine(TargetYellow, p2, Offset(0f, 0f), 3.dp.toPx())
+            drawLine(TargetYellow, Offset(0f, 0f), p3, 3.dp.toPx())
+            drawLine(TargetYellow, p3, p1, 3.dp.toPx())
+
+            drawContext.canvas.restore()
+
+            // Line connecting center to arrow
+            drawLine(TargetYellow.copy(alpha = 0.4f), Offset(cx, cy), Offset(arrowX, arrowY), 2.dp.toPx())
+        }
     }
 }
 
 // ═════════════════════════════════════════════════════════════
-//  PHASE 4 — DONE / STITCHING
+//  PHASE 4 — DONE / STITCHING & LIVE PREVIEW
 // ═════════════════════════════════════════════════════════════
 @Composable
 private fun DonePhase(
@@ -645,6 +745,7 @@ private fun DonePhase(
     scanMode: ScanGeometry.ScanMode,
     capturedFrames: List<FrameData>,
     stitchingStatus: String?,
+    stitchingPreviewBmp: Bitmap?,
     onSave: () -> Unit,
     onRetake: () -> Unit,
     onDiscard: () -> Unit
@@ -653,24 +754,41 @@ private fun DonePhase(
         ScanGeometry.computeCoveragePercent(capturedFrames.map { Pair(it.heading, it.pitchDeg) })
     }
 
-    Box(Modifier.fillMaxSize().background(DorjaColors.Ink950).padding(24.dp), contentAlignment = Alignment.Center) {
+    Box(Modifier.fillMaxSize().background(DorjaColors.Ink950).padding(20.dp), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-            Box(Modifier.size(72.dp).clip(CircleShape).background(Accent.copy(alpha = 0.15f)), contentAlignment = Alignment.Center) {
-                Icon(Icons.Default.CheckCircle, null, tint = Accent, modifier = Modifier.size(40.dp))
+            Box(Modifier.size(64.dp).clip(CircleShape).background(Accent.copy(alpha = 0.15f)), contentAlignment = Alignment.Center) {
+                Icon(Icons.Default.CheckCircle, null, tint = Accent, modifier = Modifier.size(36.dp))
             }
-            Spacer(Modifier.height(20.dp))
-            Text("Spherical Scan Complete", color = DorjaColors.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.headlineMedium)
-            Spacer(Modifier.height(6.dp))
-            Text("$frameCount photos captured for $roomName (${"%.0f".format(coverage)}% sphere coverage)", color = DorjaColors.Sand300, textAlign = TextAlign.Center)
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(14.dp))
+            Text("Spherical Scan Complete", color = DorjaColors.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
+            Spacer(Modifier.height(4.dp))
+            Text("$frameCount photos captured for $roomName (${"%.0f".format(coverage)}% sphere coverage)", color = DorjaColors.Sand300, textAlign = TextAlign.Center, fontSize = 12.sp)
+            Spacer(Modifier.height(14.dp))
 
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                StatTile("FRAMES", "$frameCount", Modifier.weight(1f))
-                StatTile("COVERAGE", "${"%.0f".format(coverage)}%", Modifier.weight(1f))
-                StatTile("MODE", if (scanMode == ScanGeometry.ScanMode.FULL_SPHERE) "360×180" else "QUICK", Modifier.weight(1f))
+            // LIVE EQUIRRECTANGULAR STITCHING CANVAS PREVIEW
+            if (stitchingPreviewBmp != null) {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = Color.Black,
+                    border = androidx.compose.foundation.BorderStroke(1.5.dp, Accent),
+                    modifier = Modifier.fillMaxWidth().height(160.dp).padding(bottom = 12.dp)
+                ) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Image(
+                            bitmap = stitchingPreviewBmp.asImageBitmap(),
+                            contentDescription = "Live 360 Panorama Stitching Preview",
+                            contentScale = ContentScale.Fit,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                        Badge(
+                            containerColor = Color.Black.copy(alpha = 0.7f),
+                            modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)
+                        ) {
+                            Text("LIVE 360° CANVAS PREVIEW", color = Accent, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
+                        }
+                    }
+                }
             }
-
-            Spacer(Modifier.height(20.dp))
 
             if (stitchingStatus != null) {
                 Surface(
@@ -682,7 +800,7 @@ private fun DonePhase(
                     Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                         CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Accent, strokeWidth = 2.dp)
                         Spacer(Modifier.width(12.dp))
-                        Text(stitchingStatus, color = Color.White, fontSize = 12.sp, fontFamily = FontFamily.Monospace)
+                        Text(stitchingStatus, color = Color.White, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
                     }
                 }
             }
@@ -690,7 +808,7 @@ private fun DonePhase(
             DorjaButton(
                 "Save 360° Sphere to $roomName",
                 onClick = onSave,
-                modifier = Modifier.fillMaxWidth().height(48.dp)
+                modifier = Modifier.fillMaxWidth().height(46.dp)
             )
             Spacer(Modifier.height(10.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -738,7 +856,7 @@ private fun VerticalRingRail(
 
                 val dotColor = when {
                     ringComplete -> Green
-                    isCurrent -> Color(0xFFFFC107)
+                    isCurrent -> TargetYellow
                     else -> Color.White.copy(alpha = 0.3f)
                 }
 
@@ -813,27 +931,6 @@ private fun ScopeOverlay() {
 }
 
 @Composable
-private fun CompassOverlay(heading: Float, targetHeading: Float, currentIdx: Int, totalShots: Int, capturedCount: Int) {
-    Canvas(Modifier.fillMaxSize()) {
-        val cx = size.width / 2
-        val cy = size.height / 2
-        val radius = size.width * 0.35f
-        drawCircle(Accent.copy(alpha = 0.15f), radius, Offset(cx, cy), style = Stroke(2.dp.toPx()))
-
-        val targetRad = Math.toRadians((targetHeading - 90).toDouble())
-        val tx = cx + radius * cos(targetRad).toFloat()
-        val ty = cy + radius * sin(targetRad).toFloat()
-        drawCircle(Accent, 8.dp.toPx(), Offset(tx, ty))
-
-        val headRad = Math.toRadians((heading - 90).toDouble())
-        val hx = cx + radius * cos(headRad).toFloat()
-        val hy = cy + radius * sin(headRad).toFloat()
-        drawCircle(Green, 5.dp.toPx(), Offset(hx, hy))
-        drawLine(Green.copy(alpha = 0.4f), Offset(cx, cy), Offset(hx, hy), 1.5.dp.toPx())
-    }
-}
-
-@Composable
 private fun LastShotThumbnail(
     frames: SnapshotStateList<FrameData>,
     capturedCount: Int,
@@ -899,75 +996,6 @@ private fun GyroChip(on: Boolean, toggle: () -> Unit) {
             Box(Modifier.size(8.dp).clip(CircleShape).background(if (on) Accent else Color.Gray))
             Spacer(Modifier.width(6.dp))
             Text("GYRO ${if (on) "ON" else "OFF"}", color = if (on) Accent else Color.Gray, fontSize = 10.sp, fontFamily = FontFamily.Monospace)
-        }
-    }
-}
-
-@Composable
-private fun StatTile(label: String, value: String, modifier: Modifier = Modifier) {
-    Surface(modifier, shape = RoundedCornerShape(10.dp), color = DorjaColors.Gray700) {
-        Column(Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(value, color = Accent, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.headlineMedium)
-            Spacer(Modifier.height(2.dp))
-            Text(label, color = DorjaColors.Sand300, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
-        }
-    }
-}
-
-@Composable
-private fun TiltIndicator(direction: Float, label: String, actualPitch: Float = 0f, idealPitch: Float = 0f, modifier: Modifier = Modifier) {
-    val phoneRotation = actualPitch.coerceIn(-30f, 30f)
-    val onTarget = abs(actualPitch - idealPitch) < 10f
-    val labelColor = when {
-        !onTarget && direction < 0 -> Color(0xFFFF9800)
-        !onTarget && direction > 0 -> Color(0xFF2196F3)
-        onTarget -> Green
-        else -> Color.White.copy(alpha = 0.5f)
-    }
-
-    Surface(
-        shape = RoundedCornerShape(20.dp),
-        color = Color.Black.copy(alpha = 0.6f),
-        border = androidx.compose.foundation.BorderStroke(1.dp, labelColor.copy(alpha = 0.4f)),
-        modifier = modifier
-    ) {
-        Row(
-            Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            Canvas(Modifier.size(24.dp)) {
-                val w = size.width * 0.5f
-                val h = size.height * 0.85f
-                val cx = size.width / 2f
-                val cy = size.height / 2f
-
-                drawContext.canvas.save()
-                drawContext.canvas.translate(cx, cy)
-                drawContext.canvas.rotate(phoneRotation)
-                drawContext.canvas.translate(-cx, -cy)
-                drawRoundRect(
-                    color = labelColor,
-                    topLeft = Offset(cx - w / 2, cy - h / 2),
-                    size = androidx.compose.ui.geometry.Size(w, h),
-                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(w * 0.2f)
-                )
-                drawRoundRect(
-                    color = Color.Black.copy(alpha = 0.4f),
-                    topLeft = Offset(cx - w * 0.35f, cy - h * 0.3f),
-                    size = androidx.compose.ui.geometry.Size(w * 0.7f, h * 0.6f),
-                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(2.dp.toPx())
-                )
-                drawContext.canvas.restore()
-            }
-
-            Text(
-                label,
-                color = labelColor,
-                fontSize = 10.sp,
-                fontFamily = FontFamily.Monospace,
-                fontWeight = FontWeight.Bold
-            )
         }
     }
 }
