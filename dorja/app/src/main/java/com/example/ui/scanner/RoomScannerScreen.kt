@@ -172,25 +172,70 @@ fun RoomScannerScreen(
 
     val sensorMgr = remember { ctx.getSystemService(SensorManager::class.java) }
     val rotVec = remember { sensorMgr?.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR) }
-    val rotMatrix = FloatArray(9)
-    val orientAngles = FloatArray(3)
+    val gameRotVec = remember { sensorMgr?.getDefaultSensor(Sensor.TYPE_GAME_ROTATION_VECTOR) }
+    val accel = remember { sensorMgr?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER) }
+    val mag = remember { sensorMgr?.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD) }
+
+    val rotMatrix = remember { FloatArray(9) }
+    val remappedMatrix = remember { FloatArray(9) }
+    val orientAngles = remember { FloatArray(3) }
+    val accelVals = remember { FloatArray(3) }
+    val magVals = remember { FloatArray(3) }
+    var hasAccel by remember { mutableStateOf(false) }
+    var hasMag by remember { mutableStateOf(false) }
 
     DisposableEffect(sensorMgr, gyroOn) {
-        if (sensorMgr == null || rotVec == null || !gyroOn) {
+        if (sensorMgr == null || !gyroOn) {
             onDispose { }
         } else {
             val listener = object : SensorEventListener {
                 override fun onSensorChanged(e: SensorEvent?) {
-                    if (e?.sensor?.type == Sensor.TYPE_ROTATION_VECTOR) {
-                        SensorManager.getRotationMatrixFromVector(rotMatrix, e.values)
-                        SensorManager.getOrientation(rotMatrix, orientAngles)
-                        heading = ((Math.toDegrees(orientAngles[0].toDouble()) % 360.0) + 360.0).toFloat() % 360f
-                        pitch = Math.toDegrees(orientAngles[1].toDouble()).toFloat()
+                    val event = e ?: return
+                    when (event.sensor.type) {
+                        Sensor.TYPE_ROTATION_VECTOR, Sensor.TYPE_GAME_ROTATION_VECTOR -> {
+                            SensorManager.getRotationMatrixFromVector(rotMatrix, event.values)
+                            // REMAP COORDINATES FOR PORTRAIT CAMERA ORIENTATION (AXIS_X, AXIS_Z)
+                            SensorManager.remapCoordinateSystem(rotMatrix, SensorManager.AXIS_X, SensorManager.AXIS_Z, remappedMatrix)
+                            SensorManager.getOrientation(remappedMatrix, orientAngles)
+                            heading = ((Math.toDegrees(orientAngles[0].toDouble()) % 360.0) + 360.0).toFloat() % 360f
+                            pitch = Math.toDegrees(orientAngles[1].toDouble()).toFloat()
+                        }
+                        Sensor.TYPE_ACCELEROMETER -> {
+                            System.arraycopy(event.values, 0, accelVals, 0, 3)
+                            hasAccel = true
+                            processAccelMagFallback()
+                        }
+                        Sensor.TYPE_MAGNETIC_FIELD -> {
+                            System.arraycopy(event.values, 0, magVals, 0, 3)
+                            hasMag = true
+                            processAccelMagFallback()
+                        }
                     }
                 }
+
+                private fun processAccelMagFallback() {
+                    if (rotVec == null && gameRotVec == null && hasAccel && hasMag) {
+                        if (SensorManager.getRotationMatrix(rotMatrix, null, accelVals, magVals)) {
+                            SensorManager.remapCoordinateSystem(rotMatrix, SensorManager.AXIS_X, SensorManager.AXIS_Z, remappedMatrix)
+                            SensorManager.getOrientation(remappedMatrix, orientAngles)
+                            heading = ((Math.toDegrees(orientAngles[0].toDouble()) % 360.0) + 360.0).toFloat() % 360f
+                            pitch = Math.toDegrees(orientAngles[1].toDouble()).toFloat()
+                        }
+                    }
+                }
+
                 override fun onAccuracyChanged(s: Sensor?, a: Int) {}
             }
-            sensorMgr.registerListener(listener, rotVec, SensorManager.SENSOR_DELAY_UI)
+
+            if (rotVec != null) {
+                sensorMgr.registerListener(listener, rotVec, SensorManager.SENSOR_DELAY_GAME)
+            } else if (gameRotVec != null) {
+                sensorMgr.registerListener(listener, gameRotVec, SensorManager.SENSOR_DELAY_GAME)
+            } else {
+                accel?.let { sensorMgr.registerListener(listener, it, SensorManager.SENSOR_DELAY_GAME) }
+                mag?.let { sensorMgr.registerListener(listener, it, SensorManager.SENSOR_DELAY_GAME) }
+            }
+
             onDispose { sensorMgr.unregisterListener(listener) }
         }
     }
@@ -232,64 +277,87 @@ fun RoomScannerScreen(
                 lifecycleOwner = lifecycleOwner
             )
 
-            Phase.CAPTURING -> CapturingPhase(
-                imageCapture = imageCapture,
-                onCaptureReady = { imageCapture = it },
-                hasCamera = hasCamera,
-                heading = heading,
-                currentPitch = pitch,
-                scanMode = scanMode,
-                scanTargets = scanTargets,
-                currentTargetIdx = currentTargetIdx,
-                capturedFrames = capturedFrames,
-                gyroOn = gyroOn,
-                onToggleGyro = { gyroOn = !gyroOn },
-                onRetakeTarget = { targetIndex -> currentTargetIdx = targetIndex },
-                onCapture = {
-                    val ic = imageCapture ?: return@CapturingPhase
-                    val target = scanTargets.getOrNull(currentTargetIdx) ?: return@CapturingPhase
-                    val file = File(ctx.cacheDir, "frame_r${target.ringIndex}_c${target.targetIndex}_${System.currentTimeMillis()}.jpg")
-                    val capturedHeading = heading
-                    val capturedPitch = pitch
-
-                    ic.takePicture(
-                        ImageCapture.OutputFileOptions.Builder(file).build(),
-                        ContextCompat.getMainExecutor(ctx),
-                        object : ImageCapture.OnImageSavedCallback {
-                            override fun onImageSaved(output: ImageCapture.OutputFileResults) {
-                                val frame = FrameData(
-                                    path = file.absolutePath,
-                                    heading = capturedHeading,
-                                    pitchDeg = capturedPitch,
-                                    row = target.ringIndex,
-                                    col = target.targetIndex,
-                                    isCap = target.isCap,
-                                    capType = target.capType
-                                )
-
-                                val existingIdx = capturedFrames.indexOfFirst { it.col == target.targetIndex }
-                                if (existingIdx >= 0) {
-                                    capturedFrames[existingIdx] = frame
-                                } else {
-                                    capturedFrames.add(frame)
+            Phase.CAPTURING -> {
+                if (scanMode == ScanGeometry.ScanMode.AR_CORNER_SCAN) {
+                    ArCornerScannerPhase(
+                        imageCapture = imageCapture,
+                        onCaptureReady = { imageCapture = it },
+                        hasCamera = hasCamera,
+                        heading = heading,
+                        currentPitch = pitch,
+                        roomName = selectedRoom?.displayName ?: "Room",
+                        onSaveArModel = { jsonStr ->
+                            scope.launch {
+                                withContext(Dispatchers.IO) {
+                                    repo.updateRoom3DScan(selectedRoom?.id ?: "", jsonStr)
                                 }
-
-                                vibrateShutter(ctx)
-                                if (currentTargetIdx < scanTargets.size - 1) {
-                                    currentTargetIdx++
-                                }
+                                onScanComplete(selectedRoom?.id ?: "", jsonStr)
                             }
-
-                            override fun onError(exc: ImageCaptureException) {
-                                Log.e("Scanner", "Capture failed", exc)
-                            }
-                        }
+                        },
+                        onBack = { phase = Phase.PREVIEW },
+                        lifecycleOwner = lifecycleOwner
                     )
-                },
-                onStop = { phase = Phase.DONE },
-                onBack = { phase = Phase.PREVIEW },
-                lifecycleOwner = lifecycleOwner
-            )
+                } else {
+                    CapturingPhase(
+                        imageCapture = imageCapture,
+                        onCaptureReady = { imageCapture = it },
+                        hasCamera = hasCamera,
+                        heading = heading,
+                        currentPitch = pitch,
+                        scanMode = scanMode,
+                        scanTargets = scanTargets,
+                        currentTargetIdx = currentTargetIdx,
+                        capturedFrames = capturedFrames,
+                        gyroOn = gyroOn,
+                        onToggleGyro = { gyroOn = !gyroOn },
+                        onRetakeTarget = { targetIndex -> currentTargetIdx = targetIndex },
+                        onCapture = {
+                            val ic = imageCapture ?: return@CapturingPhase
+                            val target = scanTargets.getOrNull(currentTargetIdx) ?: return@CapturingPhase
+                            val file = File(ctx.cacheDir, "frame_r${target.ringIndex}_c${target.targetIndex}_${System.currentTimeMillis()}.jpg")
+                            val capturedHeading = heading
+                            val capturedPitch = pitch
+
+                            ic.takePicture(
+                                ImageCapture.OutputFileOptions.Builder(file).build(),
+                                ContextCompat.getMainExecutor(ctx),
+                                object : ImageCapture.OnImageSavedCallback {
+                                    override fun onImageSaved(output: ImageCapture.OutputFileResults) {
+                                        val frame = FrameData(
+                                            path = file.absolutePath,
+                                            heading = capturedHeading,
+                                            pitchDeg = capturedPitch,
+                                            row = target.ringIndex,
+                                            col = target.targetIndex,
+                                            isCap = target.isCap,
+                                            capType = target.capType
+                                        )
+
+                                        val existingIdx = capturedFrames.indexOfFirst { it.col == target.targetIndex }
+                                        if (existingIdx >= 0) {
+                                            capturedFrames[existingIdx] = frame
+                                        } else {
+                                            capturedFrames.add(frame)
+                                        }
+
+                                        vibrateShutter(ctx)
+                                        if (currentTargetIdx < scanTargets.size - 1) {
+                                            currentTargetIdx++
+                                        }
+                                    }
+
+                                    override fun onError(exc: ImageCaptureException) {
+                                        Log.e("Scanner", "Capture failed", exc)
+                                    }
+                                }
+                            )
+                        },
+                        onStop = { phase = Phase.DONE },
+                        onBack = { phase = Phase.PREVIEW },
+                        lifecycleOwner = lifecycleOwner
+                    )
+                }
+            }
 
             Phase.DONE -> DonePhase(
                 roomName = selectedRoom?.displayName ?: "Room",
@@ -378,24 +446,35 @@ private fun SelectRoom(
             Column(Modifier.padding(12.dp)) {
                 Text("SCAN MODE", color = DorjaColors.Sand300, fontSize = 10.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(8.dp))
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        ModeOptionChip(
+                            title = "Full Sphere 360°",
+                            subtitle = "62 shots • 360°×180°",
+                            timeHint = "~2 min",
+                            icon = Icons.Default.RotateRight,
+                            isSelected = scanMode == ScanGeometry.ScanMode.FULL_SPHERE,
+                            onClick = { onModeToggle(ScanGeometry.ScanMode.FULL_SPHERE) },
+                            modifier = Modifier.weight(1f)
+                        )
+                        ModeOptionChip(
+                            title = "Quick Panorama",
+                            subtitle = "12 shots • 360° horizon",
+                            timeHint = "~25-30 s",
+                            icon = Icons.Default.Speed,
+                            isSelected = scanMode == ScanGeometry.ScanMode.QUICK_SCAN,
+                            onClick = { onModeToggle(ScanGeometry.ScanMode.QUICK_SCAN) },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
                     ModeOptionChip(
-                        title = "Full Sphere",
-                        subtitle = "62 shots • 360°×180°",
-                        timeHint = "~2 min",
-                        icon = Icons.Default.RotateRight,
-                        isSelected = scanMode == ScanGeometry.ScanMode.FULL_SPHERE,
-                        onClick = { onModeToggle(ScanGeometry.ScanMode.FULL_SPHERE) },
-                        modifier = Modifier.weight(1f)
-                    )
-                    ModeOptionChip(
-                        title = "Quick Scan",
-                        subtitle = "24 shots • fast",
-                        timeHint = "~45-60 s",
-                        icon = Icons.Default.Speed,
-                        isSelected = scanMode == ScanGeometry.ScanMode.QUICK_SCAN,
-                        onClick = { onModeToggle(ScanGeometry.ScanMode.QUICK_SCAN) },
-                        modifier = Modifier.weight(1f)
+                        title = "AR 3D Room Corner Scanner",
+                        subtitle = "Point-by-point AR vector mapping & dimension solver",
+                        timeHint = "Real-Time AR",
+                        icon = Icons.Default.CheckCircle,
+                        isSelected = scanMode == ScanGeometry.ScanMode.AR_CORNER_SCAN,
+                        onClick = { onModeToggle(ScanGeometry.ScanMode.AR_CORNER_SCAN) },
+                        modifier = Modifier.fillMaxWidth()
                     )
                 }
             }
@@ -684,7 +763,7 @@ private fun ArTargetOverlay(
         val relHeading = ((targetHeading - heading + 540) % 360) - 180
         val relPitch = targetPitch - currentPitch
 
-        val targetX = cx - (relHeading * pxPerDeg)
+        val targetX = cx + (relHeading * pxPerDeg)
         val targetY = cy - (relPitch * pxPerDeg)
 
         val isTargetOnScreen = targetX in 0f..size.width && targetY in 0f..size.height
@@ -1061,4 +1140,221 @@ private fun vibrateShutter(ctx: android.content.Context) {
             (ctx.getSystemService(android.content.Context.VIBRATOR_SERVICE) as? Vibrator)?.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 30, 60, 20), intArrayOf(0, 200, 0, 120), -1))
         }
     } catch (_: Exception) {}
+}
+
+private data class CornerAnchor3D(
+    val id: Int,
+    val headingDeg: Float,
+    val pitchDeg: Float,
+    val xMeters: Float,
+    val yMeters: Float,
+    val zMeters: Float
+)
+
+// ═════════════════════════════════════════════════════════════
+//  AR 3D ROOM CORNER SCANNER PHASE
+// ═════════════════════════════════════════════════════════════
+@Composable
+private fun ArCornerScannerPhase(
+    imageCapture: ImageCapture?,
+    onCaptureReady: (ImageCapture) -> Unit,
+    hasCamera: Boolean,
+    heading: Float,
+    currentPitch: Float,
+    roomName: String,
+    onSaveArModel: (jsonStr: String) -> Unit,
+    onBack: () -> Unit,
+    lifecycleOwner: androidx.lifecycle.LifecycleOwner
+) {
+    val ctx = LocalContext.current
+    val corners = remember { mutableStateListOf<CornerAnchor3D>() }
+
+    // Estimate 3D vector coordinates based on device posture (-1.5m eye height above floor)
+    val eyeHeight = 1.5f
+    val pitchRad = Math.toRadians(currentPitch.toDouble()).toFloat()
+    val headingRad = Math.toRadians(heading.toDouble()).toFloat()
+
+    val tanPitch = tan(pitchRad.coerceAtMost(-0.1f))
+    val groundDist = if (tanPitch < -0.05f) abs(eyeHeight / tanPitch) else 2.5f
+
+    val currentX = groundDist * sin(headingRad)
+    val currentZ = groundDist * cos(headingRad)
+
+    val totalPerimeter = remember(corners.size) {
+        if (corners.size < 2) 0f
+        else {
+            var sum = 0f
+            for (i in corners.indices) {
+                val c1 = corners[i]
+                val c2 = corners[(i + 1) % corners.size]
+                val dx = c2.xMeters - c1.xMeters
+                val dz = c2.zMeters - c1.zMeters
+                sum += Math.sqrt((dx * dx + dz * dz).toDouble()).toFloat()
+            }
+            sum
+        }
+    }
+
+    val estimatedAreaSqM = remember(corners.size) {
+        if (corners.size < 3) 0f
+        else {
+            var area = 0f
+            for (i in corners.indices) {
+                val c1 = corners[i]
+                val c2 = corners[(i + 1) % corners.size]
+                area += (c1.xMeters * c2.zMeters) - (c2.xMeters * c1.zMeters)
+            }
+            abs(area) / 2f
+        }
+    }
+
+    Box(Modifier.fillMaxSize()) {
+        CameraPreview(imageCapture, onCaptureReady, hasCamera, lifecycleOwner)
+
+        // Interactive 3D AR Vector Overlay
+        Canvas(Modifier.fillMaxSize()) {
+            val cx = size.width / 2f
+            val cy = size.height / 2f
+            val pxPerDeg = size.width / 60f
+
+            // Screen Center Crosshair
+            drawCircle(Color.White.copy(alpha = 0.3f), 36.dp.toPx(), Offset(cx, cy), style = Stroke(1.5.dp.toPx()))
+            drawCircle(TargetYellow, 4.dp.toPx(), Offset(cx, cy))
+
+            // Project 3D corner anchors onto 2D camera view
+            val projectedPoints = corners.map { c ->
+                val relH = ((c.headingDeg - heading + 540) % 360) - 180
+                val relP = c.pitchDeg - currentPitch
+                val px = cx + (relH * pxPerDeg)
+                val py = cy - (relP * pxPerDeg)
+                Offset(px, py)
+            }
+
+            // Draw connecting AR floor lines
+            for (i in projectedPoints.indices) {
+                val p1 = projectedPoints[i]
+                val p2 = projectedPoints[(i + 1) % projectedPoints.size]
+                if (i < projectedPoints.size - 1 || projectedPoints.size >= 3) {
+                    drawLine(Accent, p1, p2, 3.dp.toPx())
+                    val midX = (p1.x + p2.x) / 2f
+                    val midY = (p1.y + p2.y) / 2f
+                    drawCircle(Accent, 4.dp.toPx(), Offset(midX, midY))
+                }
+            }
+
+            // Draw 3D Corner Markers
+            for (i in projectedPoints.indices) {
+                val p = projectedPoints[i]
+                drawCircle(Green.copy(alpha = 0.35f), 22.dp.toPx(), p)
+                drawCircle(Green, 14.dp.toPx(), p, style = Stroke(2.5.dp.toPx()))
+                drawCircle(Color.White, 5.dp.toPx(), p)
+            }
+        }
+
+        // Header
+        Box(Modifier.fillMaxWidth().height(70.dp).background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.6f), Color.Transparent))).align(Alignment.TopCenter))
+        Row(Modifier.fillMaxWidth().padding(top = 40.dp, start = 12.dp, end = 12.dp).align(Alignment.TopCenter), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            IconButton(onClick = onBack, Modifier.size(38.dp).clip(CircleShape).background(Color.Black.copy(alpha = 0.5f))) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = Color.White)
+            }
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("AR 3D ROOM CORNER SCANNER", color = Accent, fontSize = 11.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+                Text(roomName, color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+            }
+            Spacer(Modifier.size(38.dp))
+        }
+
+        // Live Dimension HUD Card
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = Color.Black.copy(alpha = 0.75f),
+            border = androidx.compose.foundation.BorderStroke(1.dp, Accent.copy(alpha = 0.5f)),
+            modifier = Modifier.align(Alignment.TopCenter).padding(top = 90.dp, start = 16.dp, end = 16.dp)
+        ) {
+            Row(Modifier.padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                Column {
+                    Text("CORNERS", color = DorjaColors.Sand300, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
+                    Text("${corners.size}", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                }
+                Column {
+                    Text("PERIMETER", color = DorjaColors.Sand300, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
+                    Text("${"%.2f".format(totalPerimeter)} m", color = Accent, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                }
+                Column {
+                    Text("EST. AREA", color = DorjaColors.Sand300, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
+                    Text("${"%.1f".format(estimatedAreaSqM)} m²", color = Green, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                }
+            }
+        }
+
+        // Bottom Action Controls
+        Column(Modifier.align(Alignment.BottomCenter).padding(bottom = 24.dp, start = 16.dp, end = 16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = Color.Black.copy(alpha = 0.75f),
+                border = androidx.compose.foundation.BorderStroke(1.5.dp, TargetYellow),
+                modifier = Modifier.padding(bottom = 12.dp)
+            ) {
+                Text(
+                    if (corners.isEmpty()) "AIM AT FLOOR CORNER & TAP ADD CORNER" else "AIM AT NEXT CORNER ALONG THE WALL",
+                    color = TargetYellow,
+                    fontSize = 11.sp,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+                )
+            }
+
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                DorjaOutlinedButton("Reset", onClick = { corners.clear() }, modifier = Modifier.weight(1f))
+
+                DorjaButton(
+                    "+ Add 3D Corner Anchor",
+                    onClick = {
+                        vibrateShutter(ctx)
+                        val anchor = CornerAnchor3D(
+                            id = corners.size + 1,
+                            headingDeg = heading,
+                            pitchDeg = currentPitch,
+                            xMeters = currentX,
+                            yMeters = -eyeHeight,
+                            zMeters = currentZ
+                        )
+                        corners.add(anchor)
+                    },
+                    modifier = Modifier.weight(2f)
+                )
+            }
+
+            if (corners.size >= 3) {
+                Spacer(Modifier.height(8.dp))
+                DorjaButton(
+                    "Save 3D Room Model (${corners.size} Corners)",
+                    onClick = {
+                        val root = JSONObject()
+                        root.put("mode", "AR_CORNER_MAP")
+                        root.put("cornerCount", corners.size)
+                        root.put("perimeterMeters", totalPerimeter.toDouble())
+                        root.put("areaSqMeters", estimatedAreaSqM.toDouble())
+                        root.put("timestamp", System.currentTimeMillis())
+
+                        val arr = JSONArray()
+                        corners.forEach { c ->
+                            val obj = JSONObject()
+                            obj.put("id", c.id)
+                            obj.put("heading", c.headingDeg.toDouble())
+                            obj.put("pitch", c.pitchDeg.toDouble())
+                            obj.put("x", c.xMeters.toDouble())
+                            obj.put("y", c.yMeters.toDouble())
+                            obj.put("z", c.zMeters.toDouble())
+                            arr.put(obj)
+                        }
+                        root.put("corners", arr)
+                        onSaveArModel(root.toString())
+                    },
+                    modifier = Modifier.fillMaxWidth().height(44.dp)
+                )
+            }
+        }
+    }
 }

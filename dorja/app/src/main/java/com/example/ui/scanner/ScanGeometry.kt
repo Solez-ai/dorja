@@ -19,7 +19,8 @@ object ScanGeometry {
 
     enum class ScanMode {
         FULL_SPHERE,
-        QUICK_SCAN
+        QUICK_SCAN,
+        AR_CORNER_SCAN
     }
 
     data class Ray(val x: Float, val y: Float, val z: Float)
@@ -172,17 +173,16 @@ object ScanGeometry {
             }
 
             ScanMode.QUICK_SCAN -> {
-                // Ring 1: +35° (8 stops)
-                for (col in 0 until 8) {
-                    targets.add(ScanTarget(globalIdx++, ringIndex = 0, pitchDeg = 35f, headingDeg = col * 45f))
+                // Classic 360° Horizontal Panorama (1 ring on horizon, 12 stops)
+                for (col in 0 until 12) {
+                    targets.add(ScanTarget(globalIdx++, ringIndex = 0, pitchDeg = 0f, headingDeg = col * 30f))
                 }
-                // Ring 2: 0° (8 stops)
-                for (col in 0 until 8) {
-                    targets.add(ScanTarget(globalIdx++, ringIndex = 1, pitchDeg = 0f, headingDeg = col * 45f))
-                }
-                // Ring 3: -35° (8 stops)
-                for (col in 0 until 8) {
-                    targets.add(ScanTarget(globalIdx++, ringIndex = 2, pitchDeg = -35f, headingDeg = col * 45f))
+            }
+
+            ScanMode.AR_CORNER_SCAN -> {
+                // AR 3D Room Corner Point-by-Point Mapping Mode
+                for (col in 0 until 4) {
+                    targets.add(ScanTarget(globalIdx++, ringIndex = 0, pitchDeg = -30f, headingDeg = col * 90f))
                 }
             }
         }
