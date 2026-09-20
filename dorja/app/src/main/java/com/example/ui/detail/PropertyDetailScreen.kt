@@ -1519,8 +1519,9 @@ val legalDocPicker = rememberLauncherForActivityResult(
                                                         fontSize = 13.sp
                                                     )
                                                     if (room.has3DScan) {
+                                                        val isV2 = try { org.json.JSONObject(room.panoramaData).optInt("version", 1) >= 2 } catch(_: Exception) { false }
                                                         DorjaBadge(
-                                                            text = "3D SCAN",
+                                                            text = if (isV2) "360°×180° SPHERE" else "3D SCAN",
                                                             icon = Icons.Default.CheckCircle,
                                                             backgroundColor = DorjaColors.BentoGreenBg,
                                                             textColor = DorjaColors.BentoGreenText

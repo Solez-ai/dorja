@@ -63,10 +63,13 @@ Ring 6  (cap)   pitch  −90°  nadir         — 1 shot straight down (at feet)
 | Mode | Rings | Shots | Vertical coverage | Use |
 |---|---|---|---|---|
 | **Full Sphere** (default) | 5 rings + 2 caps | 62 | true ±90° | Competition demo, final listings |
-| **Quick** | 3 rings (+35/0/−35) | 36 | ~±60° | Impatient users; poles get synthesized fill |
+| **Quick Scan** | 3 rings (+35/0/−35) × **8 stops** | **24** | ~±60° vertical (18° horizontal overlap at 45° steps) | **Fastest capture (~45–60 s)** — small rooms, impatient users, re-scans after edits; poles synthesized |
 
-Quick mode still produces a **valid full 2:1 equirect** — the stitcher synthesizes
-pole fill (see §3), so the viewer never breaks; the poles are just softer.
+Quick Scan still produces a **valid full 2:1 equirect** — the stitcher synthesizes
+pole fill (see §3), so the viewer never breaks; the poles are just softer. The 45°
+horizontal steps still leave 18° overlap (63° hFOV), so seams stay blendable — the
+Auto-Light pipeline (§3.4) matters even more here since fewer overlaps means each seam
+carries more weight.
 
 **Light discipline at capture time (first half of the auto-light story):**
 - Lock AE/AWB via CameraX `cameraControl` while inside a ring, re-locking at the first
@@ -124,7 +127,7 @@ pole fill (see §3), so the viewer never breaks; the poles are just softer.
 Replace the heading-only paste with a **direction-based inverse mapper**:
 
 1. For each output pixel of the canvas — **8192×4096** for Full mode (4 px/°, detail
-   survives zoom), 4096×2048 for Quick, 2048×1024 low-RAM:
+   survives zoom), 4096×2048 for Quick Scan, 2048×1024 low-RAM:
    `(lon, lat) = (x/W·360−180, 90−y/H·180)`.
 2. Build the 3D ray for `(lon, lat)`; for every candidate frame (center direction
    `(heading, pitch)` within hFOV/2 + margin horizontally and vFOV/2 + margin vertically),
@@ -154,7 +157,7 @@ Replace the heading-only paste with a **direction-based inverse mapper**:
 5. **Pole handling:**
    - Cap shot exists → project the zenith/nadir photo radially (it's an isothermal patch;
      blend with the top/bottom ring).
-   - No cap (Quick mode) → synthesize: fill the pole cap by radially stretching + blurring
+   - No cap (Quick Scan) → synthesize: fill the pole cap by radially stretching + blurring
      the innermost captured ring. Cosmetically fine for ceilings/floors.
 6. **Memory & speed:** process canvas row-by-row into an `IntArray`, `setPixels()` once per
    tile, decode frames with `inSampleSize` (target ~800 px height, as today). The 8192
@@ -185,8 +188,11 @@ canvas corners contain the zenith/nadir colors; seam weight math unit-tested on
    (pitch only, no heading constraint).
 5. **Retake:** tapping a captured thumbnail re-arms that specific (row, col) slot —
    critical for 62 shots, one bad frame shouldn't scrap a scan.
-6. Intro screen copy: "Capture 5 rings × 12 photos + ceiling & floor. Turn → tap → tilt."
-   Mode toggle (Full / Quick) with shot-count labels.
+6. Intro screen mode toggle with honest trade-offs:
+   - **Full Sphere** — "5 rings × 12 photos + ceiling & floor • ~62 shots • best quality •
+     ~2 min"
+   - **Quick Scan** — "3 rings × 8 photos • 24 shots • ceiling & floor approximated •
+     ~45–60 s" — visually distinguished as the fast/default-for-retakes option.
 7. Estimated capture time hint (~90–120 s full sphere) to set expectations.
 
 **Acceptance:** user can complete a full-sphere scan without reading any documentation;
@@ -248,7 +254,7 @@ v1 scans look exactly as today; memory stays flat while zoomed (tile cache evict
 | Auto-light | Frames with synthetic ±2-stop exposure + color-cast differences → assert post-pipeline overlap luminance delta below threshold; gain-comp solver convergence on synthetic overlap graph |
 | Coverage map | Frames with a deliberate hole → coverage grid reports the missing lon/lat cells and blocks Done |
 | JSON | v1 read → v2 write round-trip; corrupt JSON → safe fallback |
-| Device QA | Full-sphere scan in a real room: ceiling/floor visible, no visible bands; Quick mode; gyro off; low-RAM device; interrupt mid-stitch |
+| Device QA | Full-sphere scan in a real room: ceiling/floor visible, no visible bands; Quick Scan; gyro off; low-RAM device; interrupt mid-stitch |
 | CI | Every phase pushed → GitHub Actions green (**never local Gradle**); compiler errors via the `ci-logs` branch |
 
 ---
@@ -260,7 +266,7 @@ v1 scans look exactly as today; memory stays flat while zoomed (tile cache evict
 | Yaw drift across 62 shots | Re-read rotation vector at every shutter (already done); per-slot retake (§4.5) |
 | Exposure/color shift between rings | Per-row luminance equalization (§3.4) |
 | OOM during stitch | Row-tile processing, `inSampleSize`, low-RAM downscale, OOM→graceful null (already exists) |
-| User fatigue (62 shots) | Quick mode (36), ring transition haptics, time hint, retake instead of restart |
+| User fatigue (62 shots) | **Quick Scan (24 shots, ~45–60 s)**, ring transition haptics, time hint, retake instead of restart |
 | Mixed lighting (window vs lamp vs shadow corner) | WB alignment + multi-band blending (§3.4); AE lock per ring at capture |
 | Over-sharpened zoomed-in view ("every inch" needs detail) | High-res stitch output + tiled zoom (§5); coverage badge proves no blind spots |
 | Stitch latency (~62 frames) | Background dispatcher + progress UI; measure, optimize only if >20 s |
@@ -273,7 +279,7 @@ v1 scans look exactly as today; memory stays flat while zoomed (tile cache evict
 | # | Phase | Size | Depends on |
 |---|---|---|---|
 | 1 | ScanGeometry + FrameData + JSON v2 (+ v1 back-compat) | S | — |
-| 2 | Ring-based capture UX (Full/Quick modes, retake) | M | 1 |
+| 2 | Ring-based capture UX (Full Sphere / Quick Scan modes, retake) | M | 1 |
 | 3 | Spherical stitcher + **Auto-Light pipeline** (gain/histogram/WB/multi-band) + coverage validation + hi-res output | L | 1 |
 | 4 | Sphere viewer (vertical drag, gyro pitch, pole vignette, hi-res tiled zoom) | M | 1, 3 |
 | 5 | Polish: badges, perf instrumentation, low-RAM path | S | 3, 4 |
