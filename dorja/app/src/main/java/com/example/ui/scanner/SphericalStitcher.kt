@@ -45,7 +45,7 @@ object SphericalStitcher {
     ): String? {
         if (frames.isEmpty()) return null
 
-        return try {
+        val resultPath = try {
             onProgress?.invoke("Loading frames...", null)
             stitchInternal(ctx, frames, mode, onProgress)
         } catch (e: OutOfMemoryError) {
@@ -62,6 +62,11 @@ object SphericalStitcher {
             Log.e(TAG, "Stitching failed: ${e.message}", e)
             null
         }
+
+        // Purge individual raw frame JPEGs and temporary debug files after stitch attempt
+        cleanupFrameCache(ctx, frames)
+
+        return resultPath
     }
 
     private fun stitchInternal(
@@ -239,7 +244,7 @@ object SphericalStitcher {
         val outFile = File(outDir, "pano_360_${System.currentTimeMillis()}.jpg")
 
         FileOutputStream(outFile).use { fos ->
-            outputBitmap.compress(Bitmap.CompressFormat.JPEG, 92, fos)
+            outputBitmap.compress(Bitmap.CompressFormat.JPEG, 85, fos)
         }
         outputBitmap.recycle()
 
@@ -247,6 +252,27 @@ object SphericalStitcher {
         Log.i(TAG, "=== STITCHING PIPELINE COMPLETE ===")
 
         return outFile.absolutePath
+    }
+
+    fun cleanupFrameCache(ctx: Context, frames: List<FrameData> = emptyList()) {
+        try {
+            for (f in frames) {
+                val file = File(f.path)
+                if (file.exists()) {
+                    file.delete()
+                }
+            }
+            val cacheDir = ctx.cacheDir
+            val orphanFrames = cacheDir.listFiles { _, name -> name.startsWith("frame_") && name.endsWith(".jpg") }
+            orphanFrames?.forEach { it.delete() }
+
+            val debugDir = File(cacheDir, "stitch_debug")
+            if (debugDir.exists()) {
+                debugDir.deleteRecursively()
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Error cleaning frame cache: ${e.message}")
+        }
     }
 
     private fun runAutoLightPipeline(frames: List<FrameMeta>) {

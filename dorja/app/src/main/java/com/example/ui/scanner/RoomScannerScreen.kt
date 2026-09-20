@@ -199,6 +199,12 @@ fun RoomScannerScreen(
         if (!hasCamera) permLauncher.launch(Manifest.permission.CAMERA)
     }
 
+    DisposableEffect(Unit) {
+        onDispose {
+            SphericalStitcher.cleanupFrameCache(ctx, capturedFrames)
+        }
+    }
+
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         when (phase) {
             Phase.SELECT -> SelectRoom(
@@ -319,6 +325,7 @@ fun RoomScannerScreen(
                     }
                 },
                 onRetake = {
+                    SphericalStitcher.cleanupFrameCache(ctx, capturedFrames)
                     capturedFrames.clear()
                     currentTargetIdx = 0
                     stitchingStatus = null
@@ -326,6 +333,7 @@ fun RoomScannerScreen(
                     phase = Phase.PREVIEW
                 },
                 onDiscard = {
+                    SphericalStitcher.cleanupFrameCache(ctx, capturedFrames)
                     capturedFrames.clear()
                     currentTargetIdx = 0
                     stitchingStatus = null

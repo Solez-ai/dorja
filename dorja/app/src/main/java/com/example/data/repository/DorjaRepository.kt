@@ -383,6 +383,18 @@ class DorjaRepository(private val database: DorjaDatabase) {
 
     suspend fun updateRoom3DScan(roomId: String, panoramaData: String = "") {
         val room = roomDao.getRoomById(roomId) ?: return
+        if (room.panoramaData.isNotBlank() && room.panoramaData != panoramaData) {
+            try {
+                val oldJson = org.json.JSONObject(room.panoramaData)
+                val oldPath = oldJson.optString("stitchedPanorama", "")
+                if (oldPath.isNotBlank()) {
+                    val oldFile = java.io.File(oldPath)
+                    if (oldFile.exists()) {
+                        oldFile.delete()
+                    }
+                }
+            } catch (_: Exception) {}
+        }
         val updated = room.copy(has3DScan = true, panoramaData = panoramaData)
         roomDao.updateRoom(updated)
 
