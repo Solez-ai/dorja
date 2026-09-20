@@ -599,7 +599,7 @@ fun HeyDorjaAssistantSheet(
     }
 }
 
-/**
+@Composable
 private fun SuggestionPill(
     text: String,
     onClick: () -> Unit

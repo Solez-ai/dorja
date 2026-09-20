@@ -8,6 +8,24 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
 
 /**
+ * Engine status. Retained as a sealed class for API compatibility; the
+ * instant engine is always [AiEngineState.Ready] — there is nothing to load.
+ */
+sealed class AiEngineState {
+    object NotLoaded : AiEngineState()
+    data class Searching(val message: String) : AiEngineState()
+    data class Loading(val progress: Float, val message: String) : AiEngineState()
+    data class Ready(
+        val modelFileName: String,
+        val accelerator: String,
+        val fileSizeBytes: Long,
+        val isNpuAccelerated: Boolean,
+        val isGpuAccelerated: Boolean
+    ) : AiEngineState()
+    data class Error(val message: String) : AiEngineState()
+}
+
+/**
  * Instant rule-based Dorja assistant.
  *
  * There is NO on-device model anymore: answers are generated deterministically
