@@ -117,19 +117,24 @@ fun HeyDorjaAssistantSheet(
 
     var userQuery by remember { mutableStateOf("") }
     var aiAnswer by remember { mutableStateOf<String?>(null) }
+    var followUps by remember { mutableStateOf<List<String>>(emptyList()) }
     var isThinking by remember { mutableStateOf(false) }
     var isKeyboardMode by remember { mutableStateOf(false) }
     var textInput by remember { mutableStateOf("") }
 
     // Instant rule-based answers from verified listing data — no model,
-    // no loading, no inference lag. Responds in ~0 ms.
+    // no loading, no inference lag. Responds in ~0 ms. Each answer also
+    // produces topic-aware follow-up questions so the conversation continues.
     fun askDorja(query: String) {
         userQuery = query
         isThinking = true
         aiAnswer = null
+        followUps = emptyList()
         keyboardController?.hide()
         scope.launch {
-            aiAnswer = aiEngine.answerQuestion(query, propertyContext)
+            val (answer, topic) = aiEngine.answerQuestion(query, propertyContext)
+            aiAnswer = answer
+            followUps = aiEngine.followUpQuestions(topic)
             isThinking = false
         }
     }
@@ -357,6 +362,12 @@ fun HeyDorjaAssistantSheet(
                                 SuggestionPill("💰 Is the price verified?") {
                                     submitQuestion("Can you explain the price and size breakdown?")
                                 }
+                                SuggestionPill("🤝 Is the price negotiable?") {
+                                    submitQuestion("Is the price negotiable?")
+                                }
+                                SuggestionPill("📍 What is the neighborhood like?") {
+                                    submitQuestion("What is the neighborhood like?")
+                                }
                             }
                         } else {
                             // User Query Bubble
@@ -427,6 +438,28 @@ fun HeyDorjaAssistantSheet(
                                             color = DorjaColors.Ink950,
                                             lineHeight = 20.sp
                                         )
+                                    }
+                                }
+
+                                // Topic-aware follow-up suggestions — the natural
+                                // next questions based on what was just answered.
+                                if (followUps.isNotEmpty()) {
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = "Keep exploring:",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = DorjaColors.Gray600,
+                                        fontWeight = FontWeight.SemiBold,
+                                        modifier = Modifier.padding(bottom = 8.dp)
+                                    )
+                                    FlowRow(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        followUps.forEach { q ->
+                                            SuggestionPill(text = q) { submitQuestion(q) }
+                                        }
                                     }
                                 }
                             }
@@ -570,6 +603,7 @@ fun HeyDorjaAssistantSheet(
                         onClick = {
                             userQuery = ""
                             aiAnswer = null
+                            followUps = emptyList()
                         },
                         modifier = Modifier
                             .size(44.dp)

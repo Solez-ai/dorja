@@ -36,6 +36,19 @@ sealed class AiEngineState {
 class DorjaAiEngine private constructor(private val appContext: Context) {
 
     companion object {
+        // Topic keys for the follow-up suggester
+        const val TOPIC_NONE = "none"
+        const val TOPIC_PARKING = "parking"
+        const val TOPIC_DOCUMENTS = "documents"
+        const val TOPIC_PROMISES = "promises"
+        const val TOPIC_ROOMS = "rooms"
+        const val TOPIC_PRICE = "price"
+        const val TOPIC_NEGOTIATION = "negotiation"
+        const val TOPIC_LIVEABILITY = "liveability"
+        const val TOPIC_VISITS = "visits"
+        const val TOPIC_NEIGHBORHOOD = "neighborhood"
+        const val TOPIC_OVERVIEW = "overview"
+
         @Volatile
         private var instance: DorjaAiEngine? = null
 
@@ -63,49 +76,126 @@ class DorjaAiEngine private constructor(private val appContext: Context) {
 
     /**
      * Answers a user query about a property instantly from verified listing data.
+     * Returns the answer paired with the detected topic key so the caller can
+     * show topic-aware follow-up suggestions.
      */
     suspend fun answerQuestion(
         query: String,
         property: PropertyAiContext?
-    ): String = withContext(Dispatchers.Default) {
+    ): Pair<String, String> = withContext(Dispatchers.Default) {
         if (property == null) {
-            return@withContext "Dorja AI is active and ready. Please open any verified property listing to ask specific questions about it."
+            return@withContext Pair(
+                "Dorja AI is active and ready. Please open any verified property listing to ask specific questions about it.",
+                TOPIC_NONE
+            )
         }
 
         val q = query.trim().lowercase()
 
         // 1. Parking specific questions (user's explicit example)
         if (q.contains("park") || q.contains("garage") || q.contains("car space") || q.contains("vehicle")) {
-            return@withContext buildParkingResponse(property)
+            return@withContext Pair(buildParkingResponse(property), TOPIC_PARKING)
+        }
+
+        // 1b. Visits, scheduling and SafeView trust questions
+        if (q.contains("visit") || q.contains("viewing") || q.contains("safeview") || q.contains("tour booking") || q.contains("schedule") || q.contains("appointment") || q.contains("pass token")) {
+            return@withContext Pair(buildVisitsResponse(property), TOPIC_VISITS)
+        }
+
+        // 1c. Neighborhood questions (location, transit, flood-prone area, etc.)
+        if (q.contains("neighborhood") || q.contains("neighbourhood") || q.contains("area like") || q.contains("area around") || q.contains("around the property") || q.contains("nearby") || q.contains("near the") || q.contains("locality") || q.contains("schools") || q.contains("hospital") || q.contains("market") || q.contains("mosque") || q.contains("transit") || q.contains("commute")) {
+            return@withContext Pair(buildNeighborhoodResponse(property), TOPIC_NEIGHBORHOOD)
         }
 
         // 2. Legal Document Verification (Khatian, Mutation, RAJUK)
         if (q.contains("document") || q.contains("khatian") || q.contains("mutation") || q.contains("rajuk") || q.contains("deed") || q.contains("legal") || q.contains("paper")) {
-            return@withContext buildDocumentsResponse(property)
+            return@withContext Pair(buildDocumentsResponse(property), TOPIC_DOCUMENTS)
         }
 
         // 3. Handover Passport & Seller Promises
         if (q.contains("promise") || q.contains("handover") || q.contains("commitment") || q.contains("guarantee") || q.contains("milestone")) {
-            return@withContext buildPromisesResponse(property)
+            return@withContext Pair(buildPromisesResponse(property), TOPIC_PROMISES)
         }
 
-        // 4. Room Dimensions, 3D Scans, Layout
+        // 4. Negotiation — offer leverage, price gaps, bargaining angles
+        if (q.contains("negotiat") || q.contains("offer") || q.contains("bargain") || q.contains("discount") || q.contains("lower the price") || q.contains("talk down") || q.contains("leverage") || q.contains("concession")) {
+            return@withContext Pair(buildNegotiationResponse(property), TOPIC_NEGOTIATION)
+        }
+
+        // 5. Room Dimensions, 3D Scans, Layout
         if (q.contains("room") || q.contains("bedroom") || q.contains("bath") || q.contains("scan") || q.contains("3d") || q.contains("tour") || q.contains("size") || q.contains("sqft") || q.contains("square")) {
-            return@withContext buildRoomsResponse(property)
+            return@withContext Pair(buildRoomsResponse(property), TOPIC_ROOMS)
         }
 
-        // 5. Price, Costs, Rent, Negotiation
+        // 6. Price, Costs, Rent, Budgeting
         if (q.contains("price") || q.contains("cost") || q.contains("rent") || q.contains("bdt") || q.contains("currency") || q.contains("worth") || q.contains("payment")) {
-            return@withContext buildPriceResponse(property)
+            return@withContext Pair(buildPriceResponse(property), TOPIC_PRICE)
         }
 
-        // 6. Liveability, Utilities, Flood Risk
+        // 7. Liveability, Utilities, Flood Risk
         if (q.contains("generator") || q.contains("power") || q.contains("water") || q.contains("flood") || q.contains("lift") || q.contains("security") || q.contains("amenit")) {
-            return@withContext buildLiveabilityResponse(property)
+            return@withContext Pair(buildLiveabilityResponse(property), TOPIC_LIVEABILITY)
         }
 
-        // 7. General Property Overview
-        return@withContext buildGeneralOverviewResponse(property, query)
+        // 8. General Property Overview
+        return@withContext Pair(buildGeneralOverviewResponse(property, query), TOPIC_OVERVIEW)
+    }
+
+    /**
+     * Natural next questions per answered topic — drives the sheet's
+     * follow-up chips so a conversation can continue without retyping.
+     */
+    fun followUpQuestions(topic: String): List<String> = when (topic) {
+        TOPIC_PARKING -> listOf(
+            "Is parking included in the price?",
+            "What legal documents are verified?",
+            "Can I visit this property?"
+        )
+        TOPIC_DOCUMENTS -> listOf(
+            "What promises did the seller make?",
+            "Is the price negotiable?",
+            "Can I visit this property?"
+        )
+        TOPIC_PROMISES -> listOf(
+            "What legal documents are verified?",
+            "When is handover and what must be completed?",
+            "Is the price negotiable?"
+        )
+        TOPIC_ROOMS -> listOf(
+            "Can I visit this property?",
+            "Does this have parking?",
+            "What is the power backup situation?"
+        )
+        TOPIC_PRICE -> listOf(
+            "Is the price negotiable?",
+            "What are the total monthly costs?",
+            "What legal documents are verified?"
+        )
+        TOPIC_NEGOTIATION -> listOf(
+            "What legal documents are verified?",
+            "What promises did the seller make?",
+            "Can I visit this property?"
+        )
+        TOPIC_LIVEABILITY -> listOf(
+            "What is the neighborhood like?",
+            "What are the room dimensions?",
+            "Is the price negotiable?"
+        )
+        TOPIC_VISITS -> listOf(
+            "What legal documents are verified?",
+            "Does this have parking?",
+            "Is the price negotiable?"
+        )
+        TOPIC_NEIGHBORHOOD -> listOf(
+            "What is the flood risk?",
+            "How do I schedule a visit?",
+            "What is the price per sq ft?"
+        )
+        else -> listOf(
+            "Does this have parking?",
+            "What legal documents are verified?",
+            "Is the price negotiable?"
+        )
     }
 
     private fun buildParkingResponse(p: PropertyAiContext): String {
@@ -131,6 +221,96 @@ class DorjaAiEngine private constructor(private val appContext: Context) {
             If you need street or rented parking nearby, we recommend asking the host directly via in-app chat.
             """.trimIndent()
         }
+    }
+
+    private fun buildVisitsResponse(p: PropertyAiContext): String {
+        val verifiedDocCount = p.documents.count { it.verificationStatus.equals("VERIFIED", ignoreCase = true) }
+        return """
+            Booking a SafeView visit for ${p.title}: 🗓
+
+            • Tap "Book Visit" on the listing to request a slot — the host confirms in-app.
+            • The exact address stays protected: it unlocks via a QR SafeView Pass only during your confirmed inspection window.
+            • Verification status: ${if (verifiedDocCount > 0) "$verifiedDocCount legal document(s) verified before you walk in" else "documents still under preliminary review — review them in-chat before the visit"}.
+
+            This protects both parties against fake listings and unvetted visitors.
+        """.trimIndent()
+    }
+
+    private fun buildNeighborhoodResponse(p: PropertyAiContext): String {
+        val tagLine = if (p.tags.isEmpty()) "No neighborhood amenity tags recorded" else p.tags.joinToString(", ")
+        return """
+            Neighborhood context for ${p.title} 📍
+
+            • Verified area: ${p.location} — Dorja shows the approximate public area until a SafeView visit unlocks the exact address.
+            • Recorded amenities & building features: $tagLine.
+            • Flood history: ${p.floodRisk ?: "No flood incidents recorded for this property"}.
+            • Utilities in the area: ${p.waterSupply ?: "Municipal water"} water supply; ${p.powerBackup ?: "standard building generator"} for power backup.
+
+            Dorja only reports what is verified for this listing — for street-level insight (schools, markets, transit stops), use the "Open Location in Google Maps" button on the listing to explore the area, or ask the host via in-app chat.
+        """.trimIndent()
+    }
+
+    /**
+     * Negotiation guidance derived from actual listing facts: verified-doc
+     * leverage, unfulfilled promises, liveability gaps and price-per-sqft
+     * math — never invented numbers.
+     */
+    private fun buildNegotiationResponse(p: PropertyAiContext): String {
+        val amount = p.priceFormatted.filter { it.isDigit() }.toLongOrNull() ?: 0L
+        val pricePerSqft = if (p.sqft > 0 && amount > 0) amount / p.sqft else 0L
+
+        val verifiedDocs = p.documents.filter { it.verificationStatus.equals("VERIFIED", ignoreCase = true) }
+        val pendingDocs = p.documents.filterNot { it.verificationStatus.equals("VERIFIED", ignoreCase = true) }
+        val openPromises = p.promises.filterNot {
+            it.status.equals("COMPLETED", ignoreCase = true) || it.status.equals("VERIFIED", ignoreCase = true)
+        }
+
+        val leveragePoints = buildList {
+            if (pendingDocs.isNotEmpty()) {
+                add("${pendingDocs.size} legal document(s) are still ${pendingDocs.joinToString { it.verificationStatus }} — request they be verified before paying any advance")
+            }
+            if (openPromises.isNotEmpty()) {
+                add("${openPromises.size} seller promise(s) are not yet completed (${openPromises.take(2).joinToString { it.title }}) — ask for them as written Handover Passport milestones, or a price concession in exchange")
+            }
+            if (p.buildingAgeYears != null && p.buildingAgeYears >= 15) {
+                add("The building is ${p.buildingAgeYears} years old — maintenance/renovation costs are a legitimate negotiation point")
+            }
+            if (p.buildingCondition != null && !p.buildingCondition.equals("EXCELLENT", ignoreCase = true)) {
+                add("Recorded building condition is ${p.buildingCondition} — use the inspection to document repair items")
+            }
+            if (!p.hasParking()) {
+                add("No dedicated parking is recorded — if you need parking, ask the host to secure it as a condition or reduce the offer")
+            }
+            if (p.floodRisk != null && !p.floodRisk.equals("NONE", ignoreCase = true) && !p.floodRisk.contains("no", ignoreCase = true)) {
+                add("Flood risk is recorded as '${p.floodRisk}' — flood-prone units justify a lower rate")
+            }
+        }
+        val leverage = leveragePoints.ifEmpty {
+            listOf("This listing verifies cleanly (documents verified, promises tracked, condition good) — negotiation room is narrower; compete on speed and a firm, polite offer")
+        }
+
+        val strengthPoints = buildList {
+            if (verifiedDocs.isNotEmpty()) add("${verifiedDocs.size} legal document(s) verified — low fraud risk")
+            if (p.hasScan) add("3D scan available — you inspected remotely, fewer surprises at handover")
+            if (p.energyClass != null) add("Energy class ${p.energyClass} — predictable running costs")
+        }
+        val strengths = strengthPoints.ifEmpty {
+            listOf("Ask the host to upload documents to the Dorja vault before negotiating further")
+        }
+
+        return """
+            Negotiation profile for ${p.title} 🤝
+
+            • Listed: ${p.priceFormatted}${if (pricePerSqft > 0) " (≈$pricePerSqft per sq ft — compare with similar ${p.propertyType} listings in ${p.location})" else ""}
+
+            Your leverage:
+            ${leverage.joinToString("\n") { "  – $it" }}
+
+            Seller's strengths (be ready for these):
+            ${strengths.joinToString("\n") { "  – $it" }}
+
+            Ground rules: anchor on the verified facts above, keep every agreed concession as a Handover Passport milestone, and never pay before documents verify.
+        """.trimIndent()
     }
 
     private fun buildDocumentsResponse(p: PropertyAiContext): String {
