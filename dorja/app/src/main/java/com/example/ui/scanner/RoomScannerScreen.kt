@@ -1323,7 +1323,14 @@ private fun stitchFramesInternal(ctx: android.content.Context, frameDataList: Li
         if (abs(gain - 1f) > 0.01f) {
             android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG or android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
                 colorFilter = android.graphics.ColorMatrixColorFilter(
-                    android.graphics.ColorMatrix().apply { setToScale(gain, gain, gain, 1f) }
+                    android.graphics.ColorMatrix(
+                        floatArrayOf(
+                            gain, 0f, 0f, 0f, 0f,
+                            0f, gain, 0f, 0f, 0f,
+                            0f, 0f, gain, 0f, 0f,
+                            0f, 0f, 0f, 1f, 0f
+                        )
+                    )
                 )
             }
         } else {
