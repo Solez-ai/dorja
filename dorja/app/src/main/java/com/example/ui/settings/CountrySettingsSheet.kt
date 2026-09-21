@@ -125,10 +125,12 @@ fun CountrySettingsSheet(
                     val languageTag = LocaleSettings.languageTagForCountry(profile.iso2)
                     val languageName = DorjaLocales.byTag(languageTag)?.nativeName ?: languageTag
                     val identity = CountryRegistry.identityCredential(profile.iso2)
+                    val signature = CountryRegistry.signatureFeature(profile.iso2)
                     CountrySettingsRow(
                         displayName = profile.displayName,
                         iso2 = profile.iso2,
-                        subtitle = "${profile.currencyCode} (${profile.currencySymbol})  •  ${identity.shortName}  •  $languageName",
+                        subtitle = "${profile.currencyCode} (${profile.currencySymbol})  •  ${identity.shortName}  •  $languageName" +
+                            if (signature != null) "\n★ ${signature.title}" else "",
                         isSelected = isSelected,
                         onClick = { onCountrySelected(profile.iso2) }
                     )

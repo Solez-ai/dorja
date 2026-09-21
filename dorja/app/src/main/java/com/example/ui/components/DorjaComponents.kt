@@ -12,6 +12,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -36,6 +37,9 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.data.country.CountryRegistry
 import com.example.data.model.Listing
+import com.example.ui.i18n.DorjaLocales
+import com.example.ui.i18n.L
+import com.example.ui.i18n.LocaleSettings
 import com.example.ui.theme.DorjaColors
 import com.example.ui.theme.LiquidGlassDefaults
 import com.example.ui.theme.liquidGlass
@@ -860,6 +864,7 @@ fun CountryPicker(
     modifier: Modifier = Modifier,
     label: String = "Select Country"
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     val activeIso2 = if (selected.isNotBlank() && selected != "BD") selected
     else if (selectedCountry.isNotBlank() && selectedCountry != "BD") selectedCountry
     else selectedIso2
@@ -939,13 +944,13 @@ fun CountryPicker(
                 Spacer(modifier = Modifier.height(4.dp))
 
                 Text(
-                    text = "Select Country",
+                    text = L("country_sheet_title"),
                     style = MaterialTheme.typography.titleLarge,
                     color = DorjaColors.DrawerCream,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "Choose your country to load specific property evidence, legal disclosures, and authority registries.",
+                    text = L("country_sheet_subtitle"),
                     style = MaterialTheme.typography.bodySmall,
                     color = DorjaColors.DrawerMuted
                 )
@@ -956,7 +961,7 @@ fun CountryPicker(
                     onQueryChange = { searchQuery = it },
                     onFilterClick = {},
                     showFilterButton = false,
-                    placeholderText = "Search by country name or code..."
+                    placeholderText = L("country_sheet_search")
                 )
                 Spacer(modifier = Modifier.height(16.dp))
 
@@ -967,6 +972,12 @@ fun CountryPicker(
                             it.iso2.contains(searchQuery, ignoreCase = true)
                 }
 
+                // Changing country here also switches the app language everywhere.
+                val onSelectWithLocale = { code: String ->
+                    com.example.ui.i18n.LocaleSettings.applyCountry(context, code)
+                    activeOnSelect(code)
+                }
+
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -974,12 +985,11 @@ fun CountryPicker(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     items(filteredProfiles, key = { it.iso2 }) { profile ->
-                        val isSelected = profile.iso2 == activeIso2
-                        Surface(
+                        val isSelected = profile.iso2 == activeIso2                            Surface(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .pressScale(onClick = {
-                                    activeOnSelect(profile.iso2)
+                                    onSelectWithLocale(profile.iso2)
                                     showSheet = false
                                 }),
                             shape = RoundedCornerShape(14.dp),
@@ -1014,11 +1024,51 @@ fun CountryPicker(
                                     }
                                     Spacer(modifier = Modifier.height(2.dp))
                                     Text(
-                                        text = "Currency: ${profile.currencyCode} (${profile.currencySymbol}) • Stage ${profile.launchStage}",
+                                        text = "${profile.currencyCode} (${profile.currencySymbol}) • ${L("country_sheet_stage").format(profile.launchStage)} • ${DorjaLocales.byTag(LocaleSettings.languageTagForCountry(profile.iso2))?.nativeName ?: ""}",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = DorjaColors.DrawerMuted,
                                         fontSize = 12.sp
                                     )
+                                    // Region-locked signature feature for this market.
+                                    CountryRegistry.signatureFeature(profile.iso2)?.let { sig ->
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Surface(
+                                            shape = RoundedCornerShape(8.dp),
+                                            color = DorjaColors.DrawerAccent.copy(alpha = 0.12f),
+                                            border = BorderStroke(0.5.dp, DorjaColors.DrawerAccent.copy(alpha = 0.35f))
+                                        ) {
+                                            Column(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp)) {
+                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Star,
+                                                        contentDescription = null,
+                                                        tint = DorjaColors.DrawerAccent,
+                                                        modifier = Modifier.size(13.dp)
+                                                    )
+                                                    Spacer(modifier = Modifier.width(6.dp))
+                                                    Text(
+                                                        text = sig.title,
+                                                        style = MaterialTheme.typography.labelMedium,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = DorjaColors.DrawerAccent
+                                                    )
+                                                    Spacer(modifier = Modifier.width(6.dp))
+                                                    DorjaBadge(
+                                                        text = L("country_locked_badge"),
+                                                        backgroundColor = DorjaColors.DrawerAccent.copy(alpha = 0.18f),
+                                                        contentColor = DorjaColors.DrawerAccent
+                                                    )
+                                                }
+                                                Spacer(modifier = Modifier.height(2.dp))
+                                                Text(
+                                                    text = sig.subtitle,
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = DorjaColors.DrawerMuted,
+                                                    fontSize = 11.sp
+                                                )
+                                            }
+                                        }
+                                    }
                                 }
                                 if (isSelected) {
                                     Icon(

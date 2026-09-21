@@ -105,7 +105,218 @@ data class CountryProfile(
         subnationalProfiles.firstOrNull { it.code.equals(code ?: "", ignoreCase = true) }
 }
 
+/**
+ * A region-locked, country-specific DORJA capability. These are the niche,
+ * market-exclusive tools each launch market gets — they only surface in the
+ * UI while that country is the active market (region-locked by design).
+ */
+data class SignatureFeature(
+    val code: String,
+    val title: String,
+    val subtitle: String
+)
+
+/** Region-locked signature features, keyed by ISO-2 country code. */
+object SignatureFeatureRegistry {
+
+    val byCountry: Map<String, SignatureFeature> = mapOf(
+        // Stage 1–2
+        "BD" to SignatureFeature(
+            "MUTATION_TRACKER",
+            "Namzari Mutation Tracker",
+            "Follow your khatian → namzari mutation status, step by step."
+        ),
+        "IN" to SignatureFeature(
+            "RERA_PROJECT_INSIGHT",
+            "RERA Project Insight",
+            "Paste a RERA number to see registration, promoter history and delay flags."
+        ),
+        "NP" to SignatureFeature(
+            "LALPURJA_VERIFY",
+            "Lalpurja Verify",
+            "Cross-check a lalpurja against MeroKitta land records before you pay."
+        ),
+        "BT" to SignatureFeature(
+            "THRAM_CHECKER",
+            "Thram Checker",
+            "Confirm thram tenure and NLCS / eSakor transaction status in one place."
+        ),
+        // Stage 3–4
+        "FR" to SignatureFeature(
+            "DPE_NOTAIRE_ESTIMATOR",
+            "DPE & Notaire Fees Estimator",
+            "Estimate energy-class running costs and notaire fees up front."
+        ),
+        "DE" to SignatureFeature(
+            "NEBENKOSTEN_PLANNER",
+            "Nebenkosten Planner",
+            "Plan Grunderwerbsteuer, notary and Grundbuch costs before you bid."
+        ),
+        "JP" to SignatureFeature(
+            "JUYO_JIKO_COMPANION",
+            "Jūyō Jikō Companion",
+            "Explains the Important Matters sheet and building-age depreciation."
+        ),
+        "AE" to SignatureFeature(
+            "EJARI_OQOOD_TRACKER",
+            "Ejari & Oqood Tracker",
+            "Dubai tenancy and off-plan registration status in one wallet."
+        ),
+        // Stage 5
+        "GB" to SignatureFeature(
+            "EPC_DEPOSIT_SHIELD",
+            "EPC & Deposit Shield",
+            "Check EPC validity and your deposit protection scheme instantly."
+        ),
+        "IE" to SignatureFeature(
+            "RTB_RENT_CHECK",
+            "RTB Rent Register Check",
+            "Verify RTB registration and lawful rent against the register."
+        ),
+        "BE" to SignatureFeature(
+            "REGION_TAX_COMPARATOR",
+            "Region Tax Comparator",
+            "Compare Brussels / Flanders / Wallonia registration duties side by side."
+        ),
+        "NL" to SignatureFeature(
+            "NHG_ELIGIBILITY_PLANNER",
+            "NHG Eligibility Planner",
+            "See if a home fits the NHG guarantee before you offer."
+        ),
+        "PT" to SignatureFeature(
+            "CADERNETA_CROSSCHECK",
+            "Caderneta Cross-Check",
+            "Match caderneta predial details against the listing claims."
+        ),
+        "ES" to SignatureFeature(
+            "NOTA_SIMPLE_SHIELD",
+            "Nota Simple Shield",
+            "Decode registry charges, community debts and tourist licence limits."
+        ),
+        "IT" to SignatureFeature(
+            "CATASTALE_MATCHUP",
+            "Catastale Match-Up",
+            "Match visura & planimetria catastale to the advertised floor plan."
+        ),
+        "PL" to SignatureFeature(
+            "KW_ENCUMBRANCE_SCAN",
+            "KW Encumbrance Scan",
+            "Scan księga wieczysta for mortgages and easements before bidding."
+        ),
+        "RO" to SignatureFeature(
+            "CARTE_FUNCIARA_SCAN",
+            "Carte Funciara Scan",
+            "Read land-register extracts: owners, charges, servitudes."
+        ),
+        "BG" to SignatureFeature(
+            "NOTARIALEN_AKT_VERIFY",
+            "Notarialen Akt Verify",
+            "Verify notarial deeds and cadastral sketch area consistency."
+        ),
+        "GR" to SignatureFeature(
+            "ENFIA_E9_CHECKER",
+            "ENFIA & E9 Checker",
+            "Check E9/TAP tax clearance and topografiko consistency."
+        ),
+        "HU" to SignatureFeature(
+            "TULAJDONI_LAP_SCAN",
+            "Tulajdoni Lap Scan",
+            "Scan property register extracts for liens and usage rights."
+        ),
+        "TR" to SignatureFeature(
+            "DASK_TAPU_GUARD",
+            "DASK & Tapu Guard",
+            "Confirm tapu deed status and mandatory DASK earthquake cover."
+        ),
+        // Stage 6
+        "LK" to SignatureFeature(
+            "NOTARIAL_DEED_TRACKER",
+            "Notarial Deed Tracker",
+            "Track your deed from attorney to Land Registry registration."
+        ),
+        "PK" to SignatureFeature(
+            "FARD_PLRA_LOOKUP",
+            "Fard / PLRA Lookup",
+            "Pull a fard extract from PLRA and flag sale-chain gaps."
+        ),
+        "VN" to SignatureFeature(
+            "SO_DO_QUOTA_MONITOR",
+            "Sổ Đỏ Quota Monitor",
+            "Watch a condo's remaining foreign-ownership quota in real time."
+        ),
+        "TH" to SignatureFeature(
+            "CHANOTE_QUOTA_CHECK",
+            "Chanote & Quota Check",
+            "Verify chanote title and the 49% foreign condo quota."
+        ),
+        "PH" to SignatureFeature(
+            "TCT_ENCUMBRANCE_SCAN",
+            "TCT Encumbrance Scan",
+            "Scan a TCT for annotated liens before you hand over a deposit."
+        ),
+        "ID" to SignatureFeature(
+            "SHM_HGB_GUIDE",
+            "SHM / HGB Rights Guide",
+            "Decode certificate rights (SHM, HGB, AJB steps) for your parcel."
+        ),
+        "KH" to SignatureFeature(
+            "HARD_SOFT_TITLE_CHECK",
+            "Hard vs Soft Title Check",
+            "Know if a listing is hard title (LMAP) or soft title before paying."
+        ),
+        "KZ" to SignatureFeature(
+            "CADASTRAL_PASSPORT_CHECK",
+            "Cadastral Passport Check",
+            "Read cadastral passports and land-use restrictions on a map."
+        ),
+        // Research-only markets with strong known devices
+        "UZ" to SignatureFeature(
+            "MAKKON_VERIFY",
+            "Makkon Verify",
+            "Check developer makkon status and registration before booking."
+        ),
+        "GE" to SignatureFeature(
+            "NAPR_EXTRACT_CHECK",
+            "NAPR Extract Check",
+            "Match your NAPR extract to the listing's claimed boundaries."
+        ),
+        "MY" to SignatureFeature(
+            "STRATA_MM2H_GUIDE",
+            "Strata & MM2H Guide",
+            "Check strata titles, Bumiputra lots and MM2H price floors."
+        ),
+        "SG" to SignatureFeature(
+            "HDB_ELIGIBILITY_METER",
+            "HDB Eligibility Meter",
+            "Model HDB grants, BSD/ABSD and eligibility in one view."
+        ),
+        "KR" to SignatureFeature(
+            "JEONSE_RISK_METER",
+            "Jeonse Risk Meter",
+            "Compare jeonse deposit risk against mortgage payments."
+        ),
+        "UA" to SignatureFeature(
+            "WAR_DAMAGE_FLAG",
+            "War-Damage Record Flag",
+            "Flag listings with registered war-damage records before viewing."
+        ),
+        "JO" to SignatureFeature(
+            "TABO_DEED_CHECKER",
+            "Tabo Deed Checker",
+            "Verify tabo (green deed) status and fees up front."
+        ),
+        "MN" to SignatureFeature(
+            "WINTER_HEATING_RECORD",
+            "Winter Heating Record",
+            "Record winter heating condition — a real deal-breaker here."
+        )
+    )
+}
+
 object CountryRegistry {
+    /** Region-locked signature feature for a country, if defined. */
+    fun signatureFeature(iso2: String): SignatureFeature? =
+        SignatureFeatureRegistry.byCountry[iso2.uppercase()]
 
     val profiles: List<CountryProfile> = listOf(
         // ── Stage 1: Bangladesh (launch market — the proving ground) ──────

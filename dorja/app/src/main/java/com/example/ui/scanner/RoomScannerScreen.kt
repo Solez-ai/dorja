@@ -118,7 +118,7 @@ import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.math.tan
 
-private enum class Phase { SELECT, PREVIEW, CAPTURING, DONE }
+private enum class Phase { SELECT, PREVIEW, CAPTURING, LEGACY_CAPTURE, DONE }
 
 private val Accent = Color(0xFF00BCD4)
 private val Green = Color(0xFF4CAF50)
@@ -272,13 +272,107 @@ fun RoomScannerScreen(
                 scanMode = scanMode,
                 gyroOn = gyroOn,
                 onToggleGyro = { gyroOn = !gyroOn },
-                onStart = { phase = Phase.CAPTURING },
+                onStart = {
+                    // Full Sphere runs the real-AR flow; if ARCore is missing the
+                    // user can still fall back to motion guidance from the AR screen.
+                    phase = Phase.CAPTURING
+                },
                 onBack = { phase = Phase.SELECT },
                 lifecycleOwner = lifecycleOwner
             )
 
+            Phase.LEGACY_CAPTURE -> {
+                // Chosen explicitly from the AR screen when the device can't run ARCore.
+                CapturingPhase(
+                    imageCapture = imageCapture,
+                    onCaptureReady = { imageCapture = it },
+                    hasCamera = hasCamera,
+                    heading = heading,
+                    currentPitch = pitch,
+                    scanMode = scanMode,
+                    scanTargets = scanTargets,
+                    currentTargetIdx = currentTargetIdx,
+                    capturedFrames = capturedFrames,
+                    gyroOn = gyroOn,
+                    onToggleGyro = { gyroOn = !gyroOn },
+                    onRetakeTarget = { targetIndex -> currentTargetIdx = targetIndex },
+                    onCapture = {
+                        val ic = imageCapture ?: return@CapturingPhase
+                        val target = scanTargets.getOrNull(currentTargetIdx) ?: return@CapturingPhase
+                        val file = File(ctx.cacheDir, "frame_r${target.ringIndex}_c${target.targetIndex}_${System.currentTimeMillis()}.jpg")
+                        val capturedHeading = heading
+                        val capturedPitch = pitch
+
+                        ic.takePicture(
+                            ImageCapture.OutputFileOptions.Builder(file).build(),
+                            ContextCompat.getMainExecutor(ctx),
+                            object : ImageCapture.OnImageSavedCallback {
+                                override fun onImageSaved(output: ImageCapture.OutputFileResults) {
+                                    val frame = FrameData(
+                                        path = file.absolutePath,
+                                        heading = capturedHeading,
+                                        pitchDeg = capturedPitch,
+                                        row = target.ringIndex,
+                                        col = target.targetIndex,
+                                        isCap = target.isCap,
+                                        capType = target.capType
+                                    )
+
+                                    val existingIdx = capturedFrames.indexOfFirst { it.col == target.targetIndex }
+                                    if (existingIdx >= 0) {
+                                        capturedFrames[existingIdx] = frame
+                                    } else {
+                                        capturedFrames.add(frame)
+                                    }
+
+                                    vibrateShutter(ctx)
+                                    if (currentTargetIdx < scanTargets.size - 1) {
+                                        currentTargetIdx++
+                                    }
+                                }
+
+                                override fun onError(exc: ImageCaptureException) {
+                                    Log.e("Scanner", "Capture failed", exc)
+                                }
+                            }
+                        )
+                    },
+                    onStop = { phase = Phase.DONE },
+                    onBack = { phase = Phase.PREVIEW },
+                    lifecycleOwner = lifecycleOwner
+                )
+            }
+
             Phase.CAPTURING -> {
-                if (scanMode == ScanGeometry.ScanMode.AR_CORNER_SCAN) {
+                if (scanMode == ScanGeometry.ScanMode.FULL_SPHERE) {
+                    // Real-AR guided spherical capture (ARCore). Clean guidance:
+                    // what the room is understood, where to turn, auto-shutter.
+                    ArSphereCapturePhase(
+                        roomName = selectedRoom?.displayName ?: "Room",
+                        scanMode = scanMode,
+                        scanTargets = scanTargets,
+                        currentTargetIdx = currentTargetIdx,
+                        capturedFrames = capturedFrames,
+                        gyroHeading = heading,
+                        gyroPitch = pitch,
+                        onFrameCaptured = { frame ->
+                            val existingIdx = capturedFrames.indexOfFirst { it.col == frame.col }
+                            if (existingIdx >= 0) {
+                                capturedFrames[existingIdx] = frame
+                            } else {
+                                capturedFrames.add(frame)
+                            }
+                            vibrateShutter(ctx)
+                            val next = scanTargets.indexOfFirst { t -> capturedFrames.none { it.col == t.targetIndex } }
+                            if (next >= 0) {
+                                currentTargetIdx = next
+                            }
+                        },
+                        onRequestLegacyFallback = { phase = Phase.LEGACY_CAPTURE },
+                        onStop = { phase = Phase.DONE },
+                        onBack = { phase = Phase.PREVIEW }
+                    )
+                } else if (scanMode == ScanGeometry.ScanMode.AR_CORNER_SCAN) {
                     ArCornerScannerPhase(
                         imageCapture = imageCapture,
                         onCaptureReady = { imageCapture = it },
@@ -449,8 +543,8 @@ private fun SelectRoom(
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         ModeOptionChip(
-                            title = "Full Sphere 360°",
-                            subtitle = "62 shots • 360°×180°",
+                            title = "AR Full Sphere 360°×180°",
+                            subtitle = "AR-guided: floor/ceiling/walls detected • 62 shots",
                             timeHint = "~2 min",
                             icon = Icons.Default.RotateRight,
                             isSelected = scanMode == ScanGeometry.ScanMode.FULL_SPHERE,
@@ -469,8 +563,8 @@ private fun SelectRoom(
                     }
                     ModeOptionChip(
                         title = "AR 3D Room Corner Scanner",
-                        subtitle = "Point-by-point AR vector mapping & dimension solver",
-                        timeHint = "Real-Time AR",
+                        subtitle = "Tilt-and-turn: point at each dot & tap the shutter",
+                        timeHint = "AR-guided",
                         icon = Icons.Default.CheckCircle,
                         isSelected = scanMode == ScanGeometry.ScanMode.AR_CORNER_SCAN,
                         onClick = { onModeToggle(ScanGeometry.ScanMode.AR_CORNER_SCAN) },
