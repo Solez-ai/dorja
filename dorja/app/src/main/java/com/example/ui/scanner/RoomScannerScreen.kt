@@ -121,6 +121,7 @@ import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.cos
+import kotlin.math.max
 import kotlin.math.sin
 import kotlin.math.tan
 
@@ -1167,6 +1168,100 @@ private fun stitchFrames(ctx: android.content.Context, frames: List<FrameData>):
     }
 }
 
+/**
+ * Overlap-band exposure gain compensation.
+ *
+ * Adjacent frames (including the wrap-around pair that closes the 360 ring)
+ * see the same physical content in their overlap band, so the mean-luminance
+ * ratio there is pure exposure difference from AE drift between shots.
+ *
+ * Gains are chained around the ring relative to frame 0 (well-defined
+ * reference). Because a closed ring has no globally consistent solution, the
+ * leftover loop error (last frame's measured ratio back to frame 0) is
+ * distributed geometrically across all frames instead of being dumped on one
+ * seam. Gains are clamped to [0.5, 2.0]; frames with too little valid
+ * overlap keep gain 1.0.
+ */
+private fun computeExposureGains(loadedFrames: List<LoadedFrameInfo>): FloatArray {
+    val n = loadedFrames.size
+    if (n < 2) return FloatArray(max(1, n)) { 1f }
+
+    val hFOV = Math.toRadians(CAMERA_HFOV_DEG)
+
+    fun meanLum(bmp: Bitmap, srcX: Int): Float? {
+        if (srcX < 0 || srcX >= bmp.width - 1) return null
+        val col = IntArray(bmp.height)
+        bmp.getPixels(col, 0, 1, srcX, 0, 1, bmp.height)
+        var sum = 0.0
+        var count = 0
+        for (p in col) {
+            // Near-black pixels carry no signal (borders / noise floor).
+            val mx = maxOf(p shr 16 and 0xFF, p shr 8 and 0xFF, p and 0xFF)
+            if (mx > 16) {
+                sum += 0.2126 * (p shr 16 and 0xFF) + 0.7152 * (p shr 8 and 0xFF) + 0.0722 * (p and 0xFF)
+                count++
+            }
+        }
+        return if (count >= 32) (sum / count).toFloat() else null
+    }
+
+    // Column in [a] and column in [b] that both look into their shared band.
+    fun overlapBand(a: Bitmap, b: Bitmap, headingA: Float, headingB: Float): Pair<Int, Int>? {
+        val headingGap = abs(((headingB - headingA + 540.0) % 360.0) - 180.0)
+        val overlapHalf = (hFOV - Math.toRadians(headingGap)) / 2.0
+        if (overlapHalf <= 0.0) return null
+
+        val relB = Math.toRadians(((headingB - headingA + 540.0) % 360.0) - 180.0)
+        val relA = -relB
+        val fa = a.width / (2.0 * Math.tan(hFOV / 2.0))
+        val fb = b.width / (2.0 * Math.tan(hFOV / 2.0))
+        val cxa = a.width / 2.0
+        val cxb = b.width / 2.0
+        // Outer edge of the overlap, on the side of each frame facing the other.
+        val aSrc = (fa * Math.tan(relB + overlapHalf * (if (relB >= 0) -1.0 else 1.0)) + cxa).toInt()
+        val bSrc = (fb * Math.tan(relA + overlapHalf * (if (relA >= 0) -1.0 else 1.0)) + cxb).toInt()
+        return Pair(aSrc, bSrc)
+    }
+
+    // Measured ratios r[i] = lum(i+1)/lum(i), wrap-around included.
+    val ratios = FloatArray(n) { 1f }
+    var measuredPairs = 0
+    for (i in 0 until n) {
+        val j = (i + 1) % n
+        val a = loadedFrames[i]
+        val b = loadedFrames[j]
+        val band = overlapBand(a.bmp, b.bmp, a.heading, b.heading) ?: continue
+        val lumA = meanLum(a.bmp, band.first) ?: continue
+        val lumB = meanLum(b.bmp, band.second) ?: continue
+        if (lumA < 8f || lumB < 8f) continue
+        ratios[i] = (lumB / lumA).coerceIn(0.4f, 2.5f)
+        measuredPairs++
+    }
+    if (measuredPairs == 0) return FloatArray(n) { 1f }
+
+    // Chain gains from the frame-0 anchor (index 0 keeps gain 1.0).
+    val gains = FloatArray(n)
+    gains[0] = 1f
+    for (i in 1 until n) gains[i] = (gains[i - 1] * ratios[i - 1]).coerceIn(0.5f, 2.0f)
+
+    // Distribute the loop error geometrically (Brown & Lowe style): if the
+    // measured ring were perfectly consistent, gains[n-1] * ratios[n-1] == 1.
+    val rho = (gains[n - 1] * ratios[n - 1]).coerceIn(0.5f, 2.0f)
+    if (abs(rho - 1f) > 0.01f) {
+        for (i in 0 until n) {
+            val correction = Math.pow(rho.toDouble(), -i.toDouble() / n).toFloat()
+            gains[i] = (gains[i] * correction).coerceIn(0.5f, 2.0f)
+        }
+    }
+    return gains
+}
+
+private class LoadedFrameInfo(
+    val bmp: Bitmap,
+    val heading: Float,
+    @Suppress("unused") val path: String
+)
+
 private fun stitchFramesInternal(ctx: android.content.Context, frameDataList: List<FrameData>): String? {
     Log.i("Stitcher", "=== PANORAMA STITCHING PIPELINE ===")
     Log.i("Stitcher", "Input: ${frameDataList.size} frames")
@@ -1174,7 +1269,6 @@ private fun stitchFramesInternal(ctx: android.content.Context, frameDataList: Li
 
     // ── Step 1: Load frames with consistent scaling ──────
     val targetH = 800
-    data class LoadedFrame(val bmp: Bitmap, val heading: Float, val path: String)
 
     val loadedFrames = frameDataList.mapNotNull { fd ->
         try {
@@ -1184,7 +1278,7 @@ private fun stitchFramesInternal(ctx: android.content.Context, frameDataList: Li
             val sample = (opts.outHeight / targetH).coerceAtLeast(1)
             val bmp = BitmapFactory.decodeFile(fd.path, BitmapFactory.Options().apply { inSampleSize = sample })
             if (bmp != null && !bmp.isRecycled && bmp.width > 100 && bmp.height > 100) {
-                LoadedFrame(bmp, fd.heading, fd.path)
+                LoadedFrameInfo(bmp, fd.heading, fd.path)
             } else {
                 Log.w("Stitcher", "  Frame SKIPPED (too small or null): ${bmp?.width}×${bmp?.height}")
                 bmp?.recycle()
@@ -1216,6 +1310,25 @@ private fun stitchFramesInternal(ctx: android.content.Context, frameDataList: Li
     val panoH = 2048
     val hFOV = Math.toRadians(CAMERA_HFOV_DEG)
 
+    // ── Step 2.5: Exposure gain compensation ───────────
+    // Adjacent frames share an overlap band of identical content; the mean
+    // luminance ratio there is pure exposure difference (AE drift between
+    // shots) — the classic banding in stitched panoramas. Compensate per
+    // frame and pre-build one ColorMatrix paint per frame so the warp loop
+    // stays allocation-free.
+    val frameGains = computeExposureGains(loadedFrames)
+    Log.i("Stitcher", "Exposure gains: ${frameGains.joinToString { "%.2f".format(it) }}")
+    val framePaints = loadedFrames.mapIndexed { idx, _ ->
+        val gain = frameGains[idx]
+        if (abs(gain - 1f) > 0.01f) {
+            android.graphics.Paint(paint).apply {
+                colorFilter = android.graphics.ColorMatrixColorFilter(
+                    android.graphics.ColorMatrix().apply { setToScale(gain, gain, gain, 1f) }
+                )
+            }
+        } else paint
+    }
+
     // ── Step 3: Create panorama canvas ────────────────
     val panorama = Bitmap.createBitmap(panoW, panoH, Bitmap.Config.ARGB_8888)
     val canvas = PanoCanvas(panorama)
@@ -1225,7 +1338,7 @@ private fun stitchFramesInternal(ctx: android.content.Context, frameDataList: Li
     for (panoX in 0 until panoW) {
         val lon = (panoX.toDouble() / panoW) * 2.0 * PI
 
-        var bestFrame: LoadedFrame? = null
+        var bestFrame: LoadedFrameInfo? = null
         var bestDist = Double.MAX_VALUE
 
         for (frame in loadedFrames) {
@@ -1257,7 +1370,7 @@ private fun stitchFramesInternal(ctx: android.content.Context, frameDataList: Li
 
         val srcRect = Rect(srcX, 0, srcX + 1, frame.bmp.height)
         val dstRect = RectF(panoX.toFloat(), 0f, (panoX + 1).toFloat(), panoH.toFloat())
-        canvas.drawBitmap(frame.bmp, srcRect, dstRect, paint)
+        canvas.drawBitmap(frame.bmp, srcRect, dstRect, framePaints[loadedFrames.indexOf(frame)])
     }
 
     Log.i("Stitcher", "Panorama composited: ${panoW}×${panoH}")
