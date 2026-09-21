@@ -19,8 +19,6 @@ import android.os.VibratorManager
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import android.hardware.camera2.CameraCharacteristics
-import androidx.camera.camera2.Camera2CameraInfo
 import androidx.camera.core.AspectRatio
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
@@ -1009,30 +1007,19 @@ private fun CameraPreview(
 /**
  * Prefers a wide-angle (0.5x/0.8x ultra-wide) back lens when available: a wider
  * FOV per shot means fewer frames, fewer seams and better stitch overlap.
- * Falls back to the default back camera on devices without an ultra-wide lens.
+ * Uses only camera-core APIs — ultra-wide modules report an intrinsic zoom
+ * ratio well below 1.0 relative to the main 1x lens. Falls back to the
+ * default back camera on devices without an ultra-wide lens.
  */
 private fun ultraWideCameraSelector(provider: ProcessCameraProvider): CameraSelector {
     return try {
-        val targetId = provider.availableCameraInfos
-            .filter {
-                Camera2CameraInfo.from(it)
-                    .getCameraCharacteristic(CameraCharacteristics.LENS_FACING) == CameraCharacteristics.LENS_FACING_BACK
-            }
-            .firstOrNull { info ->
-                // Ultra-wide modules sit around 1.6-2.5mm; main 1x lenses are >= 4mm.
-                val focal = Camera2CameraInfo.from(info)
-                    .getCameraCharacteristic(CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS)
-                focal != null && focal.any { it <= 3.0f }
-            }
-            ?.let { Camera2CameraInfo.from(it).cameraId }
-
-        if (targetId != null) {
-            Log.i("Scanner", "Using ultra-wide lens (cameraId=$targetId, ~0.5x/0.8x)")
-            CameraSelector.Builder()
-                .addCameraFilter { candidates ->
-                    candidates.filter { Camera2CameraInfo.from(it).cameraId == targetId }.ifEmpty { candidates }
-                }
-                .build()
+        val ultraWide = provider.availableCameraInfos.firstOrNull { info ->
+            info.lensFacing == CameraSelector.LENS_FACING_BACK &&
+                info.intrinsicZoomRatio < 0.9f
+        }
+        if (ultraWide != null) {
+            Log.i("Scanner", "Using ultra-wide lens (zoom ratio ${ultraWide.intrinsicZoomRatio})")
+            ultraWide.cameraSelector
         } else {
             Log.i("Scanner", "No ultra-wide lens found - using default back camera")
             CameraSelector.DEFAULT_BACK_CAMERA
