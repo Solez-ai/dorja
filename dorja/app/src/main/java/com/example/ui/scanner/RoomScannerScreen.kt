@@ -1318,15 +1318,17 @@ private fun stitchFramesInternal(ctx: android.content.Context, frameDataList: Li
     // stays allocation-free.
     val frameGains = computeExposureGains(loadedFrames)
     Log.i("Stitcher", "Exposure gains: ${frameGains.joinToString { "%.2f".format(it) }}")
-    val framePaints = loadedFrames.mapIndexed { idx, _ ->
+    val framePaints: List<android.graphics.Paint> = loadedFrames.mapIndexed { idx, _ ->
         val gain = frameGains[idx]
         if (abs(gain - 1f) > 0.01f) {
-            android.graphics.Paint(paint).apply {
+            android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG or android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
                 colorFilter = android.graphics.ColorMatrixColorFilter(
                     android.graphics.ColorMatrix().apply { setToScale(gain, gain, gain, 1f) }
                 )
             }
-        } else paint
+        } else {
+            android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG or android.graphics.Paint.ANTI_ALIAS_FLAG)
+        }
     }
 
     // ── Step 3: Create panorama canvas ────────────────
