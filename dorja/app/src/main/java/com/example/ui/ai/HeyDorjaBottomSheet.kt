@@ -506,7 +506,7 @@ fun HeyDorjaAssistantSheet(
                         onValueChange = { textInput = it },
                         modifier = Modifier
                             .weight(1f)
-                            .height(52.dp),
+                            .heightIn(min = 52.dp),
                         placeholder = {
                             Text(
                                 "Ask e.g. Does this have parking?",

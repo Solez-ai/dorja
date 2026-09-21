@@ -152,6 +152,7 @@ fun BentoMetricTile(
                     color = DorjaColors.Gray600,
                     fontSize = 10.sp,
                     maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
                     softWrap = true
                 )
                 Text(
@@ -159,7 +160,9 @@ fun BentoMetricTile(
                     style = MaterialTheme.typography.titleMedium,
                     color = DorjaColors.Ink950,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 15.sp
+                    fontSize = 15.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
                 if (!subtext.isNullOrBlank()) {
                     Text(
@@ -373,7 +376,9 @@ fun DorjaBadge(
             style = MaterialTheme.typography.labelSmall,
             color = contentColor,
             fontWeight = FontWeight.SemiBold,
-            fontSize = 11.sp
+            fontSize = 11.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
         )
     }
 }
@@ -421,7 +426,9 @@ fun DorjaChip(
                 text = label,
                 style = MaterialTheme.typography.labelMedium,
                 color = animatedFg,
-                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
     }

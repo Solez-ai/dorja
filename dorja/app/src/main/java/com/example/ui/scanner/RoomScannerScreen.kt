@@ -44,6 +44,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -990,7 +991,7 @@ private fun DonePhase(
             DorjaButton(
                 "Save 360° Sphere to $roomName",
                 onClick = onSave,
-                modifier = Modifier.fillMaxWidth().height(46.dp)
+                modifier = Modifier.fillMaxWidth().heightIn(min = 46.dp)
             )
             Spacer(Modifier.height(10.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -1446,7 +1447,7 @@ private fun ArCornerScannerPhase(
                         root.put("corners", arr)
                         onSaveArModel(root.toString())
                     },
-                    modifier = Modifier.fillMaxWidth().height(44.dp)
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 44.dp)
                 )
             }
         }

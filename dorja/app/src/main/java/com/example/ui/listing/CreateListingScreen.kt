@@ -31,6 +31,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -624,7 +626,7 @@ fun CreateListingScreen(
                     onClick = {
                         showMultiPhotoSelectorDialog = false
                     },
-                    modifier = Modifier.width(160.dp)
+                    modifier = Modifier.widthIn(min = 160.dp)
                 )
             },
             dismissButton = {
@@ -736,7 +738,7 @@ fun CreateListingScreen(
                         newRoomDescription = ""
                         showAddRoomDialog = false
                     },
-                    modifier = Modifier.width(120.dp)
+                    modifier = Modifier.widthIn(min = 120.dp)
                 )
             },
             dismissButton = {
@@ -1004,7 +1006,7 @@ fun CreateListingScreen(
                         newDocEvidenceLevel = EvidenceLevel.SELF_DECLARED.code
                         showAddDocDialog = false
                     },
-                    modifier = Modifier.width(140.dp)
+                    modifier = Modifier.widthIn(min = 140.dp)
                 )
             },
             dismissButton = {
@@ -1417,7 +1419,7 @@ fun CreateListingScreen(
                                 showAddRoomDialog = true
                             },
                             icon = Icons.Default.Add,
-                            modifier = Modifier.height(36.dp),
+                            modifier = Modifier.heightIn(min = 36.dp),
                             testTag = "add_room_button"
                         )
                     }
@@ -1582,7 +1584,7 @@ fun CreateListingScreen(
                             text = "+ Add Photos",
                             onClick = { showMultiPhotoSelectorDialog = true },
                             icon = Icons.Default.AddPhotoAlternate,
-                            modifier = Modifier.height(36.dp),
+                            modifier = Modifier.heightIn(min = 36.dp),
                             testTag = "select_multiple_photos_button"
                         )
                     }
@@ -1842,7 +1844,7 @@ fun CreateListingScreen(
                                 }
                             },
                             icon = Icons.Default.ViewInAr,
-                            modifier = Modifier.height(36.dp),
+                            modifier = Modifier.heightIn(min = 36.dp),
                             testTag = "scan_rooms_button"
                         )
                     }
@@ -1960,7 +1962,7 @@ fun CreateListingScreen(
                                 showAddDocDialog = true
                             },
                             icon = Icons.Default.Add,
-                            modifier = Modifier.height(36.dp),
+                            modifier = Modifier.heightIn(min = 36.dp),
                             testTag = "add_legal_doc_button"
                         )
                     }
@@ -2345,7 +2347,7 @@ fun CreateListingScreen(
                                     showAddPromiseDialog = false
                                 }
                             },
-                            modifier = Modifier.width(130.dp)
+                            modifier = Modifier.widthIn(min = 130.dp)
                         )
                     },
                     dismissButton = {
@@ -2389,7 +2391,7 @@ fun CreateListingScreen(
                         DorjaOutlinedButton(
                             text = "+ Promise",
                             onClick = { showAddPromiseDialog = true },
-                            modifier = Modifier.height(32.dp),
+                            modifier = Modifier.heightIn(min = 32.dp),
                             testTag = "add_promise_button"
                         )
                     }
@@ -2548,7 +2550,7 @@ fun CreateListingScreen(
                 },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(52.dp),
+                    .heightIn(min = 52.dp),
                 testTag = "publish_listing_button"
             )
 

@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -98,7 +100,7 @@ fun HostListingsScreen(
                             listingToDelete = null
                         }
                     },
-                    modifier = Modifier.width(100.dp)
+                    modifier = Modifier.widthIn(min = 100.dp)
                 )
             },
             dismissButton = {
@@ -151,7 +153,7 @@ fun HostListingsScreen(
                     text = L("host_new"),
                     onClick = onCreateListing,
                     icon = Icons.Default.Add,
-                    modifier = Modifier.height(40.dp),
+                    modifier = Modifier.heightIn(min = 40.dp),
                     testTag = "host_new_listing_btn"
                 )
             }
@@ -404,7 +406,7 @@ private fun HostListingCard(
                     text = "Scan 3D",
                     onClick = onScan,
                     icon = Icons.Default.ViewInAr,
-                    modifier = Modifier.height(40.dp),
+                    modifier = Modifier.heightIn(min = 40.dp),
                     testTag = "host_card_scan_3d_${listing.id}"
                 )
             }

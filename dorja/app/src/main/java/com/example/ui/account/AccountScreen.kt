@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -237,7 +238,7 @@ fun AccountScreen(
                             showEditProfileDialog = false
                         }
                     },
-                    modifier = Modifier.width(140.dp)
+                    modifier = Modifier.widthIn(min = 140.dp)
                 )
             },
             dismissButton = {
@@ -269,7 +270,7 @@ fun AccountScreen(
                             showContentDeletedDone = true
                         }
                     },
-                    modifier = Modifier.width(160.dp),
+                    modifier = Modifier.widthIn(min = 160.dp),
                     enabled = !isPrivacyWorking,
                     containerColor = DorjaColors.Error
                 )
@@ -306,7 +307,7 @@ fun AccountScreen(
                             showEraseDone = true
                         }
                     },
-                    modifier = Modifier.width(160.dp),
+                    modifier = Modifier.widthIn(min = 160.dp),
                     enabled = !isPrivacyWorking,
                     containerColor = DorjaColors.Error
                 )

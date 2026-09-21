@@ -20,6 +20,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -607,7 +609,7 @@ val legalDocPicker = rememberLauncherForActivityResult(
                             // fallback
                         }
                     },
-                    modifier = Modifier.width(160.dp)
+                    modifier = Modifier.widthIn(min = 160.dp)
                 )
             },
             dismissButton = {
@@ -684,13 +686,13 @@ val legalDocPicker = rememberLauncherForActivityResult(
                                 onOpen3DTour(safeListing.id)
                             },
                             icon = Icons.Default.ViewInAr,
-                            modifier = Modifier.width(140.dp)
+                            modifier = Modifier.widthIn(min = 140.dp)
                         )
                     }
                     DorjaOutlinedButton(
                         text = "Done",
                         onClick = { selectedRoomForDetail = null },
-                        modifier = Modifier.width(80.dp)
+                        modifier = Modifier.widthIn(min = 80.dp)
                     )
                 }
             }
@@ -768,7 +770,7 @@ val legalDocPicker = rememberLauncherForActivityResult(
                             visitScheduledSuccess = true
                         }
                     },
-                    modifier = Modifier.width(200.dp),
+                    modifier = Modifier.widthIn(min = 200.dp),
                     testTag = "confirm_visit_request_button"
                 )
             },
@@ -811,7 +813,7 @@ val legalDocPicker = rememberLauncherForActivityResult(
                 DorjaButton(
                     text = "Great",
                     onClick = { visitScheduledSuccess = false },
-                    modifier = Modifier.width(120.dp)
+                    modifier = Modifier.widthIn(min = 120.dp)
                 )
             }
         )
@@ -1286,7 +1288,7 @@ val legalDocPicker = rememberLauncherForActivityResult(
                                 text = "See 3D Scans",
                                 onClick = { onOpen3DTour(safeListing.id) },
                                 icon = Icons.Default.ViewInAr,
-                                modifier = Modifier.height(34.dp),
+                                modifier = Modifier.heightIn(min = 34.dp),
                                 testTag = "see_3d_scans_hero_button"
                             )
                         }
@@ -1347,7 +1349,7 @@ val legalDocPicker = rememberLauncherForActivityResult(
                                 text = "Start Scan",
                                 onClick = { onOpenScanner(safeListing.id) },
                                 icon = Icons.Default.ViewInAr,
-                                modifier = Modifier.height(34.dp),
+                                modifier = Modifier.heightIn(min = 34.dp),
                                 testTag = "host_start_scan_button"
                             )
                         }
@@ -1426,7 +1428,7 @@ val legalDocPicker = rememberLauncherForActivityResult(
                                     )
                                 },
                                 icon = Icons.Default.CameraAlt,
-                                modifier = Modifier.height(34.dp),
+                                modifier = Modifier.heightIn(min = 34.dp),
                                 testTag = "host_guided_capture_button"
                             )
                         }
@@ -1559,7 +1561,7 @@ val legalDocPicker = rememberLauncherForActivityResult(
                                                     text = "3D",
                                                     onClick = { onOpen3DTour(safeListing.id) },
                                                     icon = Icons.Default.ViewInAr,
-                                                    modifier = Modifier.height(30.dp),
+                                                    modifier = Modifier.heightIn(min = 30.dp),
                                                     testTag = "detail_room_3d_btn_${room.id}"
                                                 )
 
