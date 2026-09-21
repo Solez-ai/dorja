@@ -985,7 +985,8 @@ fun CountryPicker(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     items(filteredProfiles, key = { it.iso2 }) { profile ->
-                        val isSelected = profile.iso2 == activeIso2                            Surface(
+                        val isSelected = profile.iso2 == activeIso2
+                        Surface(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .pressScale(onClick = {

@@ -129,11 +129,11 @@ internal class ArSphereCaptureEngine {
         private const val TAG = "ArSphereScanner"
 
         fun checkAvailability(ctx: Context): ArCoreApk.Availability =
-            try { ArCoreApk.checkAvailability(ctx) } catch (_: Throwable) { ArCoreApk.Availability.UNSUPPORTED_DEVICE_NOT_CAPABLE }
+            try { ArCoreApk.getInstance().checkAvailability(ctx) } catch (_: Throwable) { ArCoreApk.Availability.UNSUPPORTED_DEVICE_NOT_CAPABLE }
 
         /** Launches the Google Play Services for AR install flow if needed. */
         fun requestInstall(activity: Activity): Boolean = try {
-            ArCoreApk.requestInstall(activity, true)
+            ArCoreApk.getInstance().requestInstall(activity, true)
             true
         } catch (t: Throwable) {
             Log.e(TAG, "ARCore install failed", t)
@@ -294,7 +294,6 @@ private class ArBackgroundRenderer(private val engine: ArSphereCaptureEngine) : 
     // Yaw unwrapping so captured headings stay continuous (no 0°/360° wrap jumps).
     private var lastRawYaw: Float? = null
     private var cumulativeYaw = 0f
-    private val zAxis = FloatArray(3)
 
     override fun onSurfaceCreated(_gl: javax.microedition.khronos.opengles.GL10?, config: javax.microedition.khronos.egl.EGLConfig?) {
         GLES20.glClearColor(0.04f, 0.06f, 0.08f, 1f)
@@ -345,11 +344,11 @@ private class ArBackgroundRenderer(private val engine: ArSphereCaptureEngine) : 
 
             // ── Device orientation → heading / pitch ──────────────────
             val pose = camera.displayOrientedPose
-            pose.getZAxis(zAxis, 0)
+            val viewVec = pose.zAxis
             // AR camera looks down -Z; view direction in world:
-            val viewX = -zAxis[0]
-            val viewY = -zAxis[1]
-            val viewZ = -zAxis[2]
+            val viewX = -viewVec[0]
+            val viewY = -viewVec[1]
+            val viewZ = -viewVec[2]
             val pitchDeg = Math.toDegrees(asin(viewY.coerceIn(-1f, 1f)).toDouble()).toFloat()
             val rawYaw = Math.toDegrees(atan2(viewX, viewZ).toDouble()).toFloat()
             cumulativeYaw = unwrapYaw(rawYaw)
@@ -384,7 +383,7 @@ private class ArBackgroundRenderer(private val engine: ArSphereCaptureEngine) : 
                 ArSphereStatus(true, headingDeg, pitchDeg, floorFound, ceilingFound, wallsFound, lowLight, null)
             )
         } catch (t: Throwable) {
-            Log.e(TAG, "AR frame failed", t)
+            Log.e("ArSphereScanner", "AR frame failed", t)
             clearScreen()
             engine.postError("AR error: ${t.message ?: t.javaClass.simpleName}")
         }
@@ -423,7 +422,7 @@ private class ArBackgroundRenderer(private val engine: ArSphereCaptureEngine) : 
                 try {
                     val yuv = YuvImage(nv21, ImageFormat.NV21, w, h, null)
                     val jpegBytes = ByteArrayOutputStream().also { out ->
-                        yuv.compressToJpeg(Rect(0, 0, w, h), 92, out, 0)
+                        yuv.compressToJpeg(Rect(0, 0, w, h), 92, out)
                     }.toByteArray()
                     var bmp = BitmapFactory.decodeByteArray(jpegBytes, 0, jpegBytes.size)
                     val matrix = Matrix().apply { postRotate(rotation) }

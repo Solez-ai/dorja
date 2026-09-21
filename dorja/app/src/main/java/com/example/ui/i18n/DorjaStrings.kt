@@ -144,7 +144,7 @@ data class DorjaStrings(
             "country_sheet_popular" to "POPULAR",
             "country_sheet_language" to "LANGUAGE",
             "country_sheet_device_lang" to "Use device language",
-            "country_sheet_stage" to "Stage %1$d",
+            "country_sheet_stage" to "Stage %1\$d",
             "country_signature_badge" to "SIGNATURE",
             "country_locked_badge" to "REGION LOCKED",
             "country_sig_exclusive" to "Exclusive to this market on DORJA",
