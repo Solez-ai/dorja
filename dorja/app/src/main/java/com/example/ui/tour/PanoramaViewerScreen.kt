@@ -113,16 +113,13 @@ fun PanoramaViewerScreen(
     var selectedIdx by remember { mutableIntStateOf(0) }
     val selectedRoom = scannedRooms.getOrNull(selectedIdx)
 
-    val (panoramaPath, isVersion2, scanMode) = remember(selectedRoom) {
+    // v1 format: flat 360° equator panorama (the original, working viewer).
+    val panoramaPath = remember(selectedRoom) {
         try {
             selectedRoom?.panoramaData?.let { jsonStr ->
-                val j = JSONObject(jsonStr)
-                val path = j.optString("stitchedPanorama", null)
-                val v2 = j.optInt("version", 1) >= 2
-                val mode = j.optString("mode", "full")
-                Triple(path, v2, mode)
-            } ?: Triple(null, false, "full")
-        } catch (_: Exception) { Triple(null, false, "full") }
+                JSONObject(jsonStr).optString("stitchedPanorama", null)
+            }
+        } catch (_: Exception) { null }
     }
 
     // Load panorama bitmap dynamically
@@ -182,8 +179,7 @@ fun PanoramaViewerScreen(
     LaunchedEffect(gyroYaw, gyroPitch, gyroOn) {
         if (gyroOn) {
             panYawDeg = gyroYaw
-            val maxPitch = if (isVersion2) 80f else 25f
-            panPitchDeg = gyroPitch.coerceIn(-maxPitch, maxPitch)
+            panPitchDeg = gyroPitch.coerceIn(-25f, 25f)
         }
     }
 
@@ -219,8 +215,7 @@ fun PanoramaViewerScreen(
                             val pxToDeg = fovDeg / size.width.toFloat()
                             panYawDeg -= pan.x * pxToDeg
 
-                            val maxPitch = if (isVersion2) 85f else 28f
-                            panPitchDeg = (panPitchDeg + pan.y * pxToDeg).coerceIn(-maxPitch, maxPitch)
+                            panPitchDeg = (panPitchDeg + pan.y * pxToDeg).coerceIn(-28f, 28f)
                         }
                     }
             ) {
@@ -276,8 +271,7 @@ fun PanoramaViewerScreen(
                     Box(Modifier.size(8.dp).clip(CircleShape).background(Accent))
                     Spacer(Modifier.width(8.dp))
                     Text(
-                        if (isVersion2) "FULL 360° × 180° SPHERE • PINCH TO ZOOM (${fovDeg.toInt()}° FOV)"
-                        else "360° EQUATOR PANORAMA • DRAG TO LOOK",
+                        "360° PANORAMA • DRAG TO LOOK",
                         color = Color.White,
                         fontSize = 10.sp,
                         fontFamily = FontFamily.Monospace,

@@ -4,6 +4,10 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Canvas as PanoCanvas
+import android.graphics.Color as AndroidColor
+import android.graphics.Rect
+import android.graphics.RectF
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
@@ -15,6 +19,8 @@ import android.os.VibratorManager
 import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import android.hardware.camera2.CameraCharacteristics
+import androidx.camera.camera2.Camera2CameraInfo
 import androidx.camera.core.AspectRatio
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
@@ -109,6 +115,7 @@ import com.example.ui.theme.DorjaColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.FileOutputStream
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -119,7 +126,7 @@ import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.math.tan
 
-private enum class Phase { SELECT, PREVIEW, CAPTURING, LEGACY_CAPTURE, DONE }
+private enum class Phase { SELECT, PREVIEW, CAPTURING, DONE }
 
 private val Accent = Color(0xFF00BCD4)
 private val Green = Color(0xFF4CAF50)
@@ -151,7 +158,7 @@ fun RoomScannerScreen(
     val rooms by repo.getRoomsByListing(listingId).collectAsState(initial = emptyList())
 
     var phase by remember { mutableStateOf(Phase.SELECT) }
-    var scanMode by remember { mutableStateOf(ScanGeometry.ScanMode.FULL_SPHERE) }
+    var scanMode by remember { mutableStateOf(ScanGeometry.ScanMode.QUICK_SCAN) }
     var selectedRoom by remember { mutableStateOf<RoomItem?>(null) }
     var imageCapture by remember { mutableStateOf<ImageCapture?>(null) }
     var hasCamera by remember {
@@ -180,6 +187,9 @@ fun RoomScannerScreen(
     val rotMatrix = remember { FloatArray(9) }
     val remappedMatrix = remember { FloatArray(9) }
     val orientAngles = remember { FloatArray(3) }
+    // Smoothed orientation for stable AR-arrow anchoring (fast-out low-pass filter).
+    var smoothHeading by remember { mutableStateOf<Float?>(null) }
+    var smoothPitch by remember { mutableStateOf<Float?>(null) }
     val accelVals = remember { FloatArray(3) }
     val magVals = remember { FloatArray(3) }
     var hasAccel by remember { mutableStateOf(false) }
@@ -198,8 +208,25 @@ fun RoomScannerScreen(
                             // REMAP COORDINATES FOR PORTRAIT CAMERA ORIENTATION (AXIS_X, AXIS_Z)
                             SensorManager.remapCoordinateSystem(rotMatrix, SensorManager.AXIS_X, SensorManager.AXIS_Z, remappedMatrix)
                             SensorManager.getOrientation(remappedMatrix, orientAngles)
-                            heading = ((Math.toDegrees(orientAngles[0].toDouble()) % 360.0) + 360.0).toFloat() % 360f
-                            pitch = Math.toDegrees(orientAngles[1].toDouble()).toFloat()
+                            val rawHeading = ((Math.toDegrees(orientAngles[0].toDouble()) % 360.0) + 360.0).toFloat() % 360f
+                            val rawPitch = Math.toDegrees(orientAngles[1].toDouble()).toFloat()
+                            // ARROW ANCHORING FIX: raw sensor frames jitter a few degrees,
+                            // which made the projected target dot/arrow bounce up and down.
+                            // Fuse readings through a light low-pass filter; fast motion
+                            // snaps instantly so guidance still feels responsive.
+                            val headingJump = abs(((rawHeading - heading + 540f) % 360f) - 180f)
+                            val snapped = abs(rawPitch - pitch) > 10f || headingJump > 12f || smoothHeading == null
+                            if (snapped) {
+                                smoothHeading = rawHeading
+                                smoothPitch = rawPitch
+                            } else {
+                                val sh = smoothHeading!!
+                                val sp = smoothPitch!!
+                                smoothHeading = sh + 0.25f * (((rawHeading - sh + 540f) % 360f) - 180f)
+                                smoothPitch = sp + 0.25f * (rawPitch - sp)
+                            }
+                            heading = ((smoothHeading!! % 360f) + 360f) % 360f
+                            pitch = smoothPitch!!
                         }
                         Sensor.TYPE_ACCELEROMETER -> {
                             System.arraycopy(event.values, 0, accelVals, 0, 3)
@@ -247,7 +274,7 @@ fun RoomScannerScreen(
 
     DisposableEffect(Unit) {
         onDispose {
-            SphericalStitcher.cleanupFrameCache(ctx, capturedFrames)
+            cleanupFrameFiles(ctx, capturedFrames)
         }
     }
 
@@ -274,106 +301,14 @@ fun RoomScannerScreen(
                 gyroOn = gyroOn,
                 onToggleGyro = { gyroOn = !gyroOn },
                 onStart = {
-                    // Full Sphere runs the real-AR flow; if ARCore is missing the
-                    // user can still fall back to motion guidance from the AR screen.
                     phase = Phase.CAPTURING
                 },
                 onBack = { phase = Phase.SELECT },
                 lifecycleOwner = lifecycleOwner
             )
 
-            Phase.LEGACY_CAPTURE -> {
-                // Chosen explicitly from the AR screen when the device can't run ARCore.
-                CapturingPhase(
-                    imageCapture = imageCapture,
-                    onCaptureReady = { imageCapture = it },
-                    hasCamera = hasCamera,
-                    heading = heading,
-                    currentPitch = pitch,
-                    scanMode = scanMode,
-                    scanTargets = scanTargets,
-                    currentTargetIdx = currentTargetIdx,
-                    capturedFrames = capturedFrames,
-                    gyroOn = gyroOn,
-                    onToggleGyro = { gyroOn = !gyroOn },
-                    onRetakeTarget = { targetIndex -> currentTargetIdx = targetIndex },
-                    onCapture = {
-                        val ic = imageCapture ?: return@CapturingPhase
-                        val target = scanTargets.getOrNull(currentTargetIdx) ?: return@CapturingPhase
-                        val file = File(ctx.cacheDir, "frame_r${target.ringIndex}_c${target.targetIndex}_${System.currentTimeMillis()}.jpg")
-                        val capturedHeading = heading
-                        val capturedPitch = pitch
-
-                        ic.takePicture(
-                            ImageCapture.OutputFileOptions.Builder(file).build(),
-                            ContextCompat.getMainExecutor(ctx),
-                            object : ImageCapture.OnImageSavedCallback {
-                                override fun onImageSaved(output: ImageCapture.OutputFileResults) {
-                                    val frame = FrameData(
-                                        path = file.absolutePath,
-                                        heading = capturedHeading,
-                                        pitchDeg = capturedPitch,
-                                        row = target.ringIndex,
-                                        col = target.targetIndex,
-                                        isCap = target.isCap,
-                                        capType = target.capType
-                                    )
-
-                                    val existingIdx = capturedFrames.indexOfFirst { it.col == target.targetIndex }
-                                    if (existingIdx >= 0) {
-                                        capturedFrames[existingIdx] = frame
-                                    } else {
-                                        capturedFrames.add(frame)
-                                    }
-
-                                    vibrateShutter(ctx)
-                                    if (currentTargetIdx < scanTargets.size - 1) {
-                                        currentTargetIdx++
-                                    }
-                                }
-
-                                override fun onError(exc: ImageCaptureException) {
-                                    Log.e("Scanner", "Capture failed", exc)
-                                }
-                            }
-                        )
-                    },
-                    onStop = { phase = Phase.DONE },
-                    onBack = { phase = Phase.PREVIEW },
-                    lifecycleOwner = lifecycleOwner
-                )
-            }
-
             Phase.CAPTURING -> {
-                if (scanMode == ScanGeometry.ScanMode.FULL_SPHERE) {
-                    // Real-AR guided spherical capture (ARCore). Clean guidance:
-                    // what the room is understood, where to turn, auto-shutter.
-                    ArSphereCapturePhase(
-                        roomName = selectedRoom?.displayName ?: "Room",
-                        scanMode = scanMode,
-                        scanTargets = scanTargets,
-                        currentTargetIdx = currentTargetIdx,
-                        capturedFrames = capturedFrames,
-                        gyroHeading = heading,
-                        gyroPitch = pitch,
-                        onFrameCaptured = { frame ->
-                            val existingIdx = capturedFrames.indexOfFirst { it.col == frame.col }
-                            if (existingIdx >= 0) {
-                                capturedFrames[existingIdx] = frame
-                            } else {
-                                capturedFrames.add(frame)
-                            }
-                            vibrateShutter(ctx)
-                            val next = scanTargets.indexOfFirst { t -> capturedFrames.none { it.col == t.targetIndex } }
-                            if (next >= 0) {
-                                currentTargetIdx = next
-                            }
-                        },
-                        onRequestLegacyFallback = { phase = Phase.LEGACY_CAPTURE },
-                        onStop = { phase = Phase.DONE },
-                        onBack = { phase = Phase.PREVIEW }
-                    )
-                } else if (scanMode == ScanGeometry.ScanMode.AR_CORNER_SCAN) {
+                if (scanMode == ScanGeometry.ScanMode.AR_CORNER_SCAN) {
                     ArCornerScannerPhase(
                         imageCapture = imageCapture,
                         onCaptureReady = { imageCapture = it },
@@ -457,7 +392,6 @@ fun RoomScannerScreen(
             Phase.DONE -> DonePhase(
                 roomName = selectedRoom?.displayName ?: "Room",
                 frameCount = capturedFrames.size,
-                scanMode = scanMode,
                 capturedFrames = capturedFrames,
                 stitchingStatus = stitchingStatus,
                 stitchingPreviewBmp = stitchingPreviewBmp,
@@ -465,20 +399,15 @@ fun RoomScannerScreen(
                     scope.launch {
                         try {
                             val frames = capturedFrames.toList()
-                            val stitched = withContext(Dispatchers.IO) {
-                                SphericalStitcher.stitch(ctx, frames, scanMode) { statusMsg, liveBmp ->
-                                    stitchingStatus = statusMsg
-                                    stitchingPreviewBmp = liveBmp
-                                }
-                            }
+                            val stitched = withContext(Dispatchers.IO) { stitchFrames(ctx, frames) }
                             if (stitched != null) {
-                                val json = buildJson(stitched, frames, selectedRoom?.id ?: "", scanMode)
+                                val json = buildJson(stitched, frames, selectedRoom?.id ?: "")
                                 withContext(Dispatchers.IO) {
                                     repo.updateRoom3DScan(selectedRoom?.id ?: "", json)
                                 }
                                 onScanComplete(selectedRoom?.id ?: "", json)
                             } else {
-                                Log.e("Scanner", "360 Stitching returned null")
+                                Log.e("Scanner", "Stitching returned null - panorama not saved")
                                 stitchingStatus = "Stitching failed. Retake frames."
                             }
                         } catch (e: Exception) {
@@ -488,7 +417,7 @@ fun RoomScannerScreen(
                     }
                 },
                 onRetake = {
-                    SphericalStitcher.cleanupFrameCache(ctx, capturedFrames)
+                    cleanupFrameFiles(ctx, capturedFrames)
                     capturedFrames.clear()
                     currentTargetIdx = 0
                     stitchingStatus = null
@@ -496,7 +425,7 @@ fun RoomScannerScreen(
                     phase = Phase.PREVIEW
                 },
                 onDiscard = {
-                    SphericalStitcher.cleanupFrameCache(ctx, capturedFrames)
+                    cleanupFrameFiles(ctx, capturedFrames)
                     capturedFrames.clear()
                     currentTargetIdx = 0
                     stitchingStatus = null
@@ -527,7 +456,7 @@ private fun SelectRoom(
             Spacer(Modifier.width(8.dp))
             Column {
                 Text("Select Room to Scan", color = DorjaColors.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
-                Text("DORJA 360° × 180° Spherical Scanner", color = Accent, style = MaterialTheme.typography.bodySmall)
+                Text("DORJA 360° Panorama Scanner", color = Accent, style = MaterialTheme.typography.bodySmall)
             }
         }
         Spacer(Modifier.height(14.dp))
@@ -544,17 +473,8 @@ private fun SelectRoom(
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         ModeOptionChip(
-                            title = "AR Full Sphere 360°×180°",
-                            subtitle = "AR-guided: floor/ceiling/walls detected • 62 shots",
-                            timeHint = "~2 min",
-                            icon = Icons.Default.RotateRight,
-                            isSelected = scanMode == ScanGeometry.ScanMode.FULL_SPHERE,
-                            onClick = { onModeToggle(ScanGeometry.ScanMode.FULL_SPHERE) },
-                            modifier = Modifier.weight(1f)
-                        )
-                        ModeOptionChip(
-                            title = "Quick Panorama",
-                            subtitle = "12 shots • 360° horizon",
+                            title = "360° Panorama",
+                            subtitle = "12 shots • 360° horizon • fastest",
                             timeHint = "~25-30 s",
                             icon = Icons.Default.Speed,
                             isSelected = scanMode == ScanGeometry.ScanMode.QUICK_SCAN,
@@ -564,8 +484,8 @@ private fun SelectRoom(
                     }
                     ModeOptionChip(
                         title = "AR 3D Room Corner Scanner",
-                        subtitle = "Tilt-and-turn: point at each dot & tap the shutter",
-                        timeHint = "AR-guided",
+                        subtitle = "Point-by-point AR vector mapping & dimension solver",
+                        timeHint = "Real-Time AR",
                         icon = Icons.Default.CheckCircle,
                         isSelected = scanMode == ScanGeometry.ScanMode.AR_CORNER_SCAN,
                         onClick = { onModeToggle(ScanGeometry.ScanMode.AR_CORNER_SCAN) },
@@ -675,7 +595,7 @@ private fun PreviewPhase(
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = Color.White)
             }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("DORJA 360° SPHERICAL", color = Accent, fontSize = 11.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+                Text("DORJA 360° PANORAMA", color = Accent, fontSize = 11.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
                 Text(roomName, color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
             }
             Spacer(Modifier.size(38.dp))
@@ -685,13 +605,13 @@ private fun PreviewPhase(
         Box(Modifier.align(Alignment.Center).padding(24.dp), contentAlignment = Alignment.Center) {
             Surface(shape = RoundedCornerShape(16.dp), color = Color.Black.copy(alpha = 0.75f), border = androidx.compose.foundation.BorderStroke(1.dp, Accent.copy(alpha = 0.4f))) {
                 Column(Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("HOW TO CAPTURE A SPHERE", color = Accent, fontSize = 11.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+                    Text("HOW TO CAPTURE A PANORAMA", color = Accent, fontSize = 11.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(10.dp))
                     Text("1. Stand in middle of room (pivot like a tripod)", color = Color.White, fontSize = 12.sp)
                     Spacer(Modifier.height(4.dp))
                     Text("2. Move phone to align center into green AR target ring", color = Color.White, fontSize = 12.sp)
                     Spacer(Modifier.height(4.dp))
-                    Text("3. Follow 3D arrows from ceiling down to floor", color = Color.White, fontSize = 12.sp)
+                    Text("3. Follow the 3D arrows all the way around", color = Color.White, fontSize = 12.sp)
                 }
             }
         }
@@ -735,6 +655,7 @@ private fun CapturingPhase(
 
     val pitchError = currentPitch - target.pitchDeg
     val headingError = ((heading - target.headingDeg + 540) % 360) - 180
+    val normalizedDelta = abs(minOf(abs(pitchError), abs(headingError)))
 
     val onPitchTarget = abs(pitchError) <= 12f
     val onHeadingTarget = target.isCap || abs(headingError) <= 12f
@@ -748,10 +669,6 @@ private fun CapturingPhase(
         headingError > 12f -> "TURN LEFT ${"%.0f".format(abs(headingError))}°"
         headingError < -12f -> "TURN RIGHT ${"%.0f".format(abs(headingError))}°"
         else -> "ALIGNED — TAP SHUTTER"
-    }
-
-    val coveragePercent = remember(capturedFrames.size) {
-        ScanGeometry.computeCoveragePercent(capturedFrames.map { Pair(it.heading, it.pitchDeg) })
     }
 
     Box(Modifier.fillMaxSize()) {
@@ -772,7 +689,7 @@ private fun CapturingPhase(
         Surface(shape = RoundedCornerShape(20.dp), color = Color.Black.copy(alpha = 0.65f), modifier = Modifier.align(Alignment.TopCenter).padding(top = 45.dp)) {
             Row(Modifier.padding(horizontal = 14.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    "SHOT ${currentTargetIdx + 1}/${scanTargets.size} • RING ${target.ringIndex} • ${"%.0f".format(coveragePercent)}% SPHERE",
+                    "SHOT ${currentTargetIdx + 1}/${scanTargets.size} • RING ${target.ringIndex} • TURN ${"%.0f".format(normalizedDelta)}°",
                     color = if (isLocked) Green else Accent,
                     fontWeight = FontWeight.Bold,
                     fontFamily = FontFamily.Monospace,
@@ -925,7 +842,6 @@ private fun ArTargetOverlay(
 private fun DonePhase(
     roomName: String,
     frameCount: Int,
-    scanMode: ScanGeometry.ScanMode,
     capturedFrames: List<FrameData>,
     stitchingStatus: String?,
     stitchingPreviewBmp: Bitmap?,
@@ -933,19 +849,15 @@ private fun DonePhase(
     onRetake: () -> Unit,
     onDiscard: () -> Unit
 ) {
-    val coverage = remember(capturedFrames) {
-        ScanGeometry.computeCoveragePercent(capturedFrames.map { Pair(it.heading, it.pitchDeg) })
-    }
-
     Box(Modifier.fillMaxSize().background(DorjaColors.Ink950).padding(20.dp), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
             Box(Modifier.size(64.dp).clip(CircleShape).background(Accent.copy(alpha = 0.15f)), contentAlignment = Alignment.Center) {
                 Icon(Icons.Default.CheckCircle, null, tint = Accent, modifier = Modifier.size(36.dp))
             }
             Spacer(Modifier.height(14.dp))
-            Text("Spherical Scan Complete", color = DorjaColors.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
+            Text("Panorama Complete", color = DorjaColors.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
             Spacer(Modifier.height(4.dp))
-            Text("$frameCount photos captured for $roomName (${"%.0f".format(coverage)}% sphere coverage)", color = DorjaColors.Sand300, textAlign = TextAlign.Center, fontSize = 12.sp)
+            Text("$frameCount photos captured for $roomName", color = DorjaColors.Sand300, textAlign = TextAlign.Center, fontSize = 12.sp)
             Spacer(Modifier.height(14.dp))
 
             // LIVE EQUIRRECTANGULAR STITCHING CANVAS PREVIEW
@@ -989,7 +901,7 @@ private fun DonePhase(
             }
 
             DorjaButton(
-                "Save 360° Sphere to $roomName",
+                "Save 360° Panorama to $roomName",
                 onClick = onSave,
                 modifier = Modifier.fillMaxWidth().heightIn(min = 46.dp)
             )
@@ -1085,13 +997,50 @@ private fun CameraPreview(
                 onCaptureReady(capture)
                 try {
                     cp.unbindAll()
-                    cp.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, capture)
+                    cp.bindToLifecycle(lifecycleOwner, ultraWideCameraSelector(cp), preview, capture)
                 } catch (e: Exception) {
                     Log.e("Scanner", "Camera bind failed", e)
                 }
             }, ContextCompat.getMainExecutor(ctx))
         }
     }, modifier = Modifier.fillMaxSize())
+}
+
+/**
+ * Prefers a wide-angle (0.5x/0.8x ultra-wide) back lens when available: a wider
+ * FOV per shot means fewer frames, fewer seams and better stitch overlap.
+ * Falls back to the default back camera on devices without an ultra-wide lens.
+ */
+private fun ultraWideCameraSelector(provider: ProcessCameraProvider): CameraSelector {
+    return try {
+        val targetId = provider.availableCameraInfos
+            .filter {
+                Camera2CameraInfo.from(it)
+                    .getCameraCharacteristic(CameraCharacteristics.LENS_FACING) == CameraCharacteristics.LENS_FACING_BACK
+            }
+            .firstOrNull { info ->
+                // Ultra-wide modules sit around 1.6-2.5mm; main 1x lenses are >= 4mm.
+                val focal = Camera2CameraInfo.from(info)
+                    .getCameraCharacteristic(CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS)
+                focal != null && focal.any { it <= 3.0f }
+            }
+            ?.let { Camera2CameraInfo.from(it).cameraId }
+
+        if (targetId != null) {
+            Log.i("Scanner", "Using ultra-wide lens (cameraId=$targetId, ~0.5x/0.8x)")
+            CameraSelector.Builder()
+                .addCameraFilter { candidates ->
+                    candidates.filter { Camera2CameraInfo.from(it).cameraId == targetId }.ifEmpty { candidates }
+                }
+                .build()
+        } else {
+            Log.i("Scanner", "No ultra-wide lens found - using default back camera")
+            CameraSelector.DEFAULT_BACK_CAMERA
+        }
+    } catch (t: Throwable) {
+        Log.w("Scanner", "Ultra-wide detection failed - default back camera", t)
+        CameraSelector.DEFAULT_BACK_CAMERA
+    }
 }
 
 @Composable
@@ -1183,47 +1132,193 @@ private fun GyroChip(on: Boolean, toggle: () -> Unit) {
     }
 }
 
-private fun buildJson(
-    stitchedPath: String?,
-    frames: List<FrameData>,
-    roomId: String,
-    mode: ScanGeometry.ScanMode
-): String {
+private fun buildJson(stitchedPath: String?, frames: List<FrameData>, roomId: String): String {
     val json = JSONObject()
-    json.put("version", 2)
-    json.put("projection", "equirectangular")
-    json.put("coverage", "360x180")
-    json.put("mode", if (mode == ScanGeometry.ScanMode.FULL_SPHERE) "full" else "quick")
-    json.put("cameraHfovDeg", ScanGeometry.DEFAULT_HFOV_DEG)
-    json.put("cameraVfovDeg", ScanGeometry.DEFAULT_VFOV_DEG)
-
-    val coveragePercent = ScanGeometry.computeCoveragePercent(
-        capturedFrames = frames.map { Pair(it.heading, it.pitchDeg) }
-    )
-    json.put("coveragePercent", coveragePercent.toDouble())
-
     if (stitchedPath != null) json.put("stitchedPanorama", stitchedPath)
-
-    val arr = JSONArray()
-    frames.forEach { fd ->
-        val fObj = JSONObject()
-        fObj.put("path", fd.path)
-        fObj.put("heading", fd.heading.toDouble())
-        fObj.put("pitchDeg", fd.pitchDeg.toDouble())
-        fObj.put("row", fd.row)
-        fObj.put("col", fd.col)
-        if (fd.isCap) {
-            fObj.put("isCap", true)
-            fObj.put("capType", fd.capType)
-        }
-        arr.put(fObj)
-    }
+    val arr = JSONArray(); frames.forEach { arr.put(it.path) }
     json.put("frames", arr)
     json.put("frameCount", frames.size)
     json.put("roomId", roomId)
     json.put("timestamp", System.currentTimeMillis())
-
+    // Store headings for debug
+    val headings = JSONArray(); frames.forEach { headings.put(it.heading.toDouble()) }
+    json.put("headings", headings)
     return json.toString()
+}
+
+/** Deletes captured frame files + debug intermediates (old scanner behavior). */
+private fun cleanupFrameFiles(ctx: android.content.Context, frames: List<FrameData> = emptyList()) {
+    try {
+        for (f in frames) {
+            val file = File(f.path)
+            if (file.exists()) file.delete()
+        }
+        ctx.cacheDir.listFiles { _, name -> name.startsWith("frame_") && name.endsWith(".jpg") }?.forEach { it.delete() }
+        File(ctx.cacheDir, "stitch_debug").deleteRecursively()
+    } catch (e: Exception) {
+        Log.w("Scanner", "Frame cleanup failed: ${e.message}")
+    }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  PANORAMA STITCHING — restored original flat-panorama pipeline.
+//  Column-by-column cylindrical warp onto a 2:1 canvas. Not a sphere.
+// ══════════════════════════════════════════════════════════════
+private const val CAMERA_HFOV_DEG = 63.0 // typical phone horizontal FOV
+
+private fun stitchFrames(ctx: android.content.Context, frames: List<FrameData>): String? {
+    if (frames.isEmpty()) return null
+    return try {
+        stitchFramesInternal(ctx, frames)
+    } catch (e: OutOfMemoryError) {
+        Log.e("Stitcher", "OOM during stitching", e)
+        System.gc()
+        null
+    } catch (e: Exception) {
+        Log.e("Stitcher", "Stitching failed: ${e.message}", e)
+        null
+    }
+}
+
+private fun stitchFramesInternal(ctx: android.content.Context, frameDataList: List<FrameData>): String? {
+    Log.i("Stitcher", "=== PANORAMA STITCHING PIPELINE ===")
+    Log.i("Stitcher", "Input: ${frameDataList.size} frames")
+    Log.i("Stitcher", "Target output: 4096×2048 (2:1 equirectangular)")
+
+    // ── Step 1: Load frames with consistent scaling ──────
+    val targetH = 800
+    data class LoadedFrame(val bmp: Bitmap, val heading: Float, val path: String)
+
+    val loadedFrames = frameDataList.mapNotNull { fd ->
+        try {
+            val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeFile(fd.path, opts)
+            Log.i("Stitcher", "  Frame: ${opts.outWidth}×${opts.outHeight} heading=${"%.1f".format(fd.heading)}° — ${fd.path}")
+            val sample = (opts.outHeight / targetH).coerceAtLeast(1)
+            val bmp = BitmapFactory.decodeFile(fd.path, BitmapFactory.Options().apply { inSampleSize = sample })
+            if (bmp != null && !bmp.isRecycled && bmp.width > 100 && bmp.height > 100) {
+                LoadedFrame(bmp, fd.heading, fd.path)
+            } else {
+                Log.w("Stitcher", "  Frame SKIPPED (too small or null): ${bmp?.width}×${bmp?.height}")
+                bmp?.recycle()
+                null
+            }
+        } catch (e: Exception) {
+            Log.e("Stitcher", "  Frame FAILED to load: ${e.message}")
+            null
+        }
+    }
+
+    if (loadedFrames.size < 2) {
+        Log.e("Stitcher", "Not enough frames: ${loadedFrames.size}")
+        loadedFrames.forEach { it.bmp.recycle() }
+        return null
+    }
+    Log.i("Stitcher", "Loaded ${loadedFrames.size} frames, first: ${loadedFrames[0].bmp.width}×${loadedFrames[0].bmp.height}")
+
+    // Save raw frames for debug
+    val debugDir = File(ctx.cacheDir, "stitch_debug")
+    debugDir.mkdirs()
+    loadedFrames.forEachIndexed { i, f ->
+        val out = File(debugDir, "raw_frame_$i.jpg")
+        FileOutputStream(out).use { f.bmp.compress(Bitmap.CompressFormat.JPEG, 90, it) }
+    }
+
+    // ── Step 2: Compute equirectangular geometry ────────
+    val panoW = 4096
+    val panoH = 2048
+    val hFOV = Math.toRadians(CAMERA_HFOV_DEG)
+
+    // ── Step 3: Create panorama canvas ────────────────
+    val panorama = Bitmap.createBitmap(panoW, panoH, Bitmap.Config.ARGB_8888)
+    val canvas = PanoCanvas(panorama)
+    val paint = android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG)
+
+    // ── Step 4: Column-by-column cylindrical warp ───────
+    for (panoX in 0 until panoW) {
+        val lon = (panoX.toDouble() / panoW) * 2.0 * PI
+
+        var bestFrame: LoadedFrame? = null
+        var bestDist = Double.MAX_VALUE
+
+        for (frame in loadedFrames) {
+            val headingRad = Math.toRadians(frame.heading.toDouble())
+            var dist = abs(lon - headingRad)
+            if (dist > PI) dist = 2.0 * PI - dist
+
+            if (dist < hFOV / 2.0 && dist < bestDist) {
+                bestFrame = frame
+                bestDist = dist
+            }
+        }
+
+        if (bestFrame == null) continue
+
+        val frame = bestFrame
+        val headingRad = Math.toRadians(frame.heading.toDouble())
+
+        var relLon = lon - headingRad
+        while (relLon > PI) relLon -= 2.0 * PI
+        while (relLon < -PI) relLon += 2.0 * PI
+
+        val f = frame.bmp.width / (2.0 * Math.tan(hFOV / 2.0))
+        val cx = frame.bmp.width / 2.0
+
+        val srcX = (f * Math.tan(relLon) + cx).toInt()
+
+        if (srcX < 0 || srcX >= frame.bmp.width) continue
+
+        val srcRect = Rect(srcX, 0, srcX + 1, frame.bmp.height)
+        val dstRect = RectF(panoX.toFloat(), 0f, (panoX + 1).toFloat(), panoH.toFloat())
+        canvas.drawBitmap(frame.bmp, srcRect, dstRect, paint)
+    }
+
+    Log.i("Stitcher", "Panorama composited: ${panoW}×${panoH}")
+
+    // ── Step 5: Crop black borders ─────────────────────────
+    val cropped = cropBlackBorders(panorama)
+    panorama.recycle()
+    Log.i("Stitcher", "After crop: ${cropped.width}×${cropped.height}")
+
+    // ── Step 6: Ensure 2:1 equirectangular aspect ratio ──
+    val finalBmp = if (cropped.width != 2 * cropped.height || cropped.width != panoW) {
+        Log.i("Stitcher", "Resizing to exact 2:1 equirectangular: ${panoW}×${panoH}")
+        val scaled = Bitmap.createScaledBitmap(cropped, panoW, panoH, true)
+        cropped.recycle()
+        scaled
+    } else {
+        cropped
+    }
+
+    // ── Step 7: Save ─────────────────────────────────
+    try {
+        val out = File(ctx.cacheDir, "panorama_${System.currentTimeMillis()}.jpg")
+        FileOutputStream(out).use { finalBmp.compress(Bitmap.CompressFormat.JPEG, 90, it) }
+        finalBmp.recycle()
+        loadedFrames.forEach { it.bmp.recycle() }
+        Log.i("Stitcher", "Saved: ${out.absolutePath}")
+        Log.i("Stitcher", "=== STITCHING COMPLETE ===")
+        return out.absolutePath
+    } catch (e: Exception) {
+        Log.e("Stitcher", "Save failed", e)
+        finalBmp.recycle()
+        loadedFrames.forEach { it.bmp.recycle() }
+        return null
+    }
+}
+
+/** Crop black (near-zero) borders from a bitmap */
+private fun cropBlackBorders(bitmap: Bitmap): Bitmap {
+    val w = bitmap.width; val h = bitmap.height
+    val pixels = IntArray(w * h); bitmap.getPixels(pixels, 0, w, 0, 0, w, h)
+    fun isBlack(px: Int) = AndroidColor.red(px) < 15 && AndroidColor.green(px) < 15 && AndroidColor.blue(px) < 15
+    var top = 0; var bottom = h - 1; var left = 0; var right = w - 1
+    for (y in 0 until h) { var found = false; for (x in 0 until w step 10) { if (!isBlack(pixels[y * w + x])) { found = true; break } }; if (found) { top = y; break } }
+    for (y in h - 1 downTo top) { var found = false; for (x in 0 until w step 10) { if (!isBlack(pixels[y * w + x])) { found = true; break } }; if (found) { bottom = y; break } }
+    for (x in 0 until w) { var found = false; for (y in top until bottom step 10) { if (!isBlack(pixels[y * w + x])) { found = true; break } }; if (found) { left = x; break } }
+    for (x in w - 1 downTo left) { var found = false; for (y in top until bottom step 10) { if (!isBlack(pixels[y * w + x])) { found = true; break } }; if (found) { right = x; break } }
+    val cropW = (right - left + 1).coerceAtLeast(1); val cropH = (bottom - top + 1).coerceAtLeast(1)
+    return Bitmap.createBitmap(bitmap, left, top, cropW, cropH)
 }
 
 private fun vibrateShutter(ctx: android.content.Context) {

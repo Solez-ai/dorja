@@ -40,7 +40,7 @@ object SphericalStitcher {
     fun stitch(
         ctx: Context,
         frames: List<FrameData>,
-        mode: ScanGeometry.ScanMode = ScanGeometry.ScanMode.FULL_SPHERE,
+        mode: ScanGeometry.ScanMode = ScanGeometry.ScanMode.QUICK_SCAN,
         onProgress: ((String, Bitmap?) -> Unit)? = null
     ): String? {
         if (frames.isEmpty()) return null
@@ -80,7 +80,7 @@ object SphericalStitcher {
 
         // 1. Determine Output Canvas Resolution
         val availMemMb = Runtime.getRuntime().maxMemory() / (1024 * 1024)
-        val panoW = if (mode == ScanGeometry.ScanMode.FULL_SPHERE && availMemMb >= 512) 8192 else 4096
+        val panoW = 4096
         val panoH = panoW / 2
 
         Log.i(TAG, "Target Canvas: ${panoW}x${panoH} (Available Max Heap: ${availMemMb}MB)")

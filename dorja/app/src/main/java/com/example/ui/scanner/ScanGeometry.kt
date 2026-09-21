@@ -18,7 +18,6 @@ object ScanGeometry {
     const val DEFAULT_VFOV_DEG = 48.0
 
     enum class ScanMode {
-        FULL_SPHERE,
         QUICK_SCAN,
         AR_CORNER_SCAN
     }
@@ -143,35 +142,6 @@ object ScanGeometry {
         var globalIdx = 0
 
         when (mode) {
-            ScanMode.FULL_SPHERE -> {
-                // Cap Zenith (+90°)
-                targets.add(ScanTarget(globalIdx++, ringIndex = 0, pitchDeg = 90f, headingDeg = 0f, isCap = true, capType = "zenith"))
-
-                // Ring 1: +70°
-                for (col in 0 until 12) {
-                    targets.add(ScanTarget(globalIdx++, ringIndex = 1, pitchDeg = 70f, headingDeg = col * 30f))
-                }
-                // Ring 2: +35°
-                for (col in 0 until 12) {
-                    targets.add(ScanTarget(globalIdx++, ringIndex = 2, pitchDeg = 35f, headingDeg = col * 30f))
-                }
-                // Ring 3: 0°
-                for (col in 0 until 12) {
-                    targets.add(ScanTarget(globalIdx++, ringIndex = 3, pitchDeg = 0f, headingDeg = col * 30f))
-                }
-                // Ring 4: -35°
-                for (col in 0 until 12) {
-                    targets.add(ScanTarget(globalIdx++, ringIndex = 4, pitchDeg = -35f, headingDeg = col * 30f))
-                }
-                // Ring 5: -70°
-                for (col in 0 until 12) {
-                    targets.add(ScanTarget(globalIdx++, ringIndex = 5, pitchDeg = -70f, headingDeg = col * 30f))
-                }
-
-                // Cap Nadir (-90°)
-                targets.add(ScanTarget(globalIdx++, ringIndex = 6, pitchDeg = -90f, headingDeg = 0f, isCap = true, capType = "nadir"))
-            }
-
             ScanMode.QUICK_SCAN -> {
                 // Classic 360° Horizontal Panorama (1 ring on horizon, 12 stops)
                 for (col in 0 until 12) {

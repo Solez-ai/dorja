@@ -45,12 +45,10 @@ googleid = "1.1.1"
 
 
 zxing = "3.5.3"
-arcore = "1.47.0"
 tensorflowLite = "2.16.1"
 
 [libraries]
 zxing-core = { group = "com.google.zxing", name = "core", version.ref = "zxing" }
-arcore = { group = "com.google.ar", name = "core", version.ref = "arcore" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
