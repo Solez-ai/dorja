@@ -73,6 +73,7 @@ import java.io.File
 import kotlin.math.PI
 import kotlin.math.atan
 import kotlin.math.cos
+import kotlin.math.max
 import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlin.math.tan
@@ -142,18 +143,30 @@ fun PanoramaViewerScreen(
 
     // Panning & Viewport State
     var panYawDeg by remember { mutableFloatStateOf(0f) }   // [-180°, 180°]
-    var panPitchDeg by remember { mutableFloatStateOf(0f) } // [-90°, 90°]
+    var panPitchDeg by remember { mutableFloatStateOf(0f) } // [-85°, 85°]
     var fovDeg by remember { mutableFloatStateOf(75f) }      // [25°, 100°]
 
     var gyroOn by remember { mutableStateOf(true) }
     var gyroYaw by remember { mutableFloatStateOf(0f) }
     var gyroPitch by remember { mutableFloatStateOf(0f) }
+    // User look offset layered on top of the gyro frame — drag adds here so
+    // touch and gyro never fight for the same value.
+    var userYawOffset by remember { mutableFloatStateOf(0f) }
+    var userPitchOffset by remember { mutableFloatStateOf(0f) }
 
     // Gyroscope registration
     val sensorMgr = remember { ctx.getSystemService(SensorManager::class.java) }
     val rotVec = remember { sensorMgr?.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR) }
     val rotMat = FloatArray(9)
+    val adjMat = FloatArray(9)
     val orient = FloatArray(3)
+    // The viewer forces landscape; remap the rotation vector into the display
+    // frame so yaw/pitch track the screen, not the portrait sensor frame.
+    val displayRotation = remember {
+        @Suppress("DEPRECATION")
+        (ctx as? ComponentActivity)?.windowManager?.defaultDisplay?.rotation
+            ?: android.view.Surface.ROTATION_90
+    }
 
     DisposableEffect(sensorMgr, gyroOn) {
         if (sensorMgr == null || rotVec == null || !gyroOn) {
@@ -163,23 +176,38 @@ fun PanoramaViewerScreen(
                 override fun onSensorChanged(e: SensorEvent?) {
                     if (e?.sensor?.type == Sensor.TYPE_ROTATION_VECTOR) {
                         SensorManager.getRotationMatrixFromVector(rotMat, e.values)
-                        SensorManager.getOrientation(rotMat, orient)
+                        when (displayRotation) {
+                            android.view.Surface.ROTATION_90 ->
+                                SensorManager.remapCoordinateSystem(rotMat, SensorManager.AXIS_Y, SensorManager.AXIS_MINUS_X, adjMat)
+                            android.view.Surface.ROTATION_270 ->
+                                SensorManager.remapCoordinateSystem(rotMat, SensorManager.AXIS_MINUS_Y, SensorManager.AXIS_X, adjMat)
+                            android.view.Surface.ROTATION_180 ->
+                                SensorManager.remapCoordinateSystem(rotMat, SensorManager.AXIS_MINUS_X, SensorManager.AXIS_MINUS_Z, adjMat)
+                            else ->
+                                SensorManager.remapCoordinateSystem(rotMat, SensorManager.AXIS_X, SensorManager.AXIS_Z, adjMat)
+                        }
+                        SensorManager.getOrientation(adjMat, orient)
                         gyroYaw = Math.toDegrees(orient[0].toDouble()).toFloat()
                         gyroPitch = Math.toDegrees(orient[1].toDouble()).toFloat()
+                        if (gyroOn) {
+                            panYawDeg = gyroYaw + userYawOffset
+                            panPitchDeg = (gyroPitch + userPitchOffset).coerceIn(-85f, 85f)
+                        }
                     }
                 }
                 override fun onAccuracyChanged(s: Sensor?, a: Int) {}
             }
-            sensorMgr.registerListener(listener, rotVec, SensorManager.SENSOR_DELAY_UI)
+            sensorMgr.registerListener(listener, rotVec, SensorManager.SENSOR_DELAY_GAME)
             onDispose { sensorMgr.unregisterListener(listener) }
         }
     }
 
-    // Sync Gyro to Pan Angles
-    LaunchedEffect(gyroYaw, gyroPitch, gyroOn) {
+    // Re-centre the user offset when gyro mode is toggled, so enabling gyro
+    // snaps to the physical view instead of keeping a stale drag offset.
+    LaunchedEffect(gyroOn) {
         if (gyroOn) {
-            panYawDeg = gyroYaw
-            panPitchDeg = gyroPitch.coerceIn(-25f, 25f)
+            userYawOffset = 0f
+            userPitchOffset = 0f
         }
     }
 
@@ -203,6 +231,10 @@ fun PanoramaViewerScreen(
             val bmp = bitmap
 
             // ── Spherical Column-Slice Projection Renderer ────────────────
+            // Every 1px screen column maps a real equirectangular ray: horizontal
+            // via tan(θ) longitude, vertical via atan(y/focal) latitude. The
+            // sampled latitude band always covers the full screen height, so the
+            // viewport never shows black bands — top or bottom — at any pitch.
             Canvas(
                 Modifier
                     .fillMaxSize()
@@ -213,44 +245,58 @@ fun PanoramaViewerScreen(
 
                             // Touch Drag Panning (Yaw & Pitch)
                             val pxToDeg = fovDeg / size.width.toFloat()
-                            panYawDeg -= pan.x * pxToDeg
-
-                            panPitchDeg = (panPitchDeg + pan.y * pxToDeg).coerceIn(-28f, 28f)
+                            val dYaw = -pan.x * pxToDeg
+                            val dPitch = pan.y * pxToDeg
+                            if (gyroOn) {
+                                userYawOffset += dYaw
+                                userPitchOffset = (userPitchOffset + dPitch).coerceIn(-60f, 60f)
+                                panYawDeg = gyroYaw + userYawOffset
+                                panPitchDeg = (gyroPitch + userPitchOffset).coerceIn(-85f, 85f)
+                            } else {
+                                panYawDeg = ((panYawDeg + dYaw + 540f) % 360f) - 180f
+                                panPitchDeg = (panPitchDeg + dPitch).coerceIn(-85f, 85f)
+                            }
                         }
                     }
             ) {
                 val cw = size.width
                 val ch = size.height
-                val bmpW = bmp.width.toFloat()
-                val bmpH = bmp.height.toFloat()
+                val bmpWi = bmp.width
+                val bmpHi = bmp.height
 
                 val focalLen = (cw / 2f) / tan(Math.toRadians(fovDeg / 2.0)).toFloat()
-                val stripW = 2f
+                val halfPi = (PI / 2f).toFloat()
+                val twoPi = (2f * PI).toFloat()
 
+                // Latitude of the top and bottom screen edges for the current pitch.
+                val edgeLat = atan((ch / 2f) / focalLen)
+                val latCenter = Math.toRadians(panPitchDeg.toDouble()).toFloat()
+                val latTop = (latCenter + edgeLat).coerceIn(-halfPi, halfPi)
+                val latBottom = (latCenter - edgeLat).coerceIn(-halfPi, halfPi)
+
+                // Equirect row mapping: lat +90° → row 0, lat -90° → row bmpH.
+                val srcTopY = ((halfPi - latTop) / PI.toFloat() * bmpHi).toInt().coerceIn(0, bmpHi - 1)
+                val srcBottomY = ((halfPi - latBottom) / PI.toFloat() * bmpHi).toInt().coerceIn(0, bmpHi)
+                val sliceH = max(1, srcBottomY - srcTopY)
+
+                val stripW = 2f
                 var sx = 0f
                 while (sx < cw) {
-                    val screenAngleX = atan((sx - cw / 2f) / focalLen)
+                    val screenAngleX = atan((sx + stripW / 2f - cw / 2f) / focalLen)
                     val lonRad = screenAngleX + Math.toRadians(panYawDeg.toDouble()).toFloat()
 
-                    // Map lonRad to panorama bitmap X [0..bmpW]
-                    val normLon = (lonRad + PI.toFloat()) / (2f * PI.toFloat())
-                    var srcX = (normLon * bmpW).toInt() % bmpW.toInt()
-                    if (srcX < 0) srcX += bmpW.toInt()
+                    // Map lonRad to panorama bitmap X [0..bmpW], wrapping at ±180°
+                    val normLon = (lonRad + PI.toFloat()) / twoPi
+                    var srcX = (normLon * bmpWi).toInt() % bmpWi
+                    if (srcX < 0) srcX += bmpWi
 
-                    // Vertical Pitch Offset Calculation
-                    val pitchRad = Math.toRadians(panPitchDeg.toDouble()).toFloat()
-                    val vertOffsetPx = tan(pitchRad) * focalLen
-                    val dstY = (ch * 0.5f - vertOffsetPx).roundToInt()
-
-                    if (srcX in 0 until bmpW.toInt()) {
-                        drawImage(
-                            image = bmp,
-                            srcOffset = IntOffset(srcX, 0),
-                            srcSize = IntSize(1, bmpH.toInt()),
-                            dstOffset = IntOffset(sx.roundToInt(), dstY - (ch / 2f).roundToInt()),
-                            dstSize = IntSize(stripW.roundToInt() + 1, (ch * 2f).roundToInt())
-                        )
-                    }
+                    drawImage(
+                        image = bmp,
+                        srcOffset = IntOffset(srcX, srcTopY),
+                        srcSize = IntSize(1, sliceH),
+                        dstOffset = IntOffset(sx.roundToInt(), 0),
+                        dstSize = IntSize(stripW.roundToInt() + 1, ch.roundToInt())
+                    )
 
                     sx += stripW
                 }

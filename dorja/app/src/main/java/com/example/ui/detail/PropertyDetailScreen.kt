@@ -214,21 +214,6 @@ val legalDocPicker = rememberLauncherForActivityResult(
     uri?.let { scope.launch { repository.addLegalDocument(listingId, it) } }
 }
 
-    // Guided optical capture: real camera via FileProvider, persisted to the listing gallery
-    var pendingCaptureFile by remember { mutableStateOf<java.io.File?>(null) }
-    val cameraCaptureLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.TakePicture()
-    ) { success ->
-        val file = pendingCaptureFile
-        if (success && file != null) {
-            val uri = FileProvider.getUriForFile(context, context.packageName + ".fileprovider", file)
-            scope.launch { repository.addCapturedPhoto(listingId, uri.toString()) }
-        } else {
-            file?.takeIf { it.length() == 0L }?.delete()
-        }
-        pendingCaptureFile = null
-    }
-
     DisposableEffect(hasAudioPermission) {
         if (hasAudioPermission && voiceHelper.isAvailable()) {
             voiceHelper.startListening(onResult = { recognized ->
@@ -267,7 +252,10 @@ val legalDocPicker = rememberLauncherForActivityResult(
     var endSection by remember { mutableStateOf("OWNERSHIP") }
     var endName by remember { mutableStateOf("") }
     var endLicence by remember { mutableStateOf("") }
-    var endStatement by remember { mutableStateOf("") }
+    // Section-specific detail fields — labels change with the endorsed section.
+    var endField1 by remember { mutableStateOf("") }
+    var endField2 by remember { mutableStateOf("") }
+    var endField3 by remember { mutableStateOf("") }
 
     if (listing == null) {
         Box(
@@ -350,6 +338,41 @@ val legalDocPicker = rememberLauncherForActivityResult(
             "DISCLOSURE" to "Disclosure completeness",
             "ENERGY" to "Energy / running costs"
         )
+        // Each section asks for the details that matter for that document type.
+        // Triple: (label, placeholder, optional)
+        val sectionFields: Map<String, List<Triple<String, String, Boolean>>> = mapOf(
+            "OWNERSHIP" to listOf(
+                Triple("Deed / Title Number", "e.g. LR-2024-0087142", false),
+                Triple("Issuing Authority", "e.g. Sub-registry office, Dhaka", false),
+                Triple("Verification URL", "https://…", true)
+            ),
+            "CONDITION" to listOf(
+                Triple("Inspection Date", "e.g. 2026-09-14", false),
+                Triple("Report Reference", "e.g. INSP-5521", false),
+                Triple("Defects Noted", "e.g. seepage in NW wall", true)
+            ),
+            "MEASUREMENTS" to listOf(
+                Triple("Measured Area (m²)", "e.g. 116.2", false),
+                Triple("Measurement Standard", "e.g. RERA carpet area", false),
+                Triple("Instrument Used", "e.g. laser disto", true)
+            ),
+            "DISCLOSURE" to listOf(
+                Triple("Checklist Completed On", "e.g. 2026-09-10", false),
+                Triple("Items Not Disclosed", "e.g. none / list items", false),
+                Triple("Shared With", "e.g. buyer + tenant", true)
+            ),
+            "ENERGY" to listOf(
+                Triple("Certificate Class", "e.g. B / 3", false),
+                Triple("Issuing Body", "e.g. DECC certified assessor", false),
+                Triple("Valid Until", "e.g. 2031-06", true)
+            )
+        )
+        val fieldsForSection = sectionFields[endSection] ?: emptyList()
+        val fieldValueFor: (Int) -> String = { i -> when (i) { 0 -> endField1; 1 -> endField2; else -> endField3 } }
+        val allRequiredFilled = endName.isNotBlank() && endLicence.isNotBlank() &&
+            fieldsForSection.withIndex().filter { !it.value.third }.all { (position, _) ->
+                fieldValueFor(position).isNotBlank()
+            }
         AlertDialog(
             onDismissRequest = { showEndorsementDialog = false },
             icon = { Icon(Icons.Default.WorkspacePremium, contentDescription = null, tint = DorjaColors.BentoPurpleIcon) },
@@ -367,7 +390,10 @@ val legalDocPicker = rememberLauncherForActivityResult(
                             DorjaChip(
                                 selected = endSection == code,
                                 label = label,
-                                onClick = { endSection = code }
+                                onClick = {
+                                    endSection = code
+                                    endField1 = ""; endField2 = ""; endField3 = ""
+                                }
                             )
                         }
                     }
@@ -385,21 +411,38 @@ val legalDocPicker = rememberLauncherForActivityResult(
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true
                     )
-                    OutlinedTextField(
-                        value = endStatement,
-                        onValueChange = { endStatement = it },
-                        label = { Text("Statement of Responsibility") },
-                        placeholder = { Text("e.g. I have reviewed the ownership evidence and confirm it is complete for transfer.") },
-                        modifier = Modifier.fillMaxWidth(),
-                        maxLines = 3
-                    )
+                    // Section-specific detail fields (labels adapt to the section)
+                    fieldsForSection.forEachIndexed { index, (label, placeholder, optional) ->
+                        val fieldValue = when (index) {
+                            0 -> endField1; 1 -> endField2; else -> endField3
+                        }
+                        val onFieldChange: (String) -> Unit = { v ->
+                            when (index) {
+                                0 -> endField1 = v; 1 -> endField2 = v; else -> endField3 = v
+                            }
+                        }
+                        OutlinedTextField(
+                            value = fieldValue,
+                            onValueChange = onFieldChange,
+                            label = { Text(if (optional) "$label (optional)" else label) },
+                            placeholder = { Text(placeholder) },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true
+                        )
+                    }
                 }
             },
             confirmButton = {
                 DorjaButton(
                     text = "Record Endorsement",
                     onClick = {
-                        if (endName.isNotBlank() && endLicence.isNotBlank()) {
+                        if (allRequiredFilled) {
+                            val details = fieldsForSection.mapIndexedNotNull { index, (label, _, optional) ->
+                                val v = when (index) {
+                                    0 -> endField1; 1 -> endField2; else -> endField3
+                                }.trim()
+                                if (v.isNotBlank()) "$label: $v" else null
+                            }
                             scope.launch {
                                 repository.addEndorsement(
                                     listingId = safeListing.id,
@@ -408,14 +451,15 @@ val legalDocPicker = rememberLauncherForActivityResult(
                                     licenceId = endLicence.trim(),
                                     roleLabel = CountryRegistry.profile(safeListing.countryCode)
                                         .professionalRoles.firstOrNull() ?: "Licensed professional",
-                                    statement = endStatement.trim()
+                                    statement = details.joinToString(" • ")
                                 )
-                                endName = ""; endLicence = ""; endStatement = ""
+                                endName = ""; endLicence = ""
+                                endField1 = ""; endField2 = ""; endField3 = ""
                                 showEndorsementDialog = false
                             }
                         }
                     },
-                    enabled = endName.isNotBlank() && endLicence.isNotBlank()
+                    enabled = allRequiredFilled
                 )
             },
             dismissButton = {
@@ -1044,20 +1088,29 @@ val legalDocPicker = rememberLauncherForActivityResult(
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
             ) {
                 item {
-                // Title and Price Bento Card
+                // Title and Price Bento Card — hero-style price with a supporting
+                // intent label so the number reads first and the context second.
                 BentoCard(modifier = Modifier.fillMaxWidth()) {
                     Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = if (safeListing.intent == "RENT") "For Rent" else "For Sale",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = DorjaColors.Gray500,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 1.sp
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = Formatters.formatPrice(safeListing.priceAmount, safeListing.currency, safeListing.intent),
+                            style = MaterialTheme.typography.headlineMedium,
+                            color = DorjaColors.Jol600,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
                         Text(
                             text = safeListing.title,
                             style = MaterialTheme.typography.titleLarge,
                             color = DorjaColors.Ink950,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = Formatters.formatPrice(safeListing.priceAmount, safeListing.currency, safeListing.intent),
-                            style = MaterialTheme.typography.titleMedium,
-                            color = DorjaColors.Jol600,
                             fontWeight = FontWeight.Bold
                         )
 
@@ -1144,17 +1197,40 @@ val legalDocPicker = rememberLauncherForActivityResult(
                     }
                 }
 
-                // Key Specs — primary stats first (sqft + beds carry the decision),
-                // secondary below; sqft gets extra weight so it never competes
-                // visually with a "0 Balconies".
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        SpecPill(icon = Icons.Default.SquareFoot, label = "${safeListing.sqft} sqft", modifier = Modifier.weight(1.2f))
-                        SpecPill(icon = Icons.Default.Bed, label = "${safeListing.bedrooms} Beds", modifier = Modifier.weight(1f))
+                // Key Specs — a 2×2 stat grid with big numbers and small labels.
+                // Each card gets equal space, so values never squish or ellipsize.
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        SpecStatCard(
+                            icon = Icons.Default.SquareFoot,
+                            value = "${safeListing.sqft}",
+                            unit = "sqft",
+                            label = "Living area",
+                            modifier = Modifier.weight(1f)
+                        )
+                        SpecStatCard(
+                            icon = Icons.Default.Bed,
+                            value = "${safeListing.bedrooms}",
+                            unit = "beds",
+                            label = "Bedrooms",
+                            modifier = Modifier.weight(1f)
+                        )
                     }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        SpecPill(icon = Icons.Default.Bathtub, label = "${safeListing.bathrooms} Baths", modifier = Modifier.weight(1f))
-                        SpecPill(icon = Icons.Default.Balcony, label = "${safeListing.balconies} Balconies", modifier = Modifier.weight(1f))
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        SpecStatCard(
+                            icon = Icons.Default.Bathtub,
+                            value = "${safeListing.bathrooms}",
+                            unit = "baths",
+                            label = "Bathrooms",
+                            modifier = Modifier.weight(1f)
+                        )
+                        SpecStatCard(
+                            icon = Icons.Default.Balcony,
+                            value = "${safeListing.balconies}",
+                            unit = "balconies",
+                            label = "Balconies",
+                            modifier = Modifier.weight(1f)
+                        )
                     }
                 }
 
@@ -1351,85 +1427,6 @@ val legalDocPicker = rememberLauncherForActivityResult(
                                 icon = Icons.Default.ViewInAr,
                                 modifier = Modifier.heightIn(min = 34.dp),
                                 testTag = "host_start_scan_button"
-                            )
-                        }
-                    }
-                }
-
-                // HOST: Guided optical capture card (owner only)
-                if (isOwner) {
-                    BentoCard(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                val captureFile = java.io.File(
-                                    java.io.File(context.filesDir, "captures").apply { mkdirs() },
-                                    "capture_${System.currentTimeMillis()}.jpg"
-                                )
-                                pendingCaptureFile = captureFile
-                                cameraCaptureLauncher.launch(
-                                    FileProvider.getUriForFile(context, context.packageName + ".fileprovider", captureFile)
-                                )
-                            }
-                            .testTag("host_guided_capture_card")
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(12.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(38.dp)
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(DorjaColors.Gray700.copy(alpha = 0.12f)),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.CameraAlt,
-                                        contentDescription = "Guided Capture",
-                                        tint = DorjaColors.Gray700,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                }
-                                Spacer(modifier = Modifier.width(10.dp))
-                                Column {
-                                    Text(
-                                        text = "Guided Optical Capture",
-                                        style = MaterialTheme.typography.titleSmall,
-                                        color = DorjaColors.Ink950,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                    Text(
-                                        text = "Camera photos for structural verification",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = DorjaColors.Gray700,
-                                        fontSize = 11.sp
-                                    )
-                                }
-                            }
-
-                            DorjaButton(
-                                text = "Capture",
-                                onClick = {
-                                    val captureFile = java.io.File(
-                                        java.io.File(context.filesDir, "captures").apply { mkdirs() }
-                                        , "capture_${System.currentTimeMillis()}.jpg"
-                                    )
-                                    pendingCaptureFile = captureFile
-                                    cameraCaptureLauncher.launch(
-                                        FileProvider.getUriForFile(context, context.packageName + ".fileprovider", captureFile)
-                                    )
-                                },
-                                icon = Icons.Default.CameraAlt,
-                                modifier = Modifier.heightIn(min = 34.dp),
-                                testTag = "host_guided_capture_button"
                             )
                         }
                     }
@@ -2188,40 +2185,63 @@ private fun matchesWakeWord(lower: String): Boolean {
     return false
 }
 
+/**
+ * Modern key-spec card: icon chip, big value, small unit + label. Fixed
+ * vertical rhythm so paired cards in a row always align.
+ */
 @Composable
-private fun SpecPill(icon: ImageVector, label: String, modifier: Modifier = Modifier) {
+private fun SpecStatCard(
+    icon: ImageVector,
+    value: String,
+    unit: String,
+    label: String,
+    modifier: Modifier = Modifier
+) {
     Surface(
         modifier = modifier,
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(16.dp),
         color = DorjaColors.White,
         border = BorderStroke(1.dp, DorjaColors.BentoCardBorder)
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(30.dp)
-                    .clip(CircleShape)
-                    .background(DorjaColors.BentoBlueBg),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    tint = DorjaColors.BentoBlueIcon,
-                    modifier = Modifier.size(16.dp)
+        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(30.dp)
+                        .clip(CircleShape)
+                        .background(DorjaColors.BentoBlueBg),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = DorjaColors.BentoBlueIcon,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(10.dp))
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text(
+                    text = value,
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = DorjaColors.Ink950,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+                Text(
+                    text = unit,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = DorjaColors.Gray500,
+                    modifier = Modifier.padding(bottom = 2.dp)
                 )
             }
-            Spacer(modifier = Modifier.width(8.dp))
             Text(
                 text = label,
-                style = MaterialTheme.typography.titleSmall,
-                color = DorjaColors.Ink950,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                style = MaterialTheme.typography.labelSmall,
+                color = DorjaColors.Gray500
             )
         }
     }

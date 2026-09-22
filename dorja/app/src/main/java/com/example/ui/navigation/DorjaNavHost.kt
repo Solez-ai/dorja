@@ -67,7 +67,6 @@ import androidx.navigation.navArgument
 import com.example.DorjaApp
 import com.example.ui.account.AccountScreen
 import com.example.ui.auth.AuthScreen
-import com.example.ui.capture.GuidedCaptureScreen
 import com.example.ui.chat.ChatThreadScreen
 import com.example.ui.chat.InboxScreen
 import com.example.ui.detail.PropertyDetailScreen
@@ -111,9 +110,6 @@ sealed class Screen(val route: String) {
     }
     object RoomScanner : Screen("room_scanner/{listingId}") {
         fun createRoute(listingId: String) = "room_scanner/$listingId"
-    }
-    object GuidedCapture : Screen("guided_capture/{listingId}") {
-        fun createRoute(listingId: String) = "guided_capture/$listingId"
     }
     object RelocationMode : Screen("relocation_mode?origin={origin}&dest={dest}") {
         fun createRoute(origin: String, destination: String) = "relocation_mode?origin=$origin&dest=$destination"
@@ -261,17 +257,6 @@ fun DorjaNavHost() {
                 onScanComplete = { _, _ ->
                     navController.popBackStack()
                 }
-            )
-        }
-
-        composable(
-            route = Screen.GuidedCapture.route,
-            arguments = listOf(navArgument("listingId") { type = NavType.StringType })
-        ) { backStackEntry ->
-            val listingId = backStackEntry.arguments?.getString("listingId") ?: "l1"
-            GuidedCaptureScreen(
-                listingId = listingId,
-                onBack = { navController.popBackStack() }
             )
         }
 

@@ -18,8 +18,7 @@ object ScanGeometry {
     const val DEFAULT_VFOV_DEG = 48.0
 
     enum class ScanMode {
-        QUICK_SCAN,
-        AR_CORNER_SCAN
+        QUICK_SCAN
     }
 
     data class Ray(val x: Float, val y: Float, val z: Float)
@@ -146,13 +145,6 @@ object ScanGeometry {
                 // Classic 360° Horizontal Panorama (1 ring on horizon, 12 stops)
                 for (col in 0 until 12) {
                     targets.add(ScanTarget(globalIdx++, ringIndex = 0, pitchDeg = 0f, headingDeg = col * 30f))
-                }
-            }
-
-            ScanMode.AR_CORNER_SCAN -> {
-                // AR 3D Room Corner Point-by-Point Mapping Mode
-                for (col in 0 until 4) {
-                    targets.add(ScanTarget(globalIdx++, ringIndex = 0, pitchDeg = -30f, headingDeg = col * 90f))
                 }
             }
         }

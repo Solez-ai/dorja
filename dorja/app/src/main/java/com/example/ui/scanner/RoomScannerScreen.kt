@@ -20,6 +20,7 @@ import android.util.Log
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.AspectRatio
+import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
@@ -61,14 +62,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.MeetingRoom
-import androidx.compose.material.icons.filled.RotateRight
-import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Badge
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -91,9 +91,10 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -122,14 +123,25 @@ import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.max
+import kotlin.math.roundToInt
 import kotlin.math.sin
-import kotlin.math.tan
 
 private enum class Phase { SELECT, PREVIEW, CAPTURING, DONE }
 
 private val Accent = Color(0xFF00BCD4)
 private val Green = Color(0xFF4CAF50)
 private val TargetYellow = Color(0xFFFFC107)
+
+/**
+ * Zoom choices the picker offers, based on the bound camera's minimum zoom
+ * ratio: 0.5x only when the device exposes an ultra-wide range, 0.8x when a
+ * wide range exists, and 1x always. Ordered widest-first.
+ */
+private fun zoomChoices(minZoomRatio: Float): List<Float> = buildList {
+    if (minZoomRatio <= 0.55f) add(0.5f)
+    if (minZoomRatio <= 0.85f) add(0.8f)
+    add(1f)
+}
 
 data class FrameData(
     val path: String,
@@ -160,6 +172,11 @@ fun RoomScannerScreen(
     var scanMode by remember { mutableStateOf(ScanGeometry.ScanMode.QUICK_SCAN) }
     var selectedRoom by remember { mutableStateOf<RoomItem?>(null) }
     var imageCapture by remember { mutableStateOf<ImageCapture?>(null) }
+    // Lens / zoom picker: 1.0x = main lens, 0.8x/0.5x = wider fields of view when
+    // the device exposes them (digital zoom range of the bound logical camera).
+    // Applied by CameraPreview; minZoomRatio feeds the supported-choice filter.
+    var zoomRatio by remember { mutableStateOf(1f) }
+    var minZoomRatio by remember { mutableStateOf(1f) }
     var hasCamera by remember {
         mutableStateOf(ContextCompat.checkSelfPermission(ctx, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED)
     }
@@ -176,6 +193,7 @@ fun RoomScannerScreen(
     // Stitching progress & live preview states
     var stitchingStatus by remember { mutableStateOf<String?>(null) }
     var stitchingPreviewBmp by remember { mutableStateOf<Bitmap?>(null) }
+    var stitchedPath by remember { mutableStateOf<String?>(null) }
 
     val sensorMgr = remember { ctx.getSystemService(SensorManager::class.java) }
     val rotVec = remember { sensorMgr?.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR) }
@@ -281,8 +299,6 @@ fun RoomScannerScreen(
         when (phase) {
             Phase.SELECT -> SelectRoom(
                 rooms = rooms,
-                scanMode = scanMode,
-                onModeToggle = { mode -> scanMode = mode },
                 onSelect = { room ->
                     selectedRoom = room
                     permLauncher.launch(Manifest.permission.CAMERA)
@@ -297,37 +313,25 @@ fun RoomScannerScreen(
                 hasCamera = hasCamera,
                 roomName = selectedRoom?.displayName ?: "Room",
                 scanMode = scanMode,
+                zoomRatio = zoomRatio,
+                onZoomPicked = { zoomRatio = it },
                 gyroOn = gyroOn,
                 onToggleGyro = { gyroOn = !gyroOn },
                 onStart = {
                     phase = Phase.CAPTURING
                 },
                 onBack = { phase = Phase.SELECT },
+                onCameraBound = { _, minZoom ->
+                    if (minZoom > 0f) {
+                        minZoomRatio = minZoom
+                        zoomRatio = minZoom // default to widest supported lens
+                    }
+                },
                 lifecycleOwner = lifecycleOwner
             )
 
             Phase.CAPTURING -> {
-                if (scanMode == ScanGeometry.ScanMode.AR_CORNER_SCAN) {
-                    ArCornerScannerPhase(
-                        imageCapture = imageCapture,
-                        onCaptureReady = { imageCapture = it },
-                        hasCamera = hasCamera,
-                        heading = heading,
-                        currentPitch = pitch,
-                        roomName = selectedRoom?.displayName ?: "Room",
-                        onSaveArModel = { jsonStr ->
-                            scope.launch {
-                                withContext(Dispatchers.IO) {
-                                    repo.updateRoom3DScan(selectedRoom?.id ?: "", jsonStr)
-                                }
-                                onScanComplete(selectedRoom?.id ?: "", jsonStr)
-                            }
-                        },
-                        onBack = { phase = Phase.PREVIEW },
-                        lifecycleOwner = lifecycleOwner
-                    )
-                } else {
-                    CapturingPhase(
+                CapturingPhase(
                         imageCapture = imageCapture,
                         onCaptureReady = { imageCapture = it },
                         hasCamera = hasCamera,
@@ -384,31 +388,65 @@ fun RoomScannerScreen(
                         onStop = { phase = Phase.DONE },
                         onBack = { phase = Phase.PREVIEW },
                         lifecycleOwner = lifecycleOwner
-                    )
-                }
+                )
             }
 
             Phase.DONE -> DonePhase(
                 roomName = selectedRoom?.displayName ?: "Room",
                 frameCount = capturedFrames.size,
-                capturedFrames = capturedFrames,
+                capturedFrames = capturedFrames.toList(),
                 stitchingStatus = stitchingStatus,
                 stitchingPreviewBmp = stitchingPreviewBmp,
+                stitchedPath = stitchedPath,
+                onStitch = { frames ->
+                    scope.launch {
+                        try {
+                            val stitched = withContext(Dispatchers.IO) { stitchFrames(ctx, frames) }
+                            if (stitched != null) {
+                                stitchedPath = stitched
+                                val bmp = withContext(Dispatchers.IO) {
+                                    BitmapFactory.decodeFile(stitched)?.asImageBitmap()
+                                }
+                                stitchingPreviewBmp = bmp
+                                stitchingStatus = "Stitching complete — tune lighting below if needed"
+                            } else {
+                                stitchingStatus = "Stitching failed. Retake frames."
+                            }
+                        } catch (e: Exception) {
+                            Log.e("Scanner", "Stitch failed", e)
+                            stitchingStatus = "Stitching error: ${e.message}"
+                        }
+                    }
+                },
+                onApplyLighting = { path, brightness, contrast, warmth ->
+                    scope.launch {
+                        stitchingStatus = "Applying lighting adjustments…"
+                        val tuned = withContext(Dispatchers.IO) {
+                            applyLightingAdjustments(path, brightness, contrast, warmth)
+                        }
+                        if (tuned != null) {
+                            stitchedPath = tuned
+                            stitchingPreviewBmp = BitmapFactory.decodeFile(tuned)?.asImageBitmap()
+                            stitchingStatus = "Lighting applied"
+                        } else {
+                            stitchingStatus = "Could not apply adjustments"
+                        }
+                    }
+                },
                 onSave = {
                     scope.launch {
                         try {
-                            val frames = capturedFrames.toList()
-                            val stitched = withContext(Dispatchers.IO) { stitchFrames(ctx, frames) }
-                            if (stitched != null) {
-                                val json = buildJson(stitched, frames, selectedRoom?.id ?: "")
-                                withContext(Dispatchers.IO) {
-                                    repo.updateRoom3DScan(selectedRoom?.id ?: "", json)
-                                }
-                                onScanComplete(selectedRoom?.id ?: "", json)
-                            } else {
-                                Log.e("Scanner", "Stitching returned null - panorama not saved")
-                                stitchingStatus = "Stitching failed. Retake frames."
+                            val path = stitchedPath
+                            if (path == null) {
+                                stitchingStatus = "Panorama is not ready yet."
+                                return@launch
                             }
+                            val frames = capturedFrames.toList()
+                            val json = buildJson(path, frames, selectedRoom?.id ?: "")
+                            withContext(Dispatchers.IO) {
+                                repo.updateRoom3DScan(selectedRoom?.id ?: "", json)
+                            }
+                            onScanComplete(selectedRoom?.id ?: "", json)
                         } catch (e: Exception) {
                             Log.e("Scanner", "Save failed", e)
                             stitchingStatus = "Error: ${e.message}"
@@ -417,18 +455,22 @@ fun RoomScannerScreen(
                 },
                 onRetake = {
                     cleanupFrameFiles(ctx, capturedFrames)
+                    if (stitchedPath != null) File(stitchedPath!!).delete()
                     capturedFrames.clear()
                     currentTargetIdx = 0
                     stitchingStatus = null
                     stitchingPreviewBmp = null
+                    stitchedPath = null
                     phase = Phase.PREVIEW
                 },
                 onDiscard = {
                     cleanupFrameFiles(ctx, capturedFrames)
+                    if (stitchedPath != null) File(stitchedPath!!).delete()
                     capturedFrames.clear()
                     currentTargetIdx = 0
                     stitchingStatus = null
                     stitchingPreviewBmp = null
+                    stitchedPath = null
                     phase = Phase.SELECT
                 }
             )
@@ -437,13 +479,11 @@ fun RoomScannerScreen(
 }
 
 // ═════════════════════════════════════════════════════════════
-//  PHASE 1 — SELECT ROOM & SCAN MODE
+//  PHASE 1 — SELECT ROOM
 // ═════════════════════════════════════════════════════════════
 @Composable
 private fun SelectRoom(
     rooms: List<RoomItem>,
-    scanMode: ScanGeometry.ScanMode,
-    onModeToggle: (ScanGeometry.ScanMode) -> Unit,
     onSelect: (RoomItem) -> Unit,
     onBack: () -> Unit
 ) {
@@ -458,42 +498,6 @@ private fun SelectRoom(
                 Text("DORJA 360° Panorama Scanner", color = Accent, style = MaterialTheme.typography.bodySmall)
             }
         }
-        Spacer(Modifier.height(14.dp))
-
-        Surface(
-            shape = RoundedCornerShape(12.dp),
-            color = DorjaColors.Gray700.copy(alpha = 0.6f),
-            border = androidx.compose.foundation.BorderStroke(1.dp, Accent.copy(alpha = 0.3f)),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(Modifier.padding(12.dp)) {
-                Text("SCAN MODE", color = DorjaColors.Sand300, fontSize = 10.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(8.dp))
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        ModeOptionChip(
-                            title = "360° Panorama",
-                            subtitle = "12 shots • 360° horizon • fastest",
-                            timeHint = "~25-30 s",
-                            icon = Icons.Default.Speed,
-                            isSelected = scanMode == ScanGeometry.ScanMode.QUICK_SCAN,
-                            onClick = { onModeToggle(ScanGeometry.ScanMode.QUICK_SCAN) },
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                    ModeOptionChip(
-                        title = "AR 3D Room Corner Scanner",
-                        subtitle = "Point-by-point AR vector mapping & dimension solver",
-                        timeHint = "Real-Time AR",
-                        icon = Icons.Default.CheckCircle,
-                        isSelected = scanMode == ScanGeometry.ScanMode.AR_CORNER_SCAN,
-                        onClick = { onModeToggle(ScanGeometry.ScanMode.AR_CORNER_SCAN) },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            }
-        }
-
         Spacer(Modifier.height(14.dp))
 
         if (rooms.isEmpty()) {
@@ -539,36 +543,6 @@ private fun SelectRoom(
     }
 }
 
-@Composable
-private fun ModeOptionChip(
-    title: String,
-    subtitle: String,
-    timeHint: String,
-    icon: ImageVector,
-    isSelected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        onClick = onClick,
-        shape = RoundedCornerShape(10.dp),
-        color = if (isSelected) Accent.copy(alpha = 0.2f) else DorjaColors.Ink950,
-        border = androidx.compose.foundation.BorderStroke(1.5.dp, if (isSelected) Accent else DorjaColors.Sand300.copy(alpha = 0.2f)),
-        modifier = modifier
-    ) {
-        Column(Modifier.padding(10.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(icon, null, tint = if (isSelected) Accent else DorjaColors.Sand300, modifier = Modifier.size(16.dp))
-                Spacer(Modifier.width(6.dp))
-                Text(title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-            }
-            Spacer(Modifier.height(4.dp))
-            Text(subtitle, color = DorjaColors.Sand300, fontSize = 10.sp)
-            Text(timeHint, color = Accent, fontSize = 9.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.SemiBold)
-        }
-    }
-}
-
 // ═════════════════════════════════════════════════════════════
 //  PHASE 2 — PREVIEW & TUTORIAL
 // ═════════════════════════════════════════════════════════════
@@ -579,14 +553,17 @@ private fun PreviewPhase(
     hasCamera: Boolean,
     roomName: String,
     scanMode: ScanGeometry.ScanMode,
+    zoomRatio: Float,
+    onZoomPicked: (Float) -> Unit,
     gyroOn: Boolean,
     onToggleGyro: () -> Unit,
     onStart: () -> Unit,
     onBack: () -> Unit,
+    onCameraBound: (Camera, Float) -> Unit = { _, _ -> },
     lifecycleOwner: androidx.lifecycle.LifecycleOwner
 ) {
     Box(Modifier.fillMaxSize()) {
-        CameraPreview(imageCapture, onCaptureReady, hasCamera, lifecycleOwner)
+        CameraPreview(imageCapture, onCaptureReady, hasCamera, lifecycleOwner, zoomRatio, onCameraBound)
         ScopeOverlay()
         Box(Modifier.fillMaxWidth().height(80.dp).background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.6f), Color.Transparent))).align(Alignment.TopCenter))
         Row(Modifier.fillMaxWidth().padding(top = 40.dp, start = 12.dp, end = 12.dp).align(Alignment.TopCenter), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
@@ -615,7 +592,32 @@ private fun PreviewPhase(
             }
         }
 
-        Column(Modifier.align(Alignment.BottomCenter).padding(bottom = 80.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(Modifier.align(Alignment.BottomCenter).padding(bottom = 96.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            // Lens zoom picker — chosen BEFORE the scan starts so every frame
+            // shares the same field of view. Options reflect what the bound
+            // camera actually supports (min zoom ratio of the device).
+            Text("LENS ZOOM — PICK BEFORE SCANNING", color = Accent, fontSize = 10.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(6.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                zoomChoices(minZoomRatio).forEach { z ->
+                    val selected = abs(zoomRatio - z) < 0.01f
+                    Surface(
+                        onClick = { onZoomPicked(z) },
+                        shape = RoundedCornerShape(20.dp),
+                        color = if (selected) Accent.copy(alpha = 0.25f) else Color.Black.copy(alpha = 0.5f),
+                        border = androidx.compose.foundation.BorderStroke(1.5.dp, if (selected) Accent else Color.White.copy(alpha = 0.3f))
+                    ) {
+                        Text(
+                            if (z == 1f) "1x" else "${z}x",
+                            color = if (selected) Accent else Color.White,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.height(12.dp))
             Text("PRESS TO START SCAN", color = Color.White, fontSize = 11.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(8.dp))
             Box(Modifier.size(68.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.15f)).border(3.dp, Color.White, CircleShape).clickable { onStart() }, contentAlignment = Alignment.Center) {
@@ -844,10 +846,26 @@ private fun DonePhase(
     capturedFrames: List<FrameData>,
     stitchingStatus: String?,
     stitchingPreviewBmp: Bitmap?,
+    stitchedPath: String?,
+    onStitch: (List<FrameData>) -> Unit,
+    onApplyLighting: (String, Float, Float, Float) -> Unit,
     onSave: () -> Unit,
     onRetake: () -> Unit,
     onDiscard: () -> Unit
 ) {
+    // Post-scan lighting tuning — the user adjusts the stitched panorama's
+    // exposure, contrast and warmth before it is saved. 1f = no change.
+    var brightness by remember { mutableFloatStateOf(1f) }
+    var contrast by remember { mutableFloatStateOf(1f) }
+    var warmth by remember { mutableFloatStateOf(1f) }
+    var showTuning by remember { mutableStateOf(false) }
+    var lastApplied by remember { mutableStateOf(Triple(1f, 1f, 1f)) }
+
+    // Auto-stitch once the frames are in — the user lands on a preview, not a blank page.
+    LaunchedEffect(capturedFrames.size) {
+        if (capturedFrames.isNotEmpty()) onStitch(capturedFrames)
+    }
+
     Box(Modifier.fillMaxSize().background(DorjaColors.Ink950).padding(20.dp), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
             Box(Modifier.size(64.dp).clip(CircleShape).background(Accent.copy(alpha = 0.15f)), contentAlignment = Alignment.Center) {
@@ -892,10 +910,64 @@ private fun DonePhase(
                     modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
                 ) {
                     Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                        CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Accent, strokeWidth = 2.dp)
-                        Spacer(Modifier.width(12.dp))
-                        Text(stitchingStatus, color = Color.White, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+                        if (stitchedPath == null) {
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Accent, strokeWidth = 2.dp)
+                            Spacer(Modifier.width(12.dp))
+                        }
+                        Text(stitchingStatus!!, color = Color.White, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
                     }
+                }
+            }
+
+            // ── Post-scan lighting tuning ──
+            if (showTuning) {
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = DorjaColors.Gray700.copy(alpha = 0.4f),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Accent.copy(alpha = 0.3f)),
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
+                ) {
+                    Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+                        Text("TUNE LIGHTING", color = Accent, fontSize = 10.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.height(4.dp))
+                        TuningSlider("Brightness", brightness, 0.5f, 1.6f) { brightness = it }
+                        TuningSlider("Contrast", contrast, 0.6f, 1.5f) { contrast = it }
+                        TuningSlider("Warmth", warmth, 0.7f, 1.3f) { warmth = it }
+                        Spacer(Modifier.height(6.dp))
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            DorjaOutlinedButton(
+                                "Reset",
+                                onClick = {
+                                    brightness = 1f; contrast = 1f; warmth = 1f
+                                },
+                                modifier = Modifier.weight(1f)
+                            )
+                            DorjaButton(
+                                "Apply",
+                                onClick = {
+                                    lastApplied = Triple(brightness, contrast, warmth)
+                                    showTuning = false
+                                },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+                }
+            } else {
+                DorjaOutlinedButton(
+                    "Tune lighting",
+                    onClick = { showTuning = true },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(10.dp))
+            }
+
+            // Apply lighting when the sliders are confirmed with a change.
+            LaunchedEffect(lastApplied, stitchedPath) {
+                val (b, c, w) = lastApplied
+                if (stitchedPath != null && (b != 1f || c != 1f || w != 1f)) {
+                    onApplyLighting(stitchedPath, b, c, w)
+                    lastApplied = Triple(1f, 1f, 1f) // consume; avoid re-apply loops
                 }
             }
 
@@ -910,6 +982,32 @@ private fun DonePhase(
                 DorjaOutlinedButton("Discard", onClick = onDiscard, modifier = Modifier.weight(1f))
             }
         }
+    }
+}
+
+@Composable
+private fun TuningSlider(
+    label: String,
+    value: Float,
+    min: Float,
+    max: Float,
+    onChange: (Float) -> Unit
+) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(label, color = DorjaColors.Sand300, fontSize = 11.sp, modifier = Modifier.width(84.dp))
+        Slider(
+            value = value,
+            onValueChange = onChange,
+            valueRange = min..max,
+            modifier = Modifier.weight(1f).height(28.dp)
+        )
+        Text(
+            "${((value - 1f) * 100).roundToInt().let { if (it >= 0) "+$it%" else "$it%" }}",
+            color = Color.White,
+            fontSize = 11.sp,
+            fontFamily = FontFamily.Monospace,
+            modifier = Modifier.width(52.dp)
+        )
     }
 }
 
@@ -971,7 +1069,9 @@ private fun CameraPreview(
     imageCapture: ImageCapture?,
     onCaptureReady: (ImageCapture) -> Unit,
     hasCamera: Boolean,
-    lifecycleOwner: androidx.lifecycle.LifecycleOwner
+    lifecycleOwner: androidx.lifecycle.LifecycleOwner,
+    zoomRatio: Float = 1f,
+    onCameraBound: (Camera, Float) -> Unit = { _, _ -> }
 ) {
     if (!hasCamera) {
         Box(Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
@@ -984,8 +1084,12 @@ private fun CameraPreview(
         return
     }
 
+    var boundCamera by remember { mutableStateOf<Camera?>(null) }
+
     AndroidView(factory = { ctx ->
         PreviewView(ctx).also { pv ->
+            // Fill the whole viewport — no letterbox bands above/below the feed.
+            pv.scaleType = PreviewView.ScaleType.FILL_CENTER
             ProcessCameraProvider.getInstance(ctx).addListener({
                 val cp = ProcessCameraProvider.getInstance(ctx).get()
                 val preview = Preview.Builder().build().also { it.setSurfaceProvider(pv.surfaceProvider) }
@@ -996,38 +1100,34 @@ private fun CameraPreview(
                 onCaptureReady(capture)
                 try {
                     cp.unbindAll()
-                    cp.bindToLifecycle(lifecycleOwner, ultraWideCameraSelector(cp), preview, capture)
+                    // Bind the default (logical) back camera so the zoom picker can
+                    // switch between main / wide / ultra-wide lenses via zoom ratio.
+                    val camera = cp.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, capture)
+                    boundCamera = camera
                 } catch (e: Exception) {
                     Log.e("Scanner", "Camera bind failed", e)
                 }
             }, ContextCompat.getMainExecutor(ctx))
         }
     }, modifier = Modifier.fillMaxSize())
-}
 
-/**
- * Prefers a wide-angle (0.5x/0.8x ultra-wide) back lens when available: a wider
- * FOV per shot means fewer frames, fewer seams and better stitch overlap.
- * Uses only camera-core APIs — ultra-wide modules report an intrinsic zoom
- * ratio well below 1.0 relative to the main 1x lens. Falls back to the
- * default back camera on devices without an ultra-wide lens.
- */
-private fun ultraWideCameraSelector(provider: ProcessCameraProvider): CameraSelector {
-    return try {
-        val ultraWide = provider.availableCameraInfos.firstOrNull { info ->
-            info.lensFacing == CameraSelector.LENS_FACING_BACK &&
-                info.intrinsicZoomRatio < 0.9f
+    // Report the bound camera + its supported zoom range ONCE per bind so the
+    // preview can offer only the lens options this device actually has. Later
+    // zoomState emissions are just the user's own zoom changes — re-reporting
+    // those would override their pick.
+    var reportedCameraBound by remember { mutableStateOf(false) }
+    LaunchedEffect(boundCamera) {
+        boundCamera?.cameraInfo?.zoomState?.collect { zs ->
+            if (!reportedCameraBound) {
+                reportedCameraBound = true
+                onCameraBound(boundCamera!!, zs.minZoomRatio)
+            }
         }
-        if (ultraWide != null) {
-            Log.i("Scanner", "Using ultra-wide lens (zoom ratio ${ultraWide.intrinsicZoomRatio})")
-            ultraWide.cameraSelector
-        } else {
-            Log.i("Scanner", "No ultra-wide lens found - using default back camera")
-            CameraSelector.DEFAULT_BACK_CAMERA
-        }
-    } catch (t: Throwable) {
-        Log.w("Scanner", "Ultra-wide detection failed - default back camera", t)
-        CameraSelector.DEFAULT_BACK_CAMERA
+    }
+
+    // Apply the chosen zoom to preview AND capture use cases.
+    LaunchedEffect(boundCamera, zoomRatio) {
+        boundCamera?.cameraControl?.setZoomRatio(zoomRatio)
     }
 }
 
@@ -1416,6 +1516,66 @@ private fun stitchFramesInternal(ctx: android.content.Context, frameDataList: Li
     }
 }
 
+/**
+ * Bakes brightness/contrast/warmth multipliers (1f = neutral) into a copy of
+ * the panorama and returns the new file path. Uses a single ColorMatrix pass
+ * so the full-size image is re-processed in one draw.
+ */
+private fun applyLightingAdjustments(srcPath: String, brightness: Float, contrast: Float, warmth: Float): String? {
+    try {
+        val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(srcPath, opts)
+        if (opts.outWidth <= 0) return null
+        val sample = (opts.outWidth / 2048).coerceAtLeast(1)
+        val bmp = BitmapFactory.decodeFile(srcPath, BitmapFactory.Options().apply { inSampleSize = sample }) ?: return null
+
+        val cm = android.graphics.ColorMatrix(
+            floatArrayOf(
+                brightness, 0f, 0f, 0f, 0f,
+                0f, brightness, 0f, 0f, 0f,
+                0f, 0f, brightness, 0f, 0f,
+                0f, 0f, 0f, 1f, 0f
+            )
+        )
+        // Contrast pivots around mid-gray (128).
+        val contrastMatrix = android.graphics.ColorMatrix(
+            floatArrayOf(
+                contrast, 0f, 0f, 0f, 128f * (1f - contrast),
+                0f, contrast, 0f, 0f, 128f * (1f - contrast),
+                0f, 0f, contrast, 0f, 128f * (1f - contrast),
+                0f, 0f, 0f, 1f, 0f
+            )
+        )
+        cm.setConcat(contrastMatrix, cm)
+        // Warmth: >1 boosts red / cools blue; <1 cools red / boosts blue.
+        val warmMatrix = android.graphics.ColorMatrix(
+            floatArrayOf(
+                warmth, 0f, 0f, 0f, 0f,
+                0f, 1f, 0f, 0f, 0f,
+                0f, 0f, 2f - warmth, 0f, 0f,
+                0f, 0f, 0f, 1f, 0f
+            )
+        )
+        cm.setConcat(warmMatrix, cm)
+
+        val paint = android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG or android.graphics.Paint.ANTI_ALIAS_FLAG)
+        paint.colorFilter = android.graphics.ColorMatrixColorFilter(cm)
+        val out = Bitmap.createBitmap(bmp.width, bmp.height, Bitmap.Config.ARGB_8888)
+        PanoCanvas(out).drawBitmap(bmp, 0f, 0f, paint)
+        bmp.recycle()
+
+        val outFile = File(File(srcPath).parent, "panorama_tuned_${System.currentTimeMillis()}.jpg")
+        FileOutputStream(outFile).use { out.compress(Bitmap.CompressFormat.JPEG, 92, it) }
+        out.recycle()
+        File(srcPath).delete()
+        Log.i("Scanner", "Lighting baked: brightness=$brightness contrast=$contrast warmth=$warmth → ${outFile.absolutePath}")
+        return outFile.absolutePath
+    } catch (e: Exception) {
+        Log.e("Scanner", "Lighting adjustment failed", e)
+        return null
+    }
+}
+
 /** Crop black (near-zero) borders from a bitmap */
 private fun cropBlackBorders(bitmap: Bitmap): Bitmap {
     val w = bitmap.width; val h = bitmap.height
@@ -1439,221 +1599,4 @@ private fun vibrateShutter(ctx: android.content.Context) {
             (ctx.getSystemService(android.content.Context.VIBRATOR_SERVICE) as? Vibrator)?.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 30, 60, 20), intArrayOf(0, 200, 0, 120), -1))
         }
     } catch (_: Exception) {}
-}
-
-private data class CornerAnchor3D(
-    val id: Int,
-    val headingDeg: Float,
-    val pitchDeg: Float,
-    val xMeters: Float,
-    val yMeters: Float,
-    val zMeters: Float
-)
-
-// ═════════════════════════════════════════════════════════════
-//  AR 3D ROOM CORNER SCANNER PHASE
-// ═════════════════════════════════════════════════════════════
-@Composable
-private fun ArCornerScannerPhase(
-    imageCapture: ImageCapture?,
-    onCaptureReady: (ImageCapture) -> Unit,
-    hasCamera: Boolean,
-    heading: Float,
-    currentPitch: Float,
-    roomName: String,
-    onSaveArModel: (jsonStr: String) -> Unit,
-    onBack: () -> Unit,
-    lifecycleOwner: androidx.lifecycle.LifecycleOwner
-) {
-    val ctx = LocalContext.current
-    val corners = remember { mutableStateListOf<CornerAnchor3D>() }
-
-    // Estimate 3D vector coordinates based on device posture (-1.5m eye height above floor)
-    val eyeHeight = 1.5f
-    val pitchRad = Math.toRadians(currentPitch.toDouble()).toFloat()
-    val headingRad = Math.toRadians(heading.toDouble()).toFloat()
-
-    val tanPitch = tan(pitchRad.coerceAtMost(-0.1f))
-    val groundDist = if (tanPitch < -0.05f) abs(eyeHeight / tanPitch) else 2.5f
-
-    val currentX = groundDist * sin(headingRad)
-    val currentZ = groundDist * cos(headingRad)
-
-    val totalPerimeter = remember(corners.size) {
-        if (corners.size < 2) 0f
-        else {
-            var sum = 0f
-            for (i in corners.indices) {
-                val c1 = corners[i]
-                val c2 = corners[(i + 1) % corners.size]
-                val dx = c2.xMeters - c1.xMeters
-                val dz = c2.zMeters - c1.zMeters
-                sum += Math.sqrt((dx * dx + dz * dz).toDouble()).toFloat()
-            }
-            sum
-        }
-    }
-
-    val estimatedAreaSqM = remember(corners.size) {
-        if (corners.size < 3) 0f
-        else {
-            var area = 0f
-            for (i in corners.indices) {
-                val c1 = corners[i]
-                val c2 = corners[(i + 1) % corners.size]
-                area += (c1.xMeters * c2.zMeters) - (c2.xMeters * c1.zMeters)
-            }
-            abs(area) / 2f
-        }
-    }
-
-    Box(Modifier.fillMaxSize()) {
-        CameraPreview(imageCapture, onCaptureReady, hasCamera, lifecycleOwner)
-
-        // Interactive 3D AR Vector Overlay
-        Canvas(Modifier.fillMaxSize()) {
-            val cx = size.width / 2f
-            val cy = size.height / 2f
-            val pxPerDeg = size.width / 60f
-
-            // Screen Center Crosshair
-            drawCircle(Color.White.copy(alpha = 0.3f), 36.dp.toPx(), Offset(cx, cy), style = Stroke(1.5.dp.toPx()))
-            drawCircle(TargetYellow, 4.dp.toPx(), Offset(cx, cy))
-
-            // Project 3D corner anchors onto 2D camera view
-            val projectedPoints = corners.map { c ->
-                val relH = ((c.headingDeg - heading + 540) % 360) - 180
-                val relP = c.pitchDeg - currentPitch
-                val px = cx + (relH * pxPerDeg)
-                val py = cy - (relP * pxPerDeg)
-                Offset(px, py)
-            }
-
-            // Draw connecting AR floor lines
-            for (i in projectedPoints.indices) {
-                val p1 = projectedPoints[i]
-                val p2 = projectedPoints[(i + 1) % projectedPoints.size]
-                if (i < projectedPoints.size - 1 || projectedPoints.size >= 3) {
-                    drawLine(Accent, p1, p2, 3.dp.toPx())
-                    val midX = (p1.x + p2.x) / 2f
-                    val midY = (p1.y + p2.y) / 2f
-                    drawCircle(Accent, 4.dp.toPx(), Offset(midX, midY))
-                }
-            }
-
-            // Draw 3D Corner Markers
-            for (i in projectedPoints.indices) {
-                val p = projectedPoints[i]
-                drawCircle(Green.copy(alpha = 0.35f), 22.dp.toPx(), p)
-                drawCircle(Green, 14.dp.toPx(), p, style = Stroke(2.5.dp.toPx()))
-                drawCircle(Color.White, 5.dp.toPx(), p)
-            }
-        }
-
-        // Header
-        Box(Modifier.fillMaxWidth().height(70.dp).background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.6f), Color.Transparent))).align(Alignment.TopCenter))
-        Row(Modifier.fillMaxWidth().padding(top = 40.dp, start = 12.dp, end = 12.dp).align(Alignment.TopCenter), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onBack, Modifier.size(38.dp).clip(CircleShape).background(Color.Black.copy(alpha = 0.5f))) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = Color.White)
-            }
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("AR 3D ROOM CORNER SCANNER", color = Accent, fontSize = 11.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
-                Text(roomName, color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
-            }
-            Spacer(Modifier.size(38.dp))
-        }
-
-        // Live Dimension HUD Card
-        Surface(
-            shape = RoundedCornerShape(16.dp),
-            color = Color.Black.copy(alpha = 0.75f),
-            border = androidx.compose.foundation.BorderStroke(1.dp, Accent.copy(alpha = 0.5f)),
-            modifier = Modifier.align(Alignment.TopCenter).padding(top = 90.dp, start = 16.dp, end = 16.dp)
-        ) {
-            Row(Modifier.padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                Column {
-                    Text("CORNERS", color = DorjaColors.Sand300, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
-                    Text("${corners.size}", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                }
-                Column {
-                    Text("PERIMETER", color = DorjaColors.Sand300, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
-                    Text("${"%.2f".format(totalPerimeter)} m", color = Accent, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                }
-                Column {
-                    Text("EST. AREA", color = DorjaColors.Sand300, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
-                    Text("${"%.1f".format(estimatedAreaSqM)} m²", color = Green, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                }
-            }
-        }
-
-        // Bottom Action Controls
-        Column(Modifier.align(Alignment.BottomCenter).padding(bottom = 24.dp, start = 16.dp, end = 16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Surface(
-                shape = RoundedCornerShape(20.dp),
-                color = Color.Black.copy(alpha = 0.75f),
-                border = androidx.compose.foundation.BorderStroke(1.5.dp, TargetYellow),
-                modifier = Modifier.padding(bottom = 12.dp)
-            ) {
-                Text(
-                    if (corners.isEmpty()) "AIM AT FLOOR CORNER & TAP ADD CORNER" else "AIM AT NEXT CORNER ALONG THE WALL",
-                    color = TargetYellow,
-                    fontSize = 11.sp,
-                    fontFamily = FontFamily.Monospace,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
-                )
-            }
-
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                DorjaOutlinedButton("Reset", onClick = { corners.clear() }, modifier = Modifier.weight(1f))
-
-                DorjaButton(
-                    "+ Add 3D Corner Anchor",
-                    onClick = {
-                        vibrateShutter(ctx)
-                        val anchor = CornerAnchor3D(
-                            id = corners.size + 1,
-                            headingDeg = heading,
-                            pitchDeg = currentPitch,
-                            xMeters = currentX,
-                            yMeters = -eyeHeight,
-                            zMeters = currentZ
-                        )
-                        corners.add(anchor)
-                    },
-                    modifier = Modifier.weight(2f)
-                )
-            }
-
-            if (corners.size >= 3) {
-                Spacer(Modifier.height(8.dp))
-                DorjaButton(
-                    "Save 3D Room Model (${corners.size} Corners)",
-                    onClick = {
-                        val root = JSONObject()
-                        root.put("mode", "AR_CORNER_MAP")
-                        root.put("cornerCount", corners.size)
-                        root.put("perimeterMeters", totalPerimeter.toDouble())
-                        root.put("areaSqMeters", estimatedAreaSqM.toDouble())
-                        root.put("timestamp", System.currentTimeMillis())
-
-                        val arr = JSONArray()
-                        corners.forEach { c ->
-                            val obj = JSONObject()
-                            obj.put("id", c.id)
-                            obj.put("heading", c.headingDeg.toDouble())
-                            obj.put("pitch", c.pitchDeg.toDouble())
-                            obj.put("x", c.xMeters.toDouble())
-                            obj.put("y", c.yMeters.toDouble())
-                            obj.put("z", c.zMeters.toDouble())
-                            arr.put(obj)
-                        }
-                        root.put("corners", arr)
-                        onSaveArModel(root.toString())
-                    },
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 44.dp)
-                )
-            }
-        }
-    }
 }
