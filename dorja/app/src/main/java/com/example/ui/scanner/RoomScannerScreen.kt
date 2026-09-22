@@ -112,6 +112,7 @@ import com.example.ui.components.DorjaButton
 import com.example.ui.components.DorjaOutlinedButton
 import com.example.ui.theme.DorjaColors
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.FileOutputStream
@@ -314,6 +315,7 @@ fun RoomScannerScreen(
                 roomName = selectedRoom?.displayName ?: "Room",
                 scanMode = scanMode,
                 zoomRatio = zoomRatio,
+                minZoomRatio = minZoomRatio,
                 onZoomPicked = { zoomRatio = it },
                 gyroOn = gyroOn,
                 onToggleGyro = { gyroOn = !gyroOn },
@@ -404,10 +406,9 @@ fun RoomScannerScreen(
                             val stitched = withContext(Dispatchers.IO) { stitchFrames(ctx, frames) }
                             if (stitched != null) {
                                 stitchedPath = stitched
-                                val bmp = withContext(Dispatchers.IO) {
-                                    BitmapFactory.decodeFile(stitched)?.asImageBitmap()
+                                stitchingPreviewBmp = withContext(Dispatchers.IO) {
+                                    BitmapFactory.decodeFile(stitched)
                                 }
-                                stitchingPreviewBmp = bmp
                                 stitchingStatus = "Stitching complete — tune lighting below if needed"
                             } else {
                                 stitchingStatus = "Stitching failed. Retake frames."
@@ -426,7 +427,9 @@ fun RoomScannerScreen(
                         }
                         if (tuned != null) {
                             stitchedPath = tuned
-                            stitchingPreviewBmp = BitmapFactory.decodeFile(tuned)?.asImageBitmap()
+                            stitchingPreviewBmp = withContext(Dispatchers.IO) {
+                                BitmapFactory.decodeFile(tuned)
+                            }
                             stitchingStatus = "Lighting applied"
                         } else {
                             stitchingStatus = "Could not apply adjustments"
@@ -554,6 +557,7 @@ private fun PreviewPhase(
     roomName: String,
     scanMode: ScanGeometry.ScanMode,
     zoomRatio: Float,
+    minZoomRatio: Float,
     onZoomPicked: (Float) -> Unit,
     gyroOn: Boolean,
     onToggleGyro: () -> Unit,
@@ -1112,16 +1116,21 @@ private fun CameraPreview(
     }, modifier = Modifier.fillMaxSize())
 
     // Report the bound camera + its supported zoom range ONCE per bind so the
-    // preview can offer only the lens options this device actually has. Later
-    // zoomState emissions are just the user's own zoom changes — re-reporting
-    // those would override their pick.
+    // preview can offer only the lens options this device actually has.
+    // zoomState is a LiveData; its value is populated shortly after binding.
     var reportedCameraBound by remember { mutableStateOf(false) }
     LaunchedEffect(boundCamera) {
-        boundCamera?.cameraInfo?.zoomState?.collect { zs ->
-            if (!reportedCameraBound) {
-                reportedCameraBound = true
-                onCameraBound(boundCamera!!, zs.minZoomRatio)
-            }
+        val cam = boundCamera ?: return@LaunchedEffect
+        var zs = cam.cameraInfo.zoomState.value
+        var tries = 0
+        while (zs == null && tries < 50) {
+            delay(100)
+            zs = cam.cameraInfo.zoomState.value
+            tries++
+        }
+        if (!reportedCameraBound && zs != null) {
+            reportedCameraBound = true
+            onCameraBound(cam, zs.minZoomRatio)
         }
     }
 
