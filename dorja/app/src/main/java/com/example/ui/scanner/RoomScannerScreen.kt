@@ -91,6 +91,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
@@ -868,33 +869,27 @@ private fun DonePhase(
     // blue-filter bug was an unscoped filter that leaked past Apply.)
     val liveTuningFilter: ColorFilter? = remember(showTuning, brightness, contrast, warmth) {
         if (showTuning && (brightness != 1f || contrast != 1f || warmth != 1f)) {
-            val cm = android.graphics.ColorMatrix(
-                floatArrayOf(
-                    brightness, 0f, 0f, 0f, 0f,
-                    0f, brightness, 0f, 0f, 0f,
-                    0f, 0f, brightness, 0f, 0f,
-                    0f, 0f, 0f, 1f, 0f
-                )
+            val mb = floatArrayOf(
+                brightness, 0f, 0f, 0f, 0f,
+                0f, brightness, 0f, 0f, 0f,
+                0f, 0f, brightness, 0f, 0f,
+                0f, 0f, 0f, 1f, 0f
             )
-            val contrastMatrix = android.graphics.ColorMatrix(
-                floatArrayOf(
-                    contrast, 0f, 0f, 0f, 128f * (1f - contrast),
-                    0f, contrast, 0f, 0f, 128f * (1f - contrast),
-                    0f, 0f, contrast, 0f, 128f * (1f - contrast),
-                    0f, 0f, 0f, 1f, 0f
-                )
+            // Contrast pivots around mid-gray (128).
+            val mc = floatArrayOf(
+                contrast, 0f, 0f, 0f, 128f * (1f - contrast),
+                0f, contrast, 0f, 0f, 128f * (1f - contrast),
+                0f, 0f, contrast, 0f, 128f * (1f - contrast),
+                0f, 0f, 0f, 1f, 0f
             )
-            cm.setConcat(contrastMatrix, cm)
-            val warmMatrix = android.graphics.ColorMatrix(
-                floatArrayOf(
-                    warmth, 0f, 0f, 0f, 0f,
-                    0f, 1f, 0f, 0f, 0f,
-                    0f, 0f, 2f - warmth, 0f, 0f,
-                    0f, 0f, 0f, 1f, 0f
-                )
+            // Warmth: >1 boosts red / cools blue; <1 cools red / boosts blue.
+            val mw = floatArrayOf(
+                warmth, 0f, 0f, 0f, 0f,
+                0f, 1f, 0f, 0f, 0f,
+                0f, 0f, 2f - warmth, 0f, 0f,
+                0f, 0f, 0f, 1f, 0f
             )
-            cm.setConcat(warmMatrix, cm)
-            android.graphics.ColorMatrixColorFilter(cm)
+            ColorFilter.colorMatrix(ColorMatrix(concatColorMatrix(concatColorMatrix(mw, mc), mb)))
         } else null
     }
 
@@ -1055,6 +1050,20 @@ private fun TuningSlider(
             modifier = Modifier.width(52.dp)
         )
     }
+}
+
+/** Row-major 4x5 color-matrix concat: apply b first, then a. */
+private fun concatColorMatrix(a: FloatArray, b: FloatArray): FloatArray {
+    val out = FloatArray(20)
+    for (i in 0 until 4) {
+        for (j in 0 until 5) {
+            var sum = 0f
+            for (k in 0 until 4) sum += a[i * 5 + k] * b[k * 5 + j]
+            if (j == 4) sum += a[i * 5 + 4]
+            out[i * 5 + j] = sum
+        }
+    }
+    return out
 }
 
 // ═══════════════════════════════════════════════════════════
