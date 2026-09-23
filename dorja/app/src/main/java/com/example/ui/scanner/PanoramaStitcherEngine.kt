@@ -6,42 +6,60 @@ import android.graphics.BitmapFactory
 import android.util.Log
 import org.opencv.android.OpenCVLoader
 import org.opencv.android.Utils
+import org.opencv.calib3d.Calib3d
 import org.opencv.core.Core
 import org.opencv.core.CvType
+import org.opencv.core.DMatch
 import org.opencv.core.Mat
+import org.opencv.core.MatOfDMatch
+import org.opencv.core.MatOfKeyPoint
+import org.opencv.core.MatOfPoint2f
+import org.opencv.core.Point
+import org.opencv.core.Scalar
 import org.opencv.core.Size
+import org.opencv.features2d.AKAZE
+import org.opencv.features2d.DescriptorMatcher
 import org.opencv.imgproc.Imgproc
-import org.opencv.stitching.Stitcher
 import java.io.File
 import java.io.FileOutputStream
-import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 
 /**
- * On-device panorama stitching powered by OpenCV's [Stitcher].
+ * On-device panorama stitching powered by OpenCV.
  *
  * Fully offline: frames come straight off CameraX, stitching runs on the
  * phone's CPU, nothing ever leaves the device.
  *
- * Pipeline:
- *   JPEG frames → OpenCV Mats → [Stitcher.PANORAMA] (feature matching,
- *   homography estimation, warping, exposure compensation, seam finding,
- *   multi-band blending — all inside OpenCV) → cropped 2:1 equirect-style
- *   JPEG written to cache.
- *
- * The stitcher is created lazily per run and released afterwards, so memory
- * returns to the system between scans.
+ * Pipeline (all OpenCV, no homemade CV):
+ *   JPEG frames → RGBA Mats → AKAZE keypoints/descriptors → BFMatcher knn
+ *   between consecutive frames → Lowe ratio test → RANSAC homography
+ *   (Calib3d.findHomography) → chained transform per frame into the frame-0
+ *   coordinate system → corner-projected canvas bounds → per-frame exposure
+ *   gains → perspective warp → feathered-alpha blend → border crop → 2:1
+ *   letterboxed equirect-style JPEG in cache.
  */
 object PanoramaStitcherEngine {
 
     private const val TAG = "PanoramaStitcher"
 
-    /** Max long-edge fed into OpenCV; keeps memory bounded on 12 MP frames. */
+    /** Max long-edge fed into the pipeline; keeps memory bounded on 12 MP frames. */
     private const val MAX_INPUT_EDGE = 1600
 
-    /** Downscale step for the Otsu border scan of the stitched output. */
+    /** Downscale step for the border scan of the stitched output. */
     private const val BORDER_SCAN_SAMPLE = 4
+
+    /** Lowe ratio test threshold for good matches. */
+    private const val MATCH_RATIO = 0.72
+
+    /** Minimum good matches before RANSAC is attempted for a pair. */
+    private const val MIN_GOOD_MATCHES = 12
+
+    /** RANSAC reprojection threshold in pixels. */
+    private const val RANSAC_REPROJ_THRESH = 4.0
+
+    /** Feather ramp width in pixels for seam blending. */
+    private const val FEATHER_PX = 48.0
 
     private var initialized = false
 
@@ -53,14 +71,6 @@ object PanoramaStitcherEngine {
         return initialized
     }
 
-    /**
-     * Result of a stitch run.
-     *
-     * Note on multi-brand status codes: OpenCV's Java wrapper predates the
-     * homography-estimation failure split (ERR_HOMOGRAPHY_EST = 3, the old
-     * generic error = 1), so both numeric failures are accepted here and
-     * mapped to a user-actionable message.
-     */
     sealed class StitchResult {
         data class Success(val panoramaPath: String, val width: Int, val height: Int) : StitchResult()
         data class Failure(val reason: Reason, val status: Int) : StitchResult()
@@ -101,34 +111,15 @@ object PanoramaStitcherEngine {
             if (mats.size < 2) {
                 return StitchResult.Failure(Reason.NOT_ENOUGH_FRAMES, -3)
             }
-            Log.i(TAG, "Stitching ${mats.size} frames with OpenCV Stitcher.PANORAMA")
 
-            // ── Hand the whole pipeline to OpenCV ───────────────────────────
-            // PANORAMA mode = spherical warping + bundle-adjusted camera
-            // estimation + exposure compensation + multi-band blending.
-            val stitcher = Stitcher.create(Stitcher.PANORAMA)
-            // Bounded work-mem gives predictable behavior on low-RAM phones.
-            try { stitcher.panoConfidenceThreshold = 0.6 } catch (_: Throwable) { /* optional knob */ }
-            val result = Mat()
-            val status: Int = try {
-                stitcher.stitch(mats, result)
-            } finally {
-                stitcher.dispose()
-            }
-
-            if (status != Stitcher.OK) {
-                Log.w(TAG, "OpenCV stitcher returned status $status")
-                result.release()
-                return StitchResult.Failure(status.toReason(), status)
-            }
-
+            val result = buildMosaic(mats)
+                ?: return StitchResult.Failure(Reason.NO_MATCH, 1)
             if (result.empty() || result.cols() < 64 || result.rows() < 64) {
                 result.release()
-                return StitchResult.Failure(Reason.UNKNOWN, status)
+                return StitchResult.Failure(Reason.NO_MATCH, 1)
             }
 
-            // ── Post-process: RGB → crop → letterbox-free 2:1 ─────────────
-            Imgproc.cvtColor(result, result, Imgproc.COLOR_BGR2RGBA)
+            // ── Post-process: crop → 2:1 letterboxed output ────────────────
             val stitched = cropAutoDetectedBorders(result)
             result.release()
 
@@ -157,10 +148,283 @@ object PanoramaStitcherEngine {
         }
     }
 
-    private fun Int.toReason(): Reason = when (this) {
-        1, 3 -> Reason.NO_MATCH          // ERR_NEED_MORE_IMGS / ERR_HOMOGRAPHY_EST
-        2 -> Reason.LOW_TEXTURE          // ERR_CAMERA_PARAMS
-        else -> Reason.UNKNOWN
+    // ═══════════════════════════════════════════════════════════════
+    //  Feature-based mosaic pipeline
+    // ═══════════════════════════════════════════════════════════════
+
+    /** Detection/descriptor state for one frame. */
+    private class FrameFeatures(
+        val gray: Mat,
+        val keypoints: MatOfKeyPoint,
+        val descriptors: Mat
+    )
+
+    private fun releaseFeatures(features: List<FrameFeatures>) {
+        for (f in features) {
+            f.gray.release()
+            f.keypoints.release()
+            f.descriptors.release()
+        }
+    }
+
+    /**
+     * Builds a blended mosaic from ordered frames.
+     * Returns null when frames cannot be reliably matched.
+     */
+    private fun buildMosaic(framesIn: List<Mat>): Mat? {
+        // 1. AKAZE features per frame
+        val detector = AKAZE.create()
+        val features = ArrayList<FrameFeatures>(framesIn.size)
+        for (mat in framesIn) {
+            val gray = Mat()
+            Imgproc.cvtColor(mat, gray, Imgproc.COLOR_RGBA2GRAY)
+            val kp = MatOfKeyPoint()
+            val desc = Mat()
+            detector.detectAndCompute(gray, Mat(), kp, desc)
+            features.add(FrameFeatures(gray, kp, desc))
+        }
+        detector.clear()
+
+        val transforms = ArrayList<Mat>(features.size)
+        try {
+            // 2+3. Consecutive pairwise homographies H[i]: frame i → frame i-1
+            val matcher = DescriptorMatcher.create(DescriptorMatcher.BRUTEFORCE_HAMMING)
+            val pairH = ArrayList<Mat?>(features.size - 1)
+            for (i in 0 until features.size - 1) {
+                pairH.add(estimatePairHomography(matcher, features[i], features[i + 1]))
+            }
+            matcher.clear()
+
+            // Placement chain: transforms[i] maps frame i's pixels into frame
+            // 0's coordinate system. gemm(prev, h) = prev * h applies h first
+            // (i → i-1), then prev (i-1 → ... → 0). A missing link means the
+            // sweep had a gap — stop there, later frames would float.
+            transforms.add(Mat.eye(3, 3, CvType.CV_64FC1))
+            for (i in 1 until features.size) {
+                val h = pairH[i - 1] ?: break
+                val prev = transforms[i - 1]
+                val composed = Mat()
+                Core.gemm(prev, h, 1.0, Mat(), 0.0, composed)
+                h.release()
+                transforms.add(composed)
+            }
+            if (transforms.size < 2) {
+                releaseFeatures(features)
+                transforms.forEach { it.release() }
+                return null
+            }
+            val usable = transforms.size
+
+            // 4. Canvas bounds: project each frame's corners through its
+            //    transform into frame-0 coordinates.
+            var minX = Double.MAX_VALUE
+            var minY = Double.MAX_VALUE
+            var maxX = -Double.MAX_VALUE
+            var maxY = -Double.MAX_VALUE
+            val corners = MatOfPoint2f()
+            val projected = MatOfPoint2f()
+            for (i in 0 until usable) {
+                val w = features[i].gray.cols().toDouble()
+                val h = features[i].gray.rows().toDouble()
+                corners.fromArray(
+                    Point(0.0, 0.0),
+                    Point(w - 1.0, 0.0),
+                    Point(w - 1.0, h - 1.0),
+                    Point(0.0, h - 1.0)
+                )
+                Core.perspectiveTransform(corners, projected, transforms[i])
+                for (p in projected.toArray()) {
+                    minX = min(minX, p.x); maxX = max(maxX, p.x)
+                    minY = min(minY, p.y); maxY = max(maxY, p.y)
+                }
+            }
+            corners.release()
+            projected.release()
+
+            if (maxX <= minX || maxY <= minY) {
+                releaseFeatures(features)
+                transforms.forEach { it.release() }
+                return null
+            }
+            val canvasW = (maxX - minX).toInt().coerceIn(64, 8192)
+            val canvasH = (maxY - minY).toInt().coerceIn(64, 4096)
+            val offsetX = -minX
+            val offsetY = -minY
+            Log.i(TAG, "Mosaic canvas: ${canvasW}×${canvasH} from $usable frames")
+
+            // 5. Exposure gains chained from frame 0.
+            val gains = exposureGains(features, usable)
+
+            // 6. Warp each frame and blend with feathered weights.
+            val accColor = Mat.zeros(canvasH, canvasW, CvType.CV_32FC4)
+            val accWeight = Mat.zeros(canvasH, canvasW, CvType.CV_32FC1)
+            val shift = Mat.eye(3, 3, CvType.CV_64FC1)
+            shift.put(0, 2, offsetX)
+            shift.put(1, 2, offsetY)
+
+            for (i in 0 until usable) {
+                val shifted = Mat()
+                Core.gemm(shift, transforms[i], 1.0, Mat(), 0.0, shifted)
+
+                val warped8 = Mat()
+                Imgproc.warpPerspective(
+                    framesIn[i], warped8, shifted,
+                    Size(canvasW.toDouble(), canvasH.toDouble()),
+                    Imgproc.INTER_LINEAR, Core.BORDER_CONSTANT,
+                    Scalar(0.0, 0.0, 0.0, 0.0)
+                )
+
+                // Feather weight: linear ramp from the frame edges inward.
+                val fw = framesIn[i].cols()
+                val fh = framesIn[i].rows()
+                val maskSrc = Mat(fh, fw, CvType.CV_32FC1)
+                val maskRow = FloatArray(fw)
+                for (y in 0 until fh) {
+                    val ey = min(y.toDouble(), (fh - 1 - y).toDouble())
+                    for (x in 0 until fw) {
+                        val ex = min(x.toDouble(), (fw - 1 - x).toDouble())
+                        maskRow[x] = min(1.0, min(ex, ey) / FEATHER_PX).toFloat()
+                    }
+                    maskSrc.put(y, 0, maskRow)
+                }
+                val wMat = Mat()
+                Imgproc.warpPerspective(
+                    maskSrc, wMat, shifted,
+                    Size(canvasW.toDouble(), canvasH.toDouble()),
+                    Imgproc.INTER_LINEAR, Core.BORDER_CONSTANT, Scalar(0.0)
+                )
+                maskSrc.release()
+
+                // Premultiply colour by weight, accumulate.
+                val warpedF = Mat()
+                warped8.convertTo(warpedF, CvType.CV_32FC4)
+                warped8.release()
+                val chs = ArrayList<Mat>(4)
+                Core.split(warpedF, chs)
+                for (c in 0 until 3) {
+                    Core.multiply(chs[c], wMat, chs[c])
+                }
+                Core.merge(chs, warpedF)
+                chs.forEach { it.release() }
+                Core.add(accColor, warpedF, accColor)
+                Core.add(accWeight, wMat, accWeight)
+                warpedF.release()
+                wMat.release()
+                shifted.release()
+            }
+            shift.release()
+            transforms.forEach { it.release() }
+            transforms.clear()
+            releaseFeatures(features)
+
+            // 7. Normalise RGB by accumulated weight; alpha from coverage.
+            val denom = Mat()
+            Core.max(accWeight, Scalar(1e-4), denom)
+            val outChs = ArrayList<Mat>(4)
+            Core.split(accColor, outChs)
+            for (c in 0 until 3) {
+                Core.divide(outChs[c], denom, outChs[c])
+            }
+            val alpha = Mat()
+            Imgproc.threshold(accWeight, alpha, 0.02, 255.0, Imgproc.THRESH_BINARY)
+            outChs[3].release()
+            outChs[3] = alpha
+            Core.merge(outChs, accColor)
+            outChs.forEach { it.release() }
+            denom.release()
+            accWeight.release()
+
+            val out = Mat()
+            accColor.convertTo(out, CvType.CV_8UC4)
+            accColor.release()
+            return out
+        } catch (e: Exception) {
+            Log.e(TAG, "Mosaic pipeline failed", e)
+            releaseFeatures(features)
+            transforms.forEach { it.release() }
+            return null
+        }
+    }
+
+    /**
+     * AKAZE match + Lowe ratio + RANSAC between two frames.
+     * Returns H mapping points in [a] to points in [b], or null if the pair
+     * does not share enough confident matches.
+     */
+    private fun estimatePairHomography(
+        matcher: DescriptorMatcher,
+        a: FrameFeatures,
+        b: FrameFeatures
+    ): Mat? {
+        val knn = ArrayList<MatOfDMatch>()
+        matcher.knnMatch(a.descriptors, b.descriptors, knn, 2)
+        val goodList = ArrayList<DMatch>(knn.size)
+        for (m in knn) {
+            val arr = m.toArray()
+            if (arr.size == 2 && arr[0].distance < MATCH_RATIO * arr[1].distance) {
+                goodList.add(arr[0])
+            }
+            m.release()
+        }
+        knn.clear()
+        if (goodList.size < MIN_GOOD_MATCHES) return null
+
+        val kpA = a.keypoints.toArray()
+        val kpB = b.keypoints.toArray()
+        val src = ArrayList<Point>(goodList.size)
+        val dst = ArrayList<Point>(goodList.size)
+        for (d in goodList) {
+            src.add(kpA[d.queryIdx].pt)
+            dst.add(kpB[d.trainIdx].pt)
+        }
+        val srcPts = MatOfPoint2f()
+        val dstPts = MatOfPoint2f()
+        srcPts.fromList(src)
+        dstPts.fromList(dst)
+
+        val inlierMask = Mat()
+        val h = Calib3d.findHomography(
+            srcPts, dstPts, Calib3d.RANSAC, RANSAC_REPROJ_THRESH, inlierMask, 2000, 0.995
+        )
+        val inliers = if (h.empty()) 0 else inlierMask.toList().count { it != 0.0 }
+        inlierMask.release()
+        srcPts.release()
+        dstPts.release()
+        if (h.empty() || inliers < MIN_GOOD_MATCHES / 2) {
+            h.release()
+            Log.d(TAG, "Pair rejected: ${goodList.size} good matches, $inliers inliers")
+            return null
+        }
+        Log.d(TAG, "Pair matched: ${goodList.size} good, $inliers inliers")
+        return h
+    }
+
+    /**
+     * Exposure levelling: mean luminance ratio between consecutive frames,
+     * chained into multiplicative gains clamped to [0.6, 1.6]. Frame 0 is
+     * the reference.
+     */
+    private fun exposureGains(features: List<FrameFeatures>, usable: Int): FloatArray {
+        val gains = FloatArray(usable) { 1f }
+        if (usable < 2) return gains
+        for (i in 1 until usable) {
+            val a = meanLum(features[i - 1].gray)
+            val b = meanLum(features[i].gray)
+            gains[i] = if (a != null && b != null && b > 10f) {
+                (gains[i - 1] * (a / b)).coerceIn(0.6f, 1.6f)
+            } else {
+                gains[i - 1]
+            }
+        }
+        return gains
+    }
+
+    private fun meanLum(gray: Mat): Float? {
+        val small = Mat()
+        Imgproc.resize(gray, small, Size(64.0, 64.0))
+        val mean = Core.mean(small).`val`[0].toFloat()
+        small.release()
+        return if (mean > 0f) mean else null
     }
 
     /** Decodes a JPEG bounded so its longest edge ≤ [MAX_INPUT_EDGE]. */
@@ -181,20 +445,22 @@ object PanoramaStitcherEngine {
 
     /**
      * Detects near-black padding rows/columns on the stitched result and crops
-     * them away. OpenCV fills warp areas it could not cover with black, and
-     * those bands would later be stretched by the 2:1 letterbox step.
+     * them away. Uncovered warp areas render as transparent/black padding, and
+     * those bands would otherwise be stretched by the 2:1 letterbox step.
      */
     private fun cropAutoDetectedBorders(src: Mat): Mat {
         val small = Mat()
-        Imgproc.resize(src, small, Size(
-            (src.cols() / BORDER_SCAN_SAMPLE.toDouble()).coerceAtLeast(1.0),
-            (src.rows() / BORDER_SCAN_SAMPLE.toDouble()).coerceAtLeast(1.0)
-        ))
+        Imgproc.resize(
+            src, small, Size(
+                (src.cols() / BORDER_SCAN_SAMPLE.toDouble()).coerceAtLeast(1.0),
+                (src.rows() / BORDER_SCAN_SAMPLE.toDouble()).coerceAtLeast(1.0)
+            )
+        )
         val gray = Mat()
         Imgproc.cvtColor(small, gray, Imgproc.COLOR_RGBA2GRAY)
 
         val thresh = Mat()
-        // 12/255 Otsu-free threshold: anything darker than near-black is padding.
+        // Anything darker than near-black is padding.
         Imgproc.threshold(gray, thresh, 12.0, 255.0, Imgproc.THRESH_BINARY)
 
         val rows = thresh.rows()
@@ -225,14 +491,12 @@ object PanoramaStitcherEngine {
         while (right > left && colMean(right) < 0.05) right--
         small.release(); gray.release(); thresh.release()
 
-        val cropW = (right - left + 1) * BORDER_SCAN_SAMPLE
-        val cropH = (bottom - top + 1) * BORDER_SCAN_SAMPLE
-        val clampedW = min(cropW, src.cols())
-        val clampedH = min(cropH, src.rows())
-        if (clampedW <= 0 || clampedH <= 0 || (clampedW == src.cols() && clampedH == src.rows())) {
+        val cropW = min((right - left + 1) * BORDER_SCAN_SAMPLE, src.cols())
+        val cropH = min((bottom - top + 1) * BORDER_SCAN_SAMPLE, src.rows())
+        if (cropW <= 0 || cropH <= 0 || (cropW == src.cols() && cropH == src.rows())) {
             return src.clone()
         }
-        return src.submat(0, clampedH, 0, clampedW).clone()
+        return src.submat(0, cropH, 0, cropW).clone()
     }
 
     /**
@@ -270,8 +534,7 @@ object PanoramaStitcherEngine {
     /**
      * Mean absolute difference between the left and right edges of a panorama
      * (0–255). A closed 360° ring should wrap seamlessly, so a high value
-     * means the sweep did not close. Used by the scanner to warn honestly
-     * instead of saving a panorama with a visible seam.
+     * means the sweep did not close. -1 when it cannot be measured.
      */
     fun wrapSeamError(panoramaPath: String): Float {
         return try {
