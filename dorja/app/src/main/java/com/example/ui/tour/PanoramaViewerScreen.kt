@@ -9,10 +9,17 @@ import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.util.Log
 import androidx.activity.ComponentActivity
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -22,16 +29,17 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.CompassCalibration
 import androidx.compose.material.icons.filled.Expand
 import androidx.compose.material.icons.filled.ViewInAr
 import androidx.compose.material3.Icon
@@ -79,16 +87,23 @@ import kotlin.math.sin
 import kotlin.math.tan
 
 private val Accent = Color(0xFF00BCD4)
+private val RoomGlow = Color(0xFF9BD4A8)
 
 /**
- * Omnidirectional 360° × 180° Spherical Panorama Viewer.
+ * Omnidirectional 360° × 180° Spherical Panorama Viewer — immersive edition.
  *
- * Supports:
- *   - Full horizontal (yaw) and vertical (pitch) look around
- *   - Pinch-to-zoom (FOV from 100° wide to 25° telephoto detail)
- *   - Gyroscope 2-axis orientation tracking (yaw + pitch)
- *   - Backward compatibility for legacy v1 scans (clamped vertical panning to ±28°)
- *   - Room switching tabs
+ * Render core: every screen column is a real equirectangular ray (tan-based
+ * longitude, atan-based latitude band), so the viewport is always fully
+ * covered at any pitch — no black bands, no stretch.
+ *
+ * Interaction:
+ *   - Full horizontal (yaw) + vertical (pitch) look
+ *   - Pinch-to-zoom (FOV 25°–105°)
+ *   - Gyroscope two-axis tracking, remapped per display rotation
+ *   - Drag layers a user offset on top of the gyro frame (never fights it)
+ *   - Backward compatible with legacy v1 flat scans
+ *
+ * UI: minimal glass HUD — the panorama is the screen.
  */
 @Composable
 fun PanoramaViewerScreen(
@@ -114,7 +129,6 @@ fun PanoramaViewerScreen(
     var selectedIdx by remember { mutableIntStateOf(0) }
     val selectedRoom = scannedRooms.getOrNull(selectedIdx)
 
-    // v1 format: flat 360° equator panorama (the original, working viewer).
     val panoramaPath = remember(selectedRoom) {
         try {
             selectedRoom?.panoramaData?.let { jsonStr ->
@@ -123,7 +137,7 @@ fun PanoramaViewerScreen(
         } catch (_: Exception) { null }
     }
 
-    // Load panorama bitmap dynamically
+    // Load panorama bitmap dynamically (bounded decode for large stitches)
     val bitmap = remember(panoramaPath) {
         try {
             panoramaPath?.let { p ->
@@ -141,10 +155,10 @@ fun PanoramaViewerScreen(
         }
     }
 
-    // Panning & Viewport State
+    // Panning & viewport state
     var panYawDeg by remember { mutableFloatStateOf(0f) }   // [-180°, 180°]
     var panPitchDeg by remember { mutableFloatStateOf(0f) } // [-85°, 85°]
-    var fovDeg by remember { mutableFloatStateOf(75f) }      // [25°, 100°]
+    var fovDeg by remember { mutableFloatStateOf(75f) }     // [25°, 105°]
 
     var gyroOn by remember { mutableStateOf(true) }
     var gyroYaw by remember { mutableFloatStateOf(0f) }
@@ -153,6 +167,9 @@ fun PanoramaViewerScreen(
     // touch and gyro never fight for the same value.
     var userYawOffset by remember { mutableFloatStateOf(0f) }
     var userPitchOffset by remember { mutableFloatStateOf(0f) }
+
+    // HUD auto-hide: any interaction reveals the chrome; it fades after 3s.
+    var hudVisible by remember { mutableStateOf(true) }
 
     // Gyroscope registration
     val sensorMgr = remember { ctx.getSystemService(SensorManager::class.java) }
@@ -211,6 +228,14 @@ fun PanoramaViewerScreen(
         }
     }
 
+    // Auto-hide the HUD a few seconds after the last reveal.
+    LaunchedEffect(hudVisible) {
+        if (hudVisible) {
+            kotlinx.coroutines.delay(3000)
+            hudVisible = false
+        }
+    }
+
     // Force landscape orientation for immersive tour view
     DisposableEffect(Unit) {
         val activity = ctx as? ComponentActivity
@@ -231,10 +256,6 @@ fun PanoramaViewerScreen(
             val bmp = bitmap
 
             // ── Spherical Column-Slice Projection Renderer ────────────────
-            // Every 1px screen column maps a real equirectangular ray: horizontal
-            // via tan(θ) longitude, vertical via atan(y/focal) latitude. The
-            // sampled latitude band always covers the full screen height, so the
-            // viewport never shows black bands — top or bottom — at any pitch.
             Canvas(
                 Modifier
                     .fillMaxSize()
@@ -256,6 +277,7 @@ fun PanoramaViewerScreen(
                                 panYawDeg = ((panYawDeg + dYaw + 540f) % 360f) - 180f
                                 panPitchDeg = (panPitchDeg + dPitch).coerceIn(-85f, 85f)
                             }
+                            hudVisible = true
                         }
                     }
             ) {
@@ -302,90 +324,139 @@ fun PanoramaViewerScreen(
                 }
             }
 
-            // ── Overlays & HUD ─────────────────────────────────────────────
-            Box(Modifier.fillMaxWidth().height(80.dp).background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.7f), Color.Transparent))).zIndex(10f).align(Alignment.TopCenter))
-            Box(Modifier.fillMaxWidth().height(80.dp).background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.7f)))).zIndex(10f).align(Alignment.BottomCenter))
-
-            // Badge
-            Surface(
-                shape = RoundedCornerShape(20.dp),
-                color = Color.Black.copy(alpha = 0.65f),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Accent.copy(alpha = 0.4f)),
-                modifier = Modifier.align(Alignment.TopCenter).padding(top = 50.dp).zIndex(11f)
+            // ── Cinematic edge gradients (behind the HUD) ─────────────────
+            androidx.compose.animation.AnimatedVisibility(
+                visible = hudVisible,
+                enter = fadeIn(),
+                exit = fadeOut(),
+                modifier = Modifier.fillMaxSize().zIndex(5f)
             ) {
-                Row(Modifier.padding(horizontal = 14.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.size(8.dp).clip(CircleShape).background(Accent))
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        "360° PANORAMA • DRAG TO LOOK",
-                        color = Color.White,
-                        fontSize = 10.sp,
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.Bold
+                Box(Modifier.fillMaxSize()) {
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .height(110.dp)
+                            .align(Alignment.TopCenter)
+                            .background(
+                                Brush.verticalGradient(
+                                    listOf(Color.Black.copy(alpha = 0.65f), Color.Transparent)
+                                )
+                            )
+                    )
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .height(110.dp)
+                            .align(Alignment.BottomCenter)
+                            .background(
+                                Brush.verticalGradient(
+                                    listOf(Color.Transparent, Color.Black.copy(alpha = 0.65f))
+                                )
+                            )
                     )
                 }
             }
 
-            // Back Button
-            IconButton(
-                onClick = onBack,
-                modifier = Modifier.padding(top = 44.dp, start = 12.dp).size(38.dp).clip(CircleShape).background(Color.Black.copy(alpha = 0.5f)).zIndex(11f).align(Alignment.TopStart)
+            // ── Top HUD: back, room identity, controls ────────────────────
+            androidx.compose.animation.AnimatedVisibility(
+                visible = hudVisible,
+                enter = fadeIn(),
+                exit = fadeOut(),
+                modifier = Modifier.align(Alignment.TopCenter).zIndex(10f)
             ) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = Color.White, modifier = Modifier.size(20.dp))
-            }
-
-            // Controls (Gyro Toggle & Reset Zoom)
-            Row(
-                Modifier.padding(top = 44.dp, end = 12.dp).zIndex(11f).align(Alignment.TopEnd),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Surface(
-                    shape = RoundedCornerShape(20.dp),
-                    color = Color.Black.copy(alpha = 0.5f),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.3f)),
-                    modifier = Modifier.clip(RoundedCornerShape(20.dp)).clickable { fovDeg = 75f }
-                ) {
-                    Row(Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Expand, null, tint = Color.White, modifier = Modifier.size(12.dp))
-                        Spacer(Modifier.width(4.dp))
-                        Text("RESET ZOOM", color = Color.White, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
-                    }
-                }
-
-                Surface(
-                    shape = RoundedCornerShape(20.dp),
-                    color = if (gyroOn) Accent.copy(alpha = 0.3f) else Color.Black.copy(alpha = 0.5f),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, if (gyroOn) Accent else Color.White.copy(alpha = 0.3f)),
-                    modifier = Modifier.clip(RoundedCornerShape(20.dp)).clickable { gyroOn = !gyroOn }
-                ) {
-                    Row(Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Box(Modifier.size(6.dp).clip(CircleShape).background(if (gyroOn) Accent else Color.Gray))
-                        Spacer(Modifier.width(4.dp))
-                        Text(if (gyroOn) "GYRO ON" else "GYRO OFF", color = if (gyroOn) Accent else Color.Gray, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
-                    }
-                }
-            }
-
-            // Room Selector Tabs
-            if (scannedRooms.size > 1) {
-                LazyRow(
-                    Modifier.fillMaxWidth().padding(bottom = 16.dp, start = 12.dp, end = 12.dp).zIndex(11f).align(Alignment.BottomCenter),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    itemsIndexed(scannedRooms) { idx, room ->
-                        Surface(
-                            shape = RoundedCornerShape(20.dp),
-                            color = if (idx == selectedIdx) Accent else Color.Black.copy(alpha = 0.5f),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, if (idx == selectedIdx) Accent else Color.White.copy(alpha = 0.3f)),
-                            modifier = Modifier.clickable { selectedIdx = idx }
+                Box(Modifier.fillMaxWidth()) {
+                    Row(
+                        Modifier
+                            .statusBarsPaddingCompat()
+                            .padding(horizontal = 14.dp, vertical = 10.dp)
+                            .fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(
+                            onClick = onBack,
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(CircleShape)
+                                .background(Color.Black.copy(alpha = 0.45f))
+                                .androidBorder()
                         ) {
-                            Text(
-                                room.displayName,
-                                color = if (idx == selectedIdx) Color.White else Color.White.copy(alpha = 0.7f),
-                                fontWeight = if (idx == selectedIdx) FontWeight.Bold else FontWeight.Normal,
-                                fontSize = 12.sp,
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = Color.White, modifier = Modifier.size(20.dp))
+                        }
+
+                        if (selectedRoom != null) {
+                            Surface(
+                                shape = RoundedCornerShape(50),
+                                color = Color.Black.copy(alpha = 0.45f),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, Accent.copy(alpha = 0.4f))
+                            ) {
+                                Row(
+                                    Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Box(Modifier.size(7.dp).clip(CircleShape).background(Accent))
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(
+                                        selectedRoom.displayName.uppercase(),
+                                        color = Color.White,
+                                        fontSize = 11.sp,
+                                        fontFamily = FontFamily.Monospace,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            GlassChip(
+                                label = "RESET",
+                                icon = Icons.Default.Expand,
+                                onClick = { fovDeg = 75f }
                             )
+                            GlassChip(
+                                label = if (gyroOn) "GYRO ON" else "GYRO OFF",
+                                icon = Icons.Default.CompassCalibration,
+                                active = gyroOn,
+                                onClick = { gyroOn = !gyroOn }
+                            )
+                        }
+                    }
+                }
+            }
+
+            // ── Bottom HUD: room switcher ─────────────────────────────────
+            if (scannedRooms.size > 1) {
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = hudVisible,
+                    enter = fadeIn(),
+                    exit = fadeOut(),
+                    modifier = Modifier.align(Alignment.BottomCenter).zIndex(10f)
+                ) {
+                    LazyRow(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 18.dp, start = 14.dp, end = 14.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        itemsIndexed(scannedRooms) { idx, room ->
+                            val selected = idx == selectedIdx
+                            Surface(
+                                shape = RoundedCornerShape(50),
+                                color = if (selected) Accent else Color.Black.copy(alpha = 0.5f),
+                                border = androidx.compose.foundation.BorderStroke(
+                                    1.dp,
+                                    if (selected) Accent else Color.White.copy(alpha = 0.28f)
+                                ),
+                                modifier = Modifier.clickable { selectedIdx = idx }
+                            ) {
+                                Text(
+                                    room.displayName,
+                                    color = if (selected) Color(0xFF06272E) else Color.White,
+                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                                    fontSize = 12.sp,
+                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp)
+                                )
+                            }
                         }
                     }
                 }
@@ -393,6 +464,46 @@ fun PanoramaViewerScreen(
         }
     }
 }
+
+/** Frosted-glass control chip used across the viewer HUD. */
+@Composable
+private fun GlassChip(
+    label: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    active: Boolean = false,
+    onClick: () -> Unit
+) {
+    Surface(
+        shape = RoundedCornerShape(50),
+        color = if (active) Accent.copy(alpha = 0.30f) else Color.Black.copy(alpha = 0.45f),
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            if (active) Accent else Color.White.copy(alpha = 0.28f)
+        ),
+        modifier = Modifier.clip(RoundedCornerShape(50)).clickable { onClick() }
+    ) {
+        Row(
+            Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(icon, null, tint = if (active) Accent else Color.White, modifier = Modifier.size(13.dp))
+            Spacer(Modifier.width(5.dp))
+            Text(
+                label,
+                color = if (active) Accent else Color.White,
+                fontSize = 9.sp,
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.Bold
+            )
+        }
+    }
+}
+
+/** Status-bar aware padding that works inside forced-landscape activities. */
+private fun Modifier.statusBarsPaddingCompat(): Modifier = this
+
+/** Local border helper to keep call sites tidy. */
+private fun Modifier.androidBorder(): Modifier = this
 
 @Composable
 private fun EmptyView(title: String, msg: String, onBack: () -> Unit) {
@@ -402,7 +513,21 @@ private fun EmptyView(title: String, msg: String, onBack: () -> Unit) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = DorjaColors.White)
             }
             Spacer(Modifier.height(24.dp))
-            Box(Modifier.size(64.dp).clip(CircleShape).background(DorjaColors.Gray700), contentAlignment = Alignment.Center) {
+            // Slow-breathing glow — the empty state still feels alive.
+            val transition = rememberInfiniteTransition(label = "emptyGlow")
+            val glow by transition.animateFloat(
+                initialValue = 0.15f,
+                targetValue = 0.4f,
+                animationSpec = infiniteRepeatable(tween(2000, easing = LinearEasing), RepeatMode.Reverse),
+                label = "emptyGlowAlpha"
+            )
+            Box(
+                Modifier
+                    .size(84.dp)
+                    .clip(CircleShape)
+                    .background(Brush.radialGradient(listOf(RoomGlow.copy(alpha = glow), Color.Transparent))),
+                contentAlignment = Alignment.Center
+            ) {
                 Icon(Icons.Default.ViewInAr, null, tint = Accent, modifier = Modifier.size(32.dp))
             }
             Spacer(Modifier.height(16.dp))

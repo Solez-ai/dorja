@@ -86,6 +86,10 @@ dependencies {
   // implementation(libs.androidx.camera.core)
   // implementation(libs.androidx.camera.lifecycle)
     implementation("com.google.code.gson:gson:2.10.1")
+  // OpenCV — on-device panorama stitching (Stitcher.PANORAMA), 100% offline.
+  // Pinned to 4.12.0: the 5.x line is brand new and the stitcher API surface
+  // is less battle-tested on Android.
+  implementation("org.opencv:opencv:4.12.0")
   implementation(libs.androidx.camera.view)
   implementation(libs.androidx.compose.material.icons.core)
   implementation(libs.androidx.compose.material.icons.extended)

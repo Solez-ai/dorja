@@ -5,9 +5,6 @@ import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas as PanoCanvas
-import android.graphics.Color as AndroidColor
-import android.graphics.Rect
-import android.graphics.RectF
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
@@ -28,7 +25,6 @@ import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
@@ -91,8 +87,6 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
@@ -119,11 +113,9 @@ import java.io.FileOutputStream
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
-import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.cos
-import kotlin.math.max
 import kotlin.math.roundToInt
 import kotlin.math.sin
 
@@ -402,20 +394,21 @@ fun RoomScannerScreen(
                 stitchedPath = stitchedPath,
                 onStitch = { frames ->
                     scope.launch {
-                        try {
-                            val stitched = withContext(Dispatchers.IO) { stitchFrames(ctx, frames) }
-                            if (stitched != null) {
-                                stitchedPath = stitched
+                        stitchingStatus = "Stitching ${frames.size} frames on-device…"
+                        val result = withContext(Dispatchers.IO) {
+                            PanoramaStitcherEngine.stitch(ctx, frames.map { it.path })
+                        }
+                        when (result) {
+                            is PanoramaStitcherEngine.StitchResult.Success -> {
+                                stitchedPath = result.panoramaPath
                                 stitchingPreviewBmp = withContext(Dispatchers.IO) {
-                                    BitmapFactory.decodeFile(stitched)
+                                    BitmapFactory.decodeFile(result.panoramaPath)
                                 }
-                                stitchingStatus = "Stitching complete — tune lighting below if needed"
-                            } else {
-                                stitchingStatus = "Stitching failed. Retake frames."
+                                stitchingStatus = "Panorama ready — tune lighting below if needed"
                             }
-                        } catch (e: Exception) {
-                            Log.e("Scanner", "Stitch failed", e)
-                            stitchingStatus = "Stitching error: ${e.message}"
+                            is PanoramaStitcherEngine.StitchResult.Failure -> {
+                                stitchingStatus = result.reason.userMessage
+                            }
                         }
                     }
                 },
@@ -923,7 +916,9 @@ private fun DonePhase(
                 }
             }
 
-            // ── Post-scan lighting tuning ──
+            // ── Post-scan lighting tuning — live preview, no color filter bug ──
+            // The preview bitmap shown above is recomputed from the tuned file
+            // whenever Apply fires, so what you see is exactly what gets saved.
             if (showTuning) {
                 Surface(
                     shape = RoundedCornerShape(12.dp),
@@ -943,6 +938,7 @@ private fun DonePhase(
                                 "Reset",
                                 onClick = {
                                     brightness = 1f; contrast = 1f; warmth = 1f
+                                    lastApplied = Triple(1f, 1f, 1f)
                                 },
                                 modifier = Modifier.weight(1f)
                             )
@@ -966,7 +962,12 @@ private fun DonePhase(
                 Spacer(Modifier.height(10.dp))
             }
 
-            // Apply lighting when the sliders are confirmed with a change.
+            // Apply lighting when the sliders are confirmed with a change. The
+            // apply path rewrites the panorama file itself (single ColorMatrix
+            // bake) — the on-screen preview is re-decoded from that file, so no
+            // runtime ColorFilter is ever drawn over the image. That was the
+            // "blue filter" bug: a stale filter stayed composited on the
+            // preview after tuning.
             LaunchedEffect(lastApplied, stitchedPath) {
                 val (b, c, w) = lastApplied
                 if (stitchedPath != null && (b != 1f || c != 1f || w != 1f)) {
@@ -1257,274 +1258,6 @@ private fun cleanupFrameFiles(ctx: android.content.Context, frames: List<FrameDa
     }
 }
 
-// ══════════════════════════════════════════════════════════════
-//  PANORAMA STITCHING — restored original flat-panorama pipeline.
-//  Column-by-column cylindrical warp onto a 2:1 canvas. Not a sphere.
-// ══════════════════════════════════════════════════════════════
-private const val CAMERA_HFOV_DEG = 63.0 // typical phone horizontal FOV
-
-private fun stitchFrames(ctx: android.content.Context, frames: List<FrameData>): String? {
-    if (frames.isEmpty()) return null
-    return try {
-        stitchFramesInternal(ctx, frames)
-    } catch (e: OutOfMemoryError) {
-        Log.e("Stitcher", "OOM during stitching", e)
-        System.gc()
-        null
-    } catch (e: Exception) {
-        Log.e("Stitcher", "Stitching failed: ${e.message}", e)
-        null
-    }
-}
-
-/**
- * Overlap-band exposure gain compensation.
- *
- * Adjacent frames (including the wrap-around pair that closes the 360 ring)
- * see the same physical content in their overlap band, so the mean-luminance
- * ratio there is pure exposure difference from AE drift between shots.
- *
- * Gains are chained around the ring relative to frame 0 (well-defined
- * reference). Because a closed ring has no globally consistent solution, the
- * leftover loop error (last frame's measured ratio back to frame 0) is
- * distributed geometrically across all frames instead of being dumped on one
- * seam. Gains are clamped to [0.5, 2.0]; frames with too little valid
- * overlap keep gain 1.0.
- */
-private fun computeExposureGains(loadedFrames: List<LoadedFrameInfo>): FloatArray {
-    val n = loadedFrames.size
-    if (n < 2) return FloatArray(max(1, n)) { 1f }
-
-    val hFOV = Math.toRadians(CAMERA_HFOV_DEG)
-
-    fun meanLum(bmp: Bitmap, srcX: Int): Float? {
-        if (srcX < 0 || srcX >= bmp.width - 1) return null
-        val col = IntArray(bmp.height)
-        bmp.getPixels(col, 0, 1, srcX, 0, 1, bmp.height)
-        var sum = 0.0
-        var count = 0
-        for (p in col) {
-            // Near-black pixels carry no signal (borders / noise floor).
-            val mx = maxOf(p shr 16 and 0xFF, p shr 8 and 0xFF, p and 0xFF)
-            if (mx > 16) {
-                sum += 0.2126 * (p shr 16 and 0xFF) + 0.7152 * (p shr 8 and 0xFF) + 0.0722 * (p and 0xFF)
-                count++
-            }
-        }
-        return if (count >= 32) (sum / count).toFloat() else null
-    }
-
-    // Column in [a] and column in [b] that both look into their shared band.
-    fun overlapBand(a: Bitmap, b: Bitmap, headingA: Float, headingB: Float): Pair<Int, Int>? {
-        val headingGap = abs(((headingB - headingA + 540.0) % 360.0) - 180.0)
-        val overlapHalf = (hFOV - Math.toRadians(headingGap)) / 2.0
-        if (overlapHalf <= 0.0) return null
-
-        val relB = Math.toRadians(((headingB - headingA + 540.0) % 360.0) - 180.0)
-        val relA = -relB
-        val fa = a.width / (2.0 * Math.tan(hFOV / 2.0))
-        val fb = b.width / (2.0 * Math.tan(hFOV / 2.0))
-        val cxa = a.width / 2.0
-        val cxb = b.width / 2.0
-        // Outer edge of the overlap, on the side of each frame facing the other.
-        val aSrc = (fa * Math.tan(relB + overlapHalf * (if (relB >= 0) -1.0 else 1.0)) + cxa).toInt()
-        val bSrc = (fb * Math.tan(relA + overlapHalf * (if (relA >= 0) -1.0 else 1.0)) + cxb).toInt()
-        return Pair(aSrc, bSrc)
-    }
-
-    // Measured ratios r[i] = lum(i+1)/lum(i), wrap-around included.
-    val ratios = FloatArray(n) { 1f }
-    var measuredPairs = 0
-    for (i in 0 until n) {
-        val j = (i + 1) % n
-        val a = loadedFrames[i]
-        val b = loadedFrames[j]
-        val band = overlapBand(a.bmp, b.bmp, a.heading, b.heading) ?: continue
-        val lumA = meanLum(a.bmp, band.first) ?: continue
-        val lumB = meanLum(b.bmp, band.second) ?: continue
-        if (lumA < 8f || lumB < 8f) continue
-        ratios[i] = (lumB / lumA).coerceIn(0.4f, 2.5f)
-        measuredPairs++
-    }
-    if (measuredPairs == 0) return FloatArray(n) { 1f }
-
-    // Chain gains from the frame-0 anchor (index 0 keeps gain 1.0).
-    val gains = FloatArray(n)
-    gains[0] = 1f
-    for (i in 1 until n) gains[i] = (gains[i - 1] * ratios[i - 1]).coerceIn(0.5f, 2.0f)
-
-    // Distribute the loop error geometrically (Brown & Lowe style): if the
-    // measured ring were perfectly consistent, gains[n-1] * ratios[n-1] == 1.
-    val rho = (gains[n - 1] * ratios[n - 1]).coerceIn(0.5f, 2.0f)
-    if (abs(rho - 1f) > 0.01f) {
-        for (i in 0 until n) {
-            val correction = Math.pow(rho.toDouble(), -i.toDouble() / n).toFloat()
-            gains[i] = (gains[i] * correction).coerceIn(0.5f, 2.0f)
-        }
-    }
-    return gains
-}
-
-private class LoadedFrameInfo(
-    val bmp: Bitmap,
-    val heading: Float,
-    @Suppress("unused") val path: String
-)
-
-private fun stitchFramesInternal(ctx: android.content.Context, frameDataList: List<FrameData>): String? {
-    Log.i("Stitcher", "=== PANORAMA STITCHING PIPELINE ===")
-    Log.i("Stitcher", "Input: ${frameDataList.size} frames")
-    Log.i("Stitcher", "Target output: 4096×2048 (2:1 equirectangular)")
-
-    // ── Step 1: Load frames with consistent scaling ──────
-    val targetH = 800
-
-    val loadedFrames = frameDataList.mapNotNull { fd ->
-        try {
-            val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-            BitmapFactory.decodeFile(fd.path, opts)
-            Log.i("Stitcher", "  Frame: ${opts.outWidth}×${opts.outHeight} heading=${"%.1f".format(fd.heading)}° — ${fd.path}")
-            val sample = (opts.outHeight / targetH).coerceAtLeast(1)
-            val bmp = BitmapFactory.decodeFile(fd.path, BitmapFactory.Options().apply { inSampleSize = sample })
-            if (bmp != null && !bmp.isRecycled && bmp.width > 100 && bmp.height > 100) {
-                LoadedFrameInfo(bmp, fd.heading, fd.path)
-            } else {
-                Log.w("Stitcher", "  Frame SKIPPED (too small or null): ${bmp?.width}×${bmp?.height}")
-                bmp?.recycle()
-                null
-            }
-        } catch (e: Exception) {
-            Log.e("Stitcher", "  Frame FAILED to load: ${e.message}")
-            null
-        }
-    }
-
-    if (loadedFrames.size < 2) {
-        Log.e("Stitcher", "Not enough frames: ${loadedFrames.size}")
-        loadedFrames.forEach { it.bmp.recycle() }
-        return null
-    }
-    Log.i("Stitcher", "Loaded ${loadedFrames.size} frames, first: ${loadedFrames[0].bmp.width}×${loadedFrames[0].bmp.height}")
-
-    // Save raw frames for debug
-    val debugDir = File(ctx.cacheDir, "stitch_debug")
-    debugDir.mkdirs()
-    loadedFrames.forEachIndexed { i, f ->
-        val out = File(debugDir, "raw_frame_$i.jpg")
-        FileOutputStream(out).use { f.bmp.compress(Bitmap.CompressFormat.JPEG, 90, it) }
-    }
-
-    // ── Step 2: Compute equirectangular geometry ────────
-    val panoW = 4096
-    val panoH = 2048
-    val hFOV = Math.toRadians(CAMERA_HFOV_DEG)
-
-    // ── Step 2.5: Exposure gain compensation ───────────
-    // Adjacent frames share an overlap band of identical content; the mean
-    // luminance ratio there is pure exposure difference (AE drift between
-    // shots) — the classic banding in stitched panoramas. Compensate per
-    // frame and pre-build one ColorMatrix paint per frame so the warp loop
-    // stays allocation-free.
-    val frameGains = computeExposureGains(loadedFrames)
-    Log.i("Stitcher", "Exposure gains: ${frameGains.joinToString { "%.2f".format(it) }}")
-    val framePaints: List<android.graphics.Paint> = loadedFrames.mapIndexed { idx, _ ->
-        val gain = frameGains[idx]
-        if (abs(gain - 1f) > 0.01f) {
-            android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG or android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-                colorFilter = android.graphics.ColorMatrixColorFilter(
-                    android.graphics.ColorMatrix(
-                        floatArrayOf(
-                            gain, 0f, 0f, 0f, 0f,
-                            0f, gain, 0f, 0f, 0f,
-                            0f, 0f, gain, 0f, 0f,
-                            0f, 0f, 0f, 1f, 0f
-                        )
-                    )
-                )
-            }
-        } else {
-            android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG or android.graphics.Paint.ANTI_ALIAS_FLAG)
-        }
-    }
-
-    // ── Step 3: Create panorama canvas ────────────────
-    val panorama = Bitmap.createBitmap(panoW, panoH, Bitmap.Config.ARGB_8888)
-    val canvas = PanoCanvas(panorama)
-    val paint = android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG)
-
-    // ── Step 4: Column-by-column cylindrical warp ───────
-    for (panoX in 0 until panoW) {
-        val lon = (panoX.toDouble() / panoW) * 2.0 * PI
-
-        var bestFrame: LoadedFrameInfo? = null
-        var bestDist = Double.MAX_VALUE
-
-        for (frame in loadedFrames) {
-            val headingRad = Math.toRadians(frame.heading.toDouble())
-            var dist = abs(lon - headingRad)
-            if (dist > PI) dist = 2.0 * PI - dist
-
-            if (dist < hFOV / 2.0 && dist < bestDist) {
-                bestFrame = frame
-                bestDist = dist
-            }
-        }
-
-        if (bestFrame == null) continue
-
-        val frame = bestFrame
-        val headingRad = Math.toRadians(frame.heading.toDouble())
-
-        var relLon = lon - headingRad
-        while (relLon > PI) relLon -= 2.0 * PI
-        while (relLon < -PI) relLon += 2.0 * PI
-
-        val f = frame.bmp.width / (2.0 * Math.tan(hFOV / 2.0))
-        val cx = frame.bmp.width / 2.0
-
-        val srcX = (f * Math.tan(relLon) + cx).toInt()
-
-        if (srcX < 0 || srcX >= frame.bmp.width) continue
-
-        val srcRect = Rect(srcX, 0, srcX + 1, frame.bmp.height)
-        val dstRect = RectF(panoX.toFloat(), 0f, (panoX + 1).toFloat(), panoH.toFloat())
-        canvas.drawBitmap(frame.bmp, srcRect, dstRect, framePaints[loadedFrames.indexOf(frame)])
-    }
-
-    Log.i("Stitcher", "Panorama composited: ${panoW}×${panoH}")
-
-    // ── Step 5: Crop black borders ─────────────────────────
-    val cropped = cropBlackBorders(panorama)
-    panorama.recycle()
-    Log.i("Stitcher", "After crop: ${cropped.width}×${cropped.height}")
-
-    // ── Step 6: Ensure 2:1 equirectangular aspect ratio ──
-    val finalBmp = if (cropped.width != 2 * cropped.height || cropped.width != panoW) {
-        Log.i("Stitcher", "Resizing to exact 2:1 equirectangular: ${panoW}×${panoH}")
-        val scaled = Bitmap.createScaledBitmap(cropped, panoW, panoH, true)
-        cropped.recycle()
-        scaled
-    } else {
-        cropped
-    }
-
-    // ── Step 7: Save ─────────────────────────────────
-    try {
-        val out = File(ctx.cacheDir, "panorama_${System.currentTimeMillis()}.jpg")
-        FileOutputStream(out).use { finalBmp.compress(Bitmap.CompressFormat.JPEG, 90, it) }
-        finalBmp.recycle()
-        loadedFrames.forEach { it.bmp.recycle() }
-        Log.i("Stitcher", "Saved: ${out.absolutePath}")
-        Log.i("Stitcher", "=== STITCHING COMPLETE ===")
-        return out.absolutePath
-    } catch (e: Exception) {
-        Log.e("Stitcher", "Save failed", e)
-        finalBmp.recycle()
-        loadedFrames.forEach { it.bmp.recycle() }
-        return null
-    }
-}
-
 /**
  * Bakes brightness/contrast/warmth multipliers (1f = neutral) into a copy of
  * the panorama and returns the new file path. Uses a single ColorMatrix pass
@@ -1583,20 +1316,6 @@ private fun applyLightingAdjustments(srcPath: String, brightness: Float, contras
         Log.e("Scanner", "Lighting adjustment failed", e)
         return null
     }
-}
-
-/** Crop black (near-zero) borders from a bitmap */
-private fun cropBlackBorders(bitmap: Bitmap): Bitmap {
-    val w = bitmap.width; val h = bitmap.height
-    val pixels = IntArray(w * h); bitmap.getPixels(pixels, 0, w, 0, 0, w, h)
-    fun isBlack(px: Int) = AndroidColor.red(px) < 15 && AndroidColor.green(px) < 15 && AndroidColor.blue(px) < 15
-    var top = 0; var bottom = h - 1; var left = 0; var right = w - 1
-    for (y in 0 until h) { var found = false; for (x in 0 until w step 10) { if (!isBlack(pixels[y * w + x])) { found = true; break } }; if (found) { top = y; break } }
-    for (y in h - 1 downTo top) { var found = false; for (x in 0 until w step 10) { if (!isBlack(pixels[y * w + x])) { found = true; break } }; if (found) { bottom = y; break } }
-    for (x in 0 until w) { var found = false; for (y in top until bottom step 10) { if (!isBlack(pixels[y * w + x])) { found = true; break } }; if (found) { left = x; break } }
-    for (x in w - 1 downTo left) { var found = false; for (y in top until bottom step 10) { if (!isBlack(pixels[y * w + x])) { found = true; break } }; if (found) { right = x; break } }
-    val cropW = (right - left + 1).coerceAtLeast(1); val cropH = (bottom - top + 1).coerceAtLeast(1)
-    return Bitmap.createBitmap(bitmap, left, top, cropW, cropH)
 }
 
 private fun vibrateShutter(ctx: android.content.Context) {
