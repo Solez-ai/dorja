@@ -90,6 +90,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
@@ -865,7 +866,7 @@ private fun DonePhase(
     // Apply the adjustments are baked into the file and the filter is removed,
     // so the saved panorama is exactly what the user confirmed. (The old
     // blue-filter bug was an unscoped filter that leaked past Apply.)
-    val liveTuningFilter = remember(showTuning, brightness, contrast, warmth) {
+    val liveTuningFilter: ColorFilter? = remember(showTuning, brightness, contrast, warmth) {
         if (showTuning && (brightness != 1f || contrast != 1f || warmth != 1f)) {
             val cm = android.graphics.ColorMatrix(
                 floatArrayOf(
