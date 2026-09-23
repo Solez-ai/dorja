@@ -5,6 +5,9 @@ import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas as PanoCanvas
+import android.graphics.Color as AndroidColor
+import android.graphics.Rect
+import android.graphics.RectF
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
@@ -113,11 +116,13 @@ import java.io.FileOutputStream
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.roundToInt
 import kotlin.math.sin
+import kotlin.math.tan
 
 private enum class Phase { SELECT, PREVIEW, CAPTURING, DONE }
 
@@ -395,20 +400,17 @@ fun RoomScannerScreen(
                 onStitch = { frames ->
                     scope.launch {
                         stitchingStatus = "Stitching ${frames.size} frames on-device…"
-                        val result = withContext(Dispatchers.IO) {
-                            PanoramaStitcherEngine.stitch(ctx, frames.map { it.path })
+                        val stitched = withContext(Dispatchers.IO) {
+                            stitchFrames(ctx, frames)
                         }
-                        when (result) {
-                            is PanoramaStitcherEngine.StitchResult.Success -> {
-                                stitchedPath = result.panoramaPath
-                                stitchingPreviewBmp = withContext(Dispatchers.IO) {
-                                    BitmapFactory.decodeFile(result.panoramaPath)
-                                }
-                                stitchingStatus = "Panorama ready — tune lighting below if needed"
+                        if (stitched != null) {
+                            stitchedPath = stitched
+                            stitchingPreviewBmp = withContext(Dispatchers.IO) {
+                                BitmapFactory.decodeFile(stitched)
                             }
-                            is PanoramaStitcherEngine.StitchResult.Failure -> {
-                                stitchingStatus = result.reason.userMessage
-                            }
+                            stitchingStatus = "Panorama ready — tune lighting below if needed"
+                        } else {
+                            stitchingStatus = "Stitching failed — retake the scan and pause at every target"
                         }
                     }
                 },
@@ -483,15 +485,15 @@ private fun SelectRoom(
     onSelect: (RoomItem) -> Unit,
     onBack: () -> Unit
 ) {
-    Column(Modifier.fillMaxSize().background(DorjaColors.Ink950).padding(16.dp)) {
+    Column(Modifier.fillMaxSize().background(DorjaColors.CanvasBg).padding(16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = DorjaColors.White)
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = DorjaColors.Ink950)
             }
             Spacer(Modifier.width(8.dp))
             Column {
-                Text("Select Room to Scan", color = DorjaColors.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
-                Text("DORJA 360° Panorama Scanner", color = Accent, style = MaterialTheme.typography.bodySmall)
+                Text("Select Room to Scan", color = DorjaColors.Ink950, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
+                Text("DORJA 360° Panorama Scanner", color = DorjaColors.Jol600, style = MaterialTheme.typography.bodySmall)
             }
         }
         Spacer(Modifier.height(14.dp))
@@ -501,8 +503,8 @@ private fun SelectRoom(
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(Icons.Default.MeetingRoom, null, tint = DorjaColors.Gray500, modifier = Modifier.size(48.dp))
                     Spacer(Modifier.height(12.dp))
-                    Text("No Rooms Added", color = DorjaColors.White, style = MaterialTheme.typography.titleMedium)
-                    Text("Add rooms to your listing first", color = DorjaColors.Sand300)
+                    Text("No Rooms Added", color = DorjaColors.Ink950, style = MaterialTheme.typography.titleMedium)
+                    Text("Add rooms to your listing first", color = DorjaColors.Gray600)
                 }
             }
         } else {
@@ -511,20 +513,20 @@ private fun SelectRoom(
                     Surface(
                         Modifier.fillMaxWidth().clickable { onSelect(room) },
                         shape = RoundedCornerShape(12.dp),
-                        color = if (room.has3DScan) Accent.copy(alpha = 0.1f) else DorjaColors.Gray700,
-                        border = androidx.compose.foundation.BorderStroke(1.dp, if (room.has3DScan) Accent else DorjaColors.Sand300.copy(alpha = 0.3f))
+                        color = if (room.has3DScan) DorjaColors.Jol100 else DorjaColors.BentoCardBg,
+                        border = androidx.compose.foundation.BorderStroke(1.dp, if (room.has3DScan) DorjaColors.Jol600 else DorjaColors.BentoCardBorder)
                     ) {
                         Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
                             Box(
-                                Modifier.size(42.dp).clip(RoundedCornerShape(10.dp)).background(if (room.has3DScan) Accent.copy(alpha = 0.2f) else DorjaColors.Ink950),
+                                Modifier.size(42.dp).clip(RoundedCornerShape(10.dp)).background(if (room.has3DScan) Accent.copy(alpha = 0.2f) else DorjaColors.Sand100),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Icon(if (room.has3DScan) Icons.Default.CheckCircle else Icons.Default.MeetingRoom, null, tint = if (room.has3DScan) Accent else DorjaColors.Sand300, modifier = Modifier.size(20.dp))
+                                Icon(if (room.has3DScan) Icons.Default.CheckCircle else Icons.Default.MeetingRoom, null, tint = if (room.has3DScan) DorjaColors.Jol600 else DorjaColors.Gray500, modifier = Modifier.size(20.dp))
                             }
                             Spacer(Modifier.width(12.dp))
                             Column(Modifier.weight(1f)) {
-                                Text(room.displayName, color = DorjaColors.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
-                                Text(room.roomType.replace("_", " ").lowercase().replaceFirstChar { it.uppercase() }, color = DorjaColors.Sand300, fontSize = 11.sp)
+                                Text(room.displayName, color = DorjaColors.Ink950, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
+                                Text(room.roomType.replace("_", " ").lowercase().replaceFirstChar { it.uppercase() }, color = DorjaColors.Gray600, fontSize = 11.sp)
                             }
                             if (room.has3DScan) {
                                 Badge(containerColor = Accent.copy(alpha = 0.2f)) {
@@ -858,28 +860,65 @@ private fun DonePhase(
     var showTuning by remember { mutableStateOf(false) }
     var lastApplied by remember { mutableStateOf(Triple(1f, 1f, 1f)) }
 
+    // Live tuning feedback: while the tuning panel is open the preview is
+    // rendered with a transient ColorFilter scoped to THIS image only. On
+    // Apply the adjustments are baked into the file and the filter is removed,
+    // so the saved panorama is exactly what the user confirmed. (The old
+    // blue-filter bug was an unscoped filter that leaked past Apply.)
+    val liveTuningFilter = remember(showTuning, brightness, contrast, warmth) {
+        if (showTuning && (brightness != 1f || contrast != 1f || warmth != 1f)) {
+            val cm = android.graphics.ColorMatrix(
+                floatArrayOf(
+                    brightness, 0f, 0f, 0f, 0f,
+                    0f, brightness, 0f, 0f, 0f,
+                    0f, 0f, brightness, 0f, 0f,
+                    0f, 0f, 0f, 1f, 0f
+                )
+            )
+            val contrastMatrix = android.graphics.ColorMatrix(
+                floatArrayOf(
+                    contrast, 0f, 0f, 0f, 128f * (1f - contrast),
+                    0f, contrast, 0f, 0f, 128f * (1f - contrast),
+                    0f, 0f, contrast, 0f, 128f * (1f - contrast),
+                    0f, 0f, 0f, 1f, 0f
+                )
+            )
+            cm.setConcat(contrastMatrix, cm)
+            val warmMatrix = android.graphics.ColorMatrix(
+                floatArrayOf(
+                    warmth, 0f, 0f, 0f, 0f,
+                    0f, 1f, 0f, 0f, 0f,
+                    0f, 0f, 2f - warmth, 0f, 0f,
+                    0f, 0f, 0f, 1f, 0f
+                )
+            )
+            cm.setConcat(warmMatrix, cm)
+            android.graphics.ColorMatrixColorFilter(cm)
+        } else null
+    }
+
     // Auto-stitch once the frames are in — the user lands on a preview, not a blank page.
     LaunchedEffect(capturedFrames.size) {
         if (capturedFrames.isNotEmpty()) onStitch(capturedFrames)
     }
 
-    Box(Modifier.fillMaxSize().background(DorjaColors.Ink950).padding(20.dp), contentAlignment = Alignment.Center) {
+    Box(Modifier.fillMaxSize().background(DorjaColors.CanvasBg).padding(20.dp), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-            Box(Modifier.size(64.dp).clip(CircleShape).background(Accent.copy(alpha = 0.15f)), contentAlignment = Alignment.Center) {
-                Icon(Icons.Default.CheckCircle, null, tint = Accent, modifier = Modifier.size(36.dp))
+            Box(Modifier.size(64.dp).clip(CircleShape).background(DorjaColors.Jol100), contentAlignment = Alignment.Center) {
+                Icon(Icons.Default.CheckCircle, null, tint = DorjaColors.Jol600, modifier = Modifier.size(36.dp))
             }
             Spacer(Modifier.height(14.dp))
-            Text("Panorama Complete", color = DorjaColors.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
+            Text("Panorama Complete", color = DorjaColors.Ink950, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleLarge)
             Spacer(Modifier.height(4.dp))
-            Text("$frameCount photos captured for $roomName", color = DorjaColors.Sand300, textAlign = TextAlign.Center, fontSize = 12.sp)
+            Text("$frameCount photos captured for $roomName", color = DorjaColors.Gray600, textAlign = TextAlign.Center, fontSize = 12.sp)
             Spacer(Modifier.height(14.dp))
 
             // LIVE EQUIRRECTANGULAR STITCHING CANVAS PREVIEW
             if (stitchingPreviewBmp != null) {
                 Surface(
                     shape = RoundedCornerShape(12.dp),
-                    color = Color.Black,
-                    border = androidx.compose.foundation.BorderStroke(1.5.dp, Accent),
+                    color = DorjaColors.Gray300,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, DorjaColors.Jol600),
                     modifier = Modifier.fillMaxWidth().height(160.dp).padding(bottom = 12.dp)
                 ) {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -887,13 +926,14 @@ private fun DonePhase(
                             bitmap = stitchingPreviewBmp.asImageBitmap(),
                             contentDescription = "Live 360 Panorama Stitching Preview",
                             contentScale = ContentScale.Fit,
+                            colorFilter = liveTuningFilter,
                             modifier = Modifier.fillMaxSize()
                         )
                         Badge(
-                            containerColor = Color.Black.copy(alpha = 0.7f),
+                            containerColor = DorjaColors.InverseBg.copy(alpha = 0.78f),
                             modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)
                         ) {
-                            Text("LIVE 360° CANVAS PREVIEW", color = Accent, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
+                            Text("LIVE 360° CANVAS PREVIEW", color = DorjaColors.InverseFg, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
                         }
                     }
                 }
@@ -902,8 +942,8 @@ private fun DonePhase(
             if (stitchingStatus != null) {
                 Surface(
                     shape = RoundedCornerShape(10.dp),
-                    color = Accent.copy(alpha = 0.1f),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Accent.copy(alpha = 0.3f)),
+                    color = DorjaColors.Jol100,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, DorjaColors.Jol600.copy(alpha = 0.4f)),
                     modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
                 ) {
                     Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -911,7 +951,7 @@ private fun DonePhase(
                             CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Accent, strokeWidth = 2.dp)
                             Spacer(Modifier.width(12.dp))
                         }
-                        Text(stitchingStatus!!, color = Color.White, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+                        Text(stitchingStatus!!, color = DorjaColors.Ink950, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
                     }
                 }
             }
@@ -922,12 +962,12 @@ private fun DonePhase(
             if (showTuning) {
                 Surface(
                     shape = RoundedCornerShape(12.dp),
-                    color = DorjaColors.Gray700.copy(alpha = 0.4f),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Accent.copy(alpha = 0.3f)),
+                    color = DorjaColors.Sand100,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, DorjaColors.Jol600.copy(alpha = 0.4f)),
                     modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
                 ) {
                     Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
-                        Text("TUNE LIGHTING", color = Accent, fontSize = 10.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+                        Text("TUNE LIGHTING — CHANGES APPLY LIVE", color = DorjaColors.Jol600, fontSize = 10.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
                         Spacer(Modifier.height(4.dp))
                         TuningSlider("Brightness", brightness, 0.5f, 1.6f) { brightness = it }
                         TuningSlider("Contrast", contrast, 0.6f, 1.5f) { contrast = it }
@@ -999,7 +1039,7 @@ private fun TuningSlider(
     onChange: (Float) -> Unit
 ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(label, color = DorjaColors.Sand300, fontSize = 11.sp, modifier = Modifier.width(84.dp))
+        Text(label, color = DorjaColors.Gray600, fontSize = 11.sp, modifier = Modifier.width(84.dp))
         Slider(
             value = value,
             onValueChange = onChange,
@@ -1008,12 +1048,171 @@ private fun TuningSlider(
         )
         Text(
             "${((value - 1f) * 100).roundToInt().let { if (it >= 0) "+$it%" else "$it%" }}",
-            color = Color.White,
+            color = DorjaColors.Ink950,
             fontSize = 11.sp,
             fontFamily = FontFamily.Monospace,
             modifier = Modifier.width(52.dp)
         )
     }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  STITCHING — gyro-based cylindrical-to-equirectangular
+//
+//  The proven pipeline from the first releases, restored verbatim:
+//  for a phone rotating around a fixed point the recorded gyro heading
+//  tells us exactly where each frame sits on the panorama. Every panorama
+//  column is sampled from the frame whose heading is closest, using the
+//  pinhole model — no feature matching, no OpenCV, instant and reliable.
+// ═════════════════════════════════════════════════════════════
+
+private const val CAMERA_HFOV_DEG = 63.0 // typical phone horizontal FOV
+
+private fun stitchFrames(ctx: android.content.Context, frames: List<FrameData>): String? {
+    if (frames.isEmpty()) return null
+    return try {
+        stitchFramesInternal(ctx, frames)
+    } catch (e: OutOfMemoryError) {
+        Log.e("Stitcher", "OOM during stitching", e)
+        System.gc()
+        null
+    } catch (e: Exception) {
+        Log.e("Stitcher", "Stitching failed: ${e.message}", e)
+        null
+    }
+}
+
+private fun stitchFramesInternal(ctx: android.content.Context, frameDataList: List<FrameData>): String? {
+    Log.i("Stitcher", "=== PANORAMA STITCHING PIPELINE ===")
+    Log.i("Stitcher", "Input: ${frameDataList.size} frames")
+
+    // ── Step 1: Load frames with consistent scaling ──────
+    val targetH = 800
+    data class LoadedFrame(val bmp: Bitmap, val heading: Float, val path: String)
+
+    val loadedFrames = frameDataList.mapNotNull { fd ->
+        try {
+            val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeFile(fd.path, opts)
+            Log.i("Stitcher", "  Frame: ${opts.outWidth}×${opts.outHeight} heading=${"%.1f".format(fd.heading)}° — ${fd.path}")
+            val sample = (opts.outHeight / targetH).coerceAtLeast(1)
+            val bmp = BitmapFactory.decodeFile(fd.path, BitmapFactory.Options().apply { inSampleSize = sample })
+            if (bmp != null && !bmp.isRecycled && bmp.width > 100 && bmp.height > 100) {
+                LoadedFrame(bmp, fd.heading, fd.path)
+            } else {
+                Log.w("Stitcher", "  Frame SKIPPED (too small or null): ${bmp?.width}×${bmp?.height}")
+                bmp?.recycle()
+                null
+            }
+        } catch (e: Exception) {
+            Log.e("Stitcher", "  Frame FAILED to load: ${e.message}")
+            null
+        }
+    }
+
+    if (loadedFrames.size < 2) {
+        Log.e("Stitcher", "Not enough frames: ${loadedFrames.size}")
+        loadedFrames.forEach { it.bmp.recycle() }
+        return null
+    }
+    Log.i("Stitcher", "Loaded ${loadedFrames.size} frames, first: ${loadedFrames[0].bmp.width}×${loadedFrames[0].bmp.height}")
+
+    // ── Step 2: Compute equirectangular geometry ─────────
+    val panoW = 4096
+    val panoH = 2048
+    val hFOV = Math.toRadians(CAMERA_HFOV_DEG)
+
+    // ── Step 3: Create panorama canvas ───────────────────
+    val panorama = Bitmap.createBitmap(panoW, panoH, Bitmap.Config.ARGB_8888)
+    val canvas = PanoCanvas(panorama)
+    val paint = android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG)
+
+    // ── Step 4: Column-by-column cylindrical warp ────────
+    // For each panorama column, determine the longitude angle it represents,
+    // find the best source frame, and draw the corresponding source column.
+    for (panoX in 0 until panoW) {
+        val lon = (panoX.toDouble() / panoW) * 2.0 * PI
+
+        var bestFrame: LoadedFrame? = null
+        var bestDist = Double.MAX_VALUE
+
+        for (frame in loadedFrames) {
+            val headingRad = Math.toRadians(frame.heading.toDouble())
+            var dist = abs(lon - headingRad)
+            if (dist > PI) dist = 2.0 * PI - dist
+            if (dist < hFOV / 2.0 && dist < bestDist) {
+                bestFrame = frame
+                bestDist = dist
+            }
+        }
+
+        if (bestFrame == null) continue
+
+        val frame = bestFrame
+        val headingRad = Math.toRadians(frame.heading.toDouble())
+
+        var relLon = lon - headingRad
+        while (relLon > PI) relLon -= 2.0 * PI
+        while (relLon < -PI) relLon += 2.0 * PI
+
+        // Pinhole model: pixel x corresponds to angle atan((x - cx) / f)
+        val f = frame.bmp.width / (2.0 * tan(hFOV / 2.0))
+        val cx = frame.bmp.width / 2.0
+        val srcX = (f * tan(relLon) + cx).toInt()
+
+        if (srcX < 0 || srcX >= frame.bmp.width) continue
+
+        val srcRect = Rect(srcX, 0, srcX + 1, frame.bmp.height)
+        val dstRect = RectF(panoX.toFloat(), 0f, (panoX + 1).toFloat(), panoH.toFloat())
+        canvas.drawBitmap(frame.bmp, srcRect, dstRect, paint)
+    }
+
+    Log.i("Stitcher", "Panorama composited: ${panoW}×${panoH}")
+
+    // ── Step 5: Crop black borders (partial 360° coverage) ──
+    val cropped = cropBlackBorders(panorama)
+    panorama.recycle()
+    Log.i("Stitcher", "After crop: ${cropped.width}×${cropped.height}")
+
+    // ── Step 6: Ensure 2:1 equirectangular aspect ratio ──
+    val finalBmp = if (cropped.width != 2 * cropped.height || cropped.width != panoW) {
+        Log.i("Stitcher", "Resizing to exact 2:1 equirectangular: ${panoW}×${panoH}")
+        val scaled = Bitmap.createScaledBitmap(cropped, panoW, panoH, true)
+        cropped.recycle()
+        scaled
+    } else {
+        cropped
+    }
+
+    // ── Step 7: Save ────────────────────────────────────
+    return try {
+        val out = File(ctx.cacheDir, "panorama_${System.currentTimeMillis()}.jpg")
+        FileOutputStream(out).use { finalBmp.compress(Bitmap.CompressFormat.JPEG, 90, it) }
+        finalBmp.recycle()
+        loadedFrames.forEach { it.bmp.recycle() }
+        Log.i("Stitcher", "Saved: ${out.absolutePath}")
+        Log.i("Stitcher", "=== STITCHING COMPLETE ===")
+        out.absolutePath
+    } catch (e: Exception) {
+        Log.e("Stitcher", "Save failed", e)
+        finalBmp.recycle()
+        loadedFrames.forEach { it.bmp.recycle() }
+        null
+    }
+}
+
+/** Crop black (near-zero) borders from a bitmap */
+private fun cropBlackBorders(bitmap: Bitmap): Bitmap {
+    val w = bitmap.width; val h = bitmap.height
+    val pixels = IntArray(w * h); bitmap.getPixels(pixels, 0, w, 0, 0, w, h)
+    fun isBlack(px: Int) = AndroidColor.red(px) < 15 && AndroidColor.green(px) < 15 && AndroidColor.blue(px) < 15
+    var top = 0; var bottom = h - 1; var left = 0; var right = w - 1
+    for (y in 0 until h) { var found = false; for (x in 0 until w step 10) { if (!isBlack(pixels[y * w + x])) { found = true; break } }; if (found) { top = y; break } }
+    for (y in h - 1 downTo top) { var found = false; for (x in 0 until w step 10) { if (!isBlack(pixels[y * w + x])) { found = true; break } }; if (found) { bottom = y; break } }
+    for (x in 0 until w) { var found = false; for (y in top until bottom step 10) { if (!isBlack(pixels[y * w + x])) { found = true; break } }; if (found) { left = x; break } }
+    for (x in w - 1 downTo left) { var found = false; for (y in top until bottom step 10) { if (!isBlack(pixels[y * w + x])) { found = true; break } }; if (found) { right = x; break } }
+    val cropW = (right - left + 1).coerceAtLeast(1); val cropH = (bottom - top + 1).coerceAtLeast(1)
+    return Bitmap.createBitmap(bitmap, left, top, cropW, cropH)
 }
 
 // ═════════════════════════════════════════════════════════════

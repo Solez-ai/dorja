@@ -149,6 +149,7 @@ import com.example.ai.VoiceAssistantHelper
 import com.example.ui.ai.HeyDorjaAssistantSheet
 import com.example.ui.components.DorjaLogo
 import com.example.ui.theme.DorjaColors
+import com.example.ui.theme.LocalDarkTheme
 import com.example.ui.util.Formatters
 import kotlinx.coroutines.launch
 
@@ -1796,14 +1797,16 @@ val legalDocPicker = rememberLauncherForActivityResult(
         }
 
         // ── FLOATING GLASS ACTION BAR — a pill, not a slab ──
+        // Light mode: solid white pill so controls stay legible on bright
+        // pages; dark mode keeps the near-black glass.
         Surface(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(bottom = 18.dp),
             shape = RoundedCornerShape(28.dp),
-            color = DorjaColors.InverseBg.copy(alpha = 0.96f),
+            color = if (LocalDarkTheme.current) DorjaColors.InverseBg.copy(alpha = 0.96f) else DorjaColors.White,
             shadowElevation = 12.dp,
-            border = BorderStroke(1.dp, Color.White.copy(alpha = 0.14f))
+            border = BorderStroke(1.dp, if (LocalDarkTheme.current) Color.White.copy(alpha = 0.14f) else DorjaColors.BentoCardBorder)
         ) {
             Row(
                 modifier = Modifier
@@ -1814,7 +1817,7 @@ val legalDocPicker = rememberLauncherForActivityResult(
                 if (isOwner) {
                     Surface(
                         shape = RoundedCornerShape(22.dp),
-                        color = Color.White.copy(alpha = 0.10f),
+                        color = if (LocalDarkTheme.current) Color.White.copy(alpha = 0.10f) else DorjaColors.ErrorContainer,
                         onClick = {
                             scope.launch {
                                 repository.deleteListing(safeListing.id)
@@ -1853,7 +1856,7 @@ val legalDocPicker = rememberLauncherForActivityResult(
                     Surface(
                         shape = RoundedCornerShape(22.dp),
                         color = Color.Transparent,
-                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.35f)),
+                        border = BorderStroke(1.dp, if (LocalDarkTheme.current) Color.White.copy(alpha = 0.35f) else DorjaColors.Gray300),
                         onClick = {
                             val seekerId = currentUser?.id ?: "u2"
                             onChatWithSeller(safeListing.id, seekerId, safeListing.ownerId)
@@ -1867,14 +1870,14 @@ val legalDocPicker = rememberLauncherForActivityResult(
                             Icon(
                                 Icons.AutoMirrored.Filled.Chat,
                                 contentDescription = null,
-                                tint = Color.White,
+                                tint = if (LocalDarkTheme.current) Color.White else DorjaColors.Ink950,
                                 modifier = Modifier.size(18.dp)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
                                 "Chat",
                                 style = MaterialTheme.typography.labelLarge,
-                                color = Color.White,
+                                color = if (LocalDarkTheme.current) Color.White else DorjaColors.Ink950,
                                 fontWeight = FontWeight.Bold
                             )
                         }
@@ -2057,13 +2060,25 @@ private fun ImmersiveTourBanner(scannedCount: Int, onClick: () -> Unit) {
         Box(
             modifier = Modifier
                 .background(
-                    Brush.linearGradient(
-                        listOf(
-                            Color(0xFF122B1F),
-                            Color(0xFF0D1F17),
-                            Color(0xFF122B1F)
+                    // Dark mode keeps the deep-forest cinematic gradient; light
+                    // mode gets a soft mint band so it never reads as a dark blob.
+                    if (LocalDarkTheme.current) {
+                        Brush.linearGradient(
+                            listOf(
+                                Color(0xFF122B1F),
+                                Color(0xFF0D1F17),
+                                Color(0xFF122B1F)
+                            )
                         )
-                    )
+                    } else {
+                        Brush.linearGradient(
+                            listOf(
+                                Color(0xFFE7F4EA),
+                                Color(0xFFDCF0E3),
+                                Color(0xFFE7F4EA)
+                            )
+                        )
+                    }
                 )
                 .padding(18.dp)
         ) {
@@ -2080,13 +2095,13 @@ private fun ImmersiveTourBanner(scannedCount: Int, onClick: () -> Unit) {
                     modifier = Modifier
                         .size(52.dp)
                         .clip(RoundedCornerShape(16.dp))
-                        .background(DorjaColors.DrawerAccent.copy(alpha = 0.18f)),
+                        .background(DorjaColors.DrawerAccent.copy(alpha = if (LocalDarkTheme.current) 0.18f else 0.35f)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Default.ViewInAr,
                         contentDescription = "3D Scan",
-                        tint = DorjaColors.DrawerAccent,
+                        tint = if (LocalDarkTheme.current) DorjaColors.DrawerAccent else DorjaColors.Success,
                         modifier = Modifier.size(26.dp)
                     )
                 }
@@ -2095,19 +2110,19 @@ private fun ImmersiveTourBanner(scannedCount: Int, onClick: () -> Unit) {
                     Text(
                         text = "Step Inside",
                         style = MaterialTheme.typography.titleLarge,
-                        color = Color.White,
+                        color = if (LocalDarkTheme.current) Color.White else DorjaColors.Ink950,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
                         text = if (scannedCount > 0) "$scannedCount room${if (scannedCount == 1) "" else "s"} scanned in immersive 360°" else "Immersive 360° walkthrough available",
                         style = MaterialTheme.typography.bodySmall,
-                        color = DorjaColors.DrawerAccent,
+                        color = if (LocalDarkTheme.current) DorjaColors.DrawerAccent else DorjaColors.Success,
                         fontSize = 12.sp
                     )
                 }
                 Surface(
                     shape = RoundedCornerShape(50),
-                    color = DorjaColors.DrawerAccent,
+                    color = if (LocalDarkTheme.current) DorjaColors.DrawerAccent else DorjaColors.Success,
                     modifier = Modifier.testTag("see_3d_scans_hero_button")
                 ) {
                     Row(
@@ -2117,14 +2132,14 @@ private fun ImmersiveTourBanner(scannedCount: Int, onClick: () -> Unit) {
                         Text(
                             text = "Enter",
                             style = MaterialTheme.typography.labelLarge,
-                            color = Color(0xFF0D1F17),
+                            color = Color.White,
                             fontWeight = FontWeight.Black
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowForward,
                             contentDescription = null,
-                            tint = Color(0xFF0D1F17),
+                            tint = Color.White,
                             modifier = Modifier.size(14.dp)
                         )
                     }
@@ -2157,13 +2172,25 @@ private fun ScanBanner(onClick: () -> Unit) {
         Box(
             modifier = Modifier
                 .background(
-                    Brush.linearGradient(
-                        listOf(
-                            Color(0xFF0E2430),
-                            Color(0xFF0B1A24),
-                            Color(0xFF0E2430)
+                    // Same light-mode treatment as the green banner: keep the
+                    // deep-cyan cinematic gradient for dark mode only.
+                    if (LocalDarkTheme.current) {
+                        Brush.linearGradient(
+                            listOf(
+                                Color(0xFF0E2430),
+                                Color(0xFF0B1A24),
+                                Color(0xFF0E2430)
+                            )
                         )
-                    )
+                    } else {
+                        Brush.linearGradient(
+                            listOf(
+                                Color(0xFFE1F3F7),
+                                Color(0xFFD2ECF3),
+                                Color(0xFFE1F3F7)
+                            )
+                        )
+                    }
                 )
                 .padding(16.dp)
         ) {
@@ -2179,13 +2206,13 @@ private fun ScanBanner(onClick: () -> Unit) {
                     modifier = Modifier
                         .size(44.dp)
                         .clip(RoundedCornerShape(14.dp))
-                        .background(Color(0xFF00BCD4).copy(alpha = 0.16f)),
+                        .background(Color(0xFF00838F).copy(alpha = if (LocalDarkTheme.current) 0.16f else 0.12f)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Default.CameraAlt,
                         contentDescription = "Scan 3D",
-                        tint = Color(0xFF00BCD4),
+                        tint = if (LocalDarkTheme.current) Color(0xFF00BCD4) else Color(0xFF00838F),
                         modifier = Modifier.size(22.dp)
                     )
                 }
@@ -2194,20 +2221,20 @@ private fun ScanBanner(onClick: () -> Unit) {
                     Text(
                         text = "Scan a New Room",
                         style = MaterialTheme.typography.titleMedium,
-                        color = Color.White,
+                        color = if (LocalDarkTheme.current) Color.White else DorjaColors.Ink950,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
                         text = "360° capture with gyroscope guidance",
                         style = MaterialTheme.typography.bodySmall,
-                        color = Color(0xFF00BCD4),
+                        color = if (LocalDarkTheme.current) Color(0xFF00BCD4) else Color(0xFF00838F),
                         fontSize = 11.sp
                     )
                 }
                 Icon(
                     imageVector = Icons.Default.Add,
                     contentDescription = null,
-                    tint = Color(0xFF00BCD4),
+                    tint = if (LocalDarkTheme.current) Color(0xFF00BCD4) else Color(0xFF00838F),
                     modifier = Modifier.size(20.dp)
                 )
             }
@@ -2434,8 +2461,8 @@ private fun PaperTrailCard(
 private fun HeyDorjaPill(onClick: () -> Unit) {
     Surface(
         shape = CircleShape,
-        color = DorjaColors.White.copy(alpha = 0.12f),
-        border = BorderStroke(1.dp, DorjaColors.DrawerAccent.copy(alpha = 0.5f)),
+        color = if (LocalDarkTheme.current) DorjaColors.White.copy(alpha = 0.12f) else DorjaColors.BentoGreenBg,
+        border = BorderStroke(1.dp, DorjaColors.DrawerAccent.copy(alpha = if (LocalDarkTheme.current) 0.5f else 0.65f)),
         onClick = onClick
     ) {
         Row(
