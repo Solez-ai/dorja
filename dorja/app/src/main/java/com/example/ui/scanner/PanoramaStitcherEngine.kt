@@ -386,7 +386,15 @@ object PanoramaStitcherEngine {
         val h = Calib3d.findHomography(
             srcPts, dstPts, Calib3d.RANSAC, RANSAC_REPROJ_THRESH, inlierMask, 2000, 0.995
         )
-        val inliers = if (h.empty()) 0 else inlierMask.toList().count { it != 0.0 }
+        // inlierMask is CV_8U: 255 = inlier. Read it out row-by-row.
+        var inliers = 0
+        if (!h.empty()) {
+            val row = ByteArray(inlierMask.cols())
+            for (y in 0 until inlierMask.rows()) {
+                inlierMask.get(y, 0, row)
+                for (v in row) if (v.toInt() != 0) inliers++
+            }
+        }
         inlierMask.release()
         srcPts.release()
         dstPts.release()
