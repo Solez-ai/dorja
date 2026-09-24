@@ -56,8 +56,10 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavType
@@ -368,6 +370,10 @@ fun MainContainer(
     var currentBuyerTab by remember { mutableStateOf(BuyerTab.EXPLORE) }
     var drawerOpen by remember { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
+    // The drawer lives on the layout's start edge: the left in LTR, the right
+    // in RTL (Arabic, Persian, Hebrew, Urdu). Both the reveal animation and the
+    // edge-swipe gesture have to follow that edge.
+    val isRtl = LocalLayoutDirection.current == LayoutDirection.Rtl
 
     // Honor Settings-tab requests coming from stacked destinations (Hey Dorja sheet).
     // Guards against a race where MainContainer leaves composition while its
@@ -397,23 +403,32 @@ fun MainContainer(
         modifier = Modifier
             .fillMaxSize()
             .background(DorjaColors.DrawerBackdrop)
-            .pointerInput(Unit) {
-                // Edge-swipe: drag right starting within 48dp of the left edge
-                // opens the drawer. Vertical scrolls are ignored because their
-                // deltas arrive consumed by the scrolling child.
+            .pointerInput(isRtl) {
+                // Edge-swipe: an inward drag that starts within 48dp of the edge
+                // the drawer is on opens it - left edge in LTR, right edge in
+                // RTL. Vertical scrolls are ignored because their deltas arrive
+                // consumed by the scrolling child.
+                val edgeBand = 48.dp.toPx()
+                val openDistance = 72.dp.toPx()
+                val viewportWidth = size.width
                 awaitEachGesture {
                     val down = awaitFirstDown()
-                    var totalX = 0f
+                    var inward = 0f
                     var openedThisGesture = false
+                    // Physical right edge in RTL, physical left edge in LTR.
+                    val startedAtEdge =
+                        if (isRtl) down.position.x > viewportWidth - edgeBand
+                        else down.position.x < edgeBand
                     while (true) {
                         val event = awaitPointerEvent()
                         val change = event.changes.firstOrNull { it.id == down.id } ?: break
                         if (!event.changes.any { it.isConsumed }) {
-                            totalX += change.positionChange().x
+                            // Drag distance measured inwards, so the gesture reads
+                            // the same in both directions.
+                            inward += change.positionChange().x * (if (isRtl) -1f else 1f)
                         }
                         if (!openedThisGesture && !drawerOpen &&
-                            down.position.x < 48.dp.toPx() &&
-                            totalX > 72.dp.toPx()
+                            startedAtEdge && inward > openDistance
                         ) {
                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                             drawerOpen = true
@@ -451,18 +466,20 @@ fun MainContainer(
             }
         )
 
-        // ── Main app card (scales down + slides right to reveal the drawer) ──
+        // ── Main app card (scales down and slides away from the drawer edge) ──
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .graphicsLayer {
+                    // Negative travel in RTL: the card has to move left to uncover
+                    // a sidebar that sits on the right edge.
+                    val direction = if (isRtl) -1f else 1f
                     val slide = size.width * SIDEBAR_WIDTH_FRACTION
-                    translationX = slide * progress
                     val scale = 1f - (1f - DRAWER_SCALE) * progress
+                    // Keep the card centered on the visible column while scaled.
+                    translationX = direction * (slide - (size.width * (1f - scale) / 2f)) * progress
                     scaleX = scale
                     scaleY = scale
-                    // Keep the card centered on the visible column while scaled.
-                    translationX -= (size.width * (1f - scale) / 2f) * progress
                     shadowElevation = 24f * progress
                     shape = RoundedCornerShape((DRAWER_RADIUS_PX * progress).dp)
                     clip = progress > 0.01f

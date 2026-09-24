@@ -21,7 +21,6 @@ import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.PersonAdd
-import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -49,6 +48,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.DorjaApp
 import com.example.data.country.CountryRegistry
@@ -56,6 +56,7 @@ import com.example.ui.components.BentoCard
 import com.example.ui.components.DorjaButton
 import com.example.ui.components.DorjaLogo
 import com.example.ui.components.DorjaOutlinedButton
+import com.example.ui.components.ForwardChevron
 import com.example.ui.i18n.DorjaLocales
 import com.example.ui.i18n.L
 import com.example.ui.i18n.LocaleSettings
@@ -88,7 +89,7 @@ private fun SettingsActionRow(
             Text(title, style = MaterialTheme.typography.titleSmall, color = DorjaColors.Ink950, fontWeight = FontWeight.Bold)
             Text(subtitle, style = MaterialTheme.typography.bodySmall, color = DorjaColors.Gray700)
         }
-        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = DorjaColors.Gray500)
+        ForwardChevron(tint = DorjaColors.Gray500)
     }
 }
 
@@ -178,7 +179,8 @@ fun SettingsScreen(
                     text = L("settings_subtitle"),
                     style = MaterialTheme.typography.labelSmall,
                     color = DorjaColors.Gray700,
-                    maxLines = 1
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
         }

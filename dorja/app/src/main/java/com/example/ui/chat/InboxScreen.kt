@@ -18,7 +18,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
-import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -43,6 +42,7 @@ import com.example.DorjaApp
 import com.example.ui.components.DorjaAvatar
 import com.example.ui.components.DorjaBadge
 import com.example.ui.components.DorjaCard
+import com.example.ui.components.ForwardChevron
 import com.example.ui.i18n.L
 import com.example.ui.theme.DorjaColors
 import com.example.ui.util.Formatters
@@ -223,11 +223,7 @@ fun InboxScreen(
                                 )
                             }
                             Spacer(modifier = Modifier.width(8.dp))
-                            Icon(
-                                imageVector = Icons.Default.ChevronRight,
-                                contentDescription = null,
-                                tint = DorjaColors.Gray500
-                            )
+                            ForwardChevron(tint = DorjaColors.Gray500)
                         }
                     }
                 }

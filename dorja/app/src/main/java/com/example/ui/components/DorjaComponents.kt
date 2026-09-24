@@ -22,23 +22,26 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.sp
+import com.example.ui.i18n.L
 import coil.compose.AsyncImage
 import com.example.data.country.CountryRegistry
 import com.example.data.model.Listing
 import com.example.ui.i18n.DorjaLocales
-import com.example.ui.i18n.L
 import com.example.ui.i18n.LocaleSettings
 import com.example.ui.theme.DorjaColors
 import com.example.ui.theme.LiquidGlassDefaults
@@ -925,10 +928,9 @@ fun CountryPicker(
                     )
                 }
             }
-            Icon(
-                imageVector = Icons.Default.ChevronRight,
-                contentDescription = "Change country",
-                tint = DorjaColors.Gray600
+            ForwardChevron(
+                tint = DorjaColors.Gray600,
+                contentDescription = "Change country"
             )
         }
     }
@@ -1093,4 +1095,28 @@ fun CountryPicker(
             }
         }
     }
+}
+
+/**
+ * A chevron that always points "forward": right in LTR, left in RTL.
+ *
+ * Material's ChevronRight is not auto-mirrored in the icons version this app
+ * depends on, so a right-pointing glyph would keep pointing right in Arabic,
+ * Persian, Hebrew and Urdu — reading as "back" to those users. The glyph is
+ * flipped explicitly instead of relying on an AutoMirrored asset that may not
+ * exist in this dependency set.
+ */
+@Composable
+fun ForwardChevron(
+    modifier: Modifier = Modifier,
+    tint: Color = DorjaColors.Gray500,
+    contentDescription: String? = null
+) {
+    val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+    Icon(
+        imageVector = Icons.Default.ChevronRight,
+        contentDescription = contentDescription,
+        tint = tint,
+        modifier = modifier.graphicsLayer { if (rtl) scaleX = -1f }
+    )
 }

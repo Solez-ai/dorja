@@ -22,7 +22,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Apartment
 import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.DataUsage
 import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.Edit
@@ -88,6 +87,7 @@ import com.example.ui.components.DorjaBadge
 import com.example.ui.components.DorjaButton
 import com.example.ui.components.DorjaChip
 import com.example.ui.components.DorjaOutlinedButton
+import com.example.ui.components.ForwardChevron
 import com.example.ui.i18n.L
 import com.example.ui.i18n.Lf
 import com.example.ui.theme.DorjaColors
@@ -973,11 +973,7 @@ fun AccountScreen(
                                 color = DorjaColors.Gray700
                             )
                         }
-                        Icon(
-                            imageVector = Icons.Default.ChevronRight,
-                            contentDescription = null,
-                            tint = DorjaColors.Gray500
-                        )
+                        ForwardChevron(tint = DorjaColors.Gray500)
                     }
                 }
             }
@@ -1180,11 +1176,7 @@ private fun PrivacyActionRow(
                 color = DorjaColors.Gray700
             )
         }
-        Icon(
-            Icons.Default.ChevronRight,
-            contentDescription = null,
-            tint = DorjaColors.Gray500
-        )
+        ForwardChevron(tint = DorjaColors.Gray500)
     }
 }
 

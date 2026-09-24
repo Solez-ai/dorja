@@ -1499,7 +1499,8 @@ fun CreateListingScreen(
                                                     style = MaterialTheme.typography.bodySmall,
                                                     color = DorjaColors.Gray700,
                                                     fontSize = 11.sp,
-                                                    maxLines = 1
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Ellipsis
                                                 )
                                             }
                                             Spacer(modifier = Modifier.height(4.dp))
@@ -1732,7 +1733,8 @@ fun CreateListingScreen(
                                                                 style = MaterialTheme.typography.bodySmall,
                                                                 color = DorjaColors.Ink950,
                                                                 fontWeight = FontWeight.SemiBold,
-                                                                maxLines = 1
+                                                                maxLines = 1,
+                                                                overflow = TextOverflow.Ellipsis
                                                             )
                                                         }
                                                         Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Select Room", tint = DorjaColors.Gray700, modifier = Modifier.size(16.dp))

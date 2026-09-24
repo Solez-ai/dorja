@@ -576,7 +576,8 @@ private fun SpecChip(
                 color = if (highlighted) DorjaColors.Jol600 else DorjaColors.Gray700,
                 fontSize = 11.sp,
                 fontWeight = FontWeight.SemiBold,
-                maxLines = 1
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
     }
