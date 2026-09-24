@@ -4,9 +4,9 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
-import androidx.sqlite.db.SupportSQLiteDatabase
 import com.example.data.model.AppealRecord
 import com.example.data.model.Conversation
+import com.example.data.model.IdentityVerification
 import com.example.data.model.LegalDocument
 import com.example.data.model.Listing
 import com.example.data.model.Message
@@ -17,13 +17,11 @@ import com.example.data.model.Report
 import com.example.data.model.ReportResponse
 import com.example.data.model.RoomItem
 import com.example.data.model.Scan
+import com.example.data.model.ThirdPartyCheck
 import com.example.data.model.User
+import com.example.data.model.UserCredential
 import com.example.data.model.Viewing
-import androidx.room.RoomDatabase.Callback
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import androidx.room.TypeConverters
-import kotlinx.coroutines.launch
 
 @Database(
     entities = [
@@ -40,9 +38,12 @@ import kotlinx.coroutines.launch
         ProfessionalEndorsement::class,
         Report::class,
         ReportResponse::class,
-        AppealRecord::class
+        AppealRecord::class,
+        IdentityVerification::class,
+        UserCredential::class,
+        ThirdPartyCheck::class
     ],
-    version = 13,
+    version = 15,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -61,6 +62,9 @@ abstract class DorjaDatabase : RoomDatabase() {
     abstract fun reportDao(): ReportDao
     abstract fun reportResponseDao(): ReportResponseDao
     abstract fun appealDao(): AppealDao
+    abstract fun identityVerificationDao(): IdentityVerificationDao
+    abstract fun userCredentialDao(): UserCredentialDao
+    abstract fun thirdPartyCheckDao(): ThirdPartyCheckDao
 
     companion object {
         @Volatile
@@ -73,52 +77,14 @@ abstract class DorjaDatabase : RoomDatabase() {
                     DorjaDatabase::class.java,
                     "dorja_database"
                 )
+                    // The app ships with zero seed data: a fresh install starts
+                    // empty and every account is created by a real user through
+                    // the signup flow.
                     .fallbackToDestructiveMigration()
-                    .addCallback(DatabaseCallback())
                     .build()
                 INSTANCE = instance
                 instance
             }
-        }
-
-        private class DatabaseCallback : Callback() {
-            override fun onCreate(db: SupportSQLiteDatabase) {
-                super.onCreate(db)
-                INSTANCE?.let { database ->
-                    CoroutineScope(Dispatchers.IO).launch {
-                        populateInitialData(database)
-                    }
-                }
-            }
-        }
-
-        suspend fun populateInitialData(database: DorjaDatabase) {
-            val userDao = database.userDao()
-
-            // Only create default user accounts — no fake listings, rooms, scans, or documents
-            val hostUser = User(
-                id = "u1",
-                username = "shovro",
-                displayName = "Shovro",
-                role = "SELLER",
-                phone = "+880 1712-345678",
-                email = "",
-                bio = "Verified Host on Dorja",
-                location = "",
-                countryCode = "BD"
-            )
-            val buyerUser = User(
-                id = "u2",
-                username = "samin",
-                displayName = "Samin Yeasar",
-                role = "BUYER",
-                phone = "+880 1812-345678",
-                email = "",
-                bio = "Property Seeker",
-                location = "",
-                countryCode = "BD"
-            )
-            userDao.insertAll(listOf(hostUser, buyerUser))
         }
     }
 }

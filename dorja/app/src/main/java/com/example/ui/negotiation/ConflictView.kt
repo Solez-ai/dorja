@@ -2,7 +2,6 @@ package com.example.ui.negotiation
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -17,10 +16,14 @@ import androidx.compose.material.icons.filled.Balance
 import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.Gavel
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -43,13 +46,29 @@ import java.util.Locale
  * Evidence-graph conflict view (atlas §8): when two parties provide
  * conflicting claims, DORJA shows both — side by side, with source and
  * date. It never silently chooses one and never shows an opaque score.
+ *
+ * The card closes the whole loop: the reporter can withdraw while the
+ * dispute is open, the owner can record a resolution, either side can
+ * appeal a closed outcome, and the owner decides a submitted appeal.
  */
 @Composable
 fun ConflictCard(
     report: Report,
     responses: List<ReportResponse>,
     appeals: List<AppealRecord>,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    /** Id of the user viewing the card; gates the withdraw action. */
+    viewerId: String? = null,
+    /** True when the listing owner is viewing; gates resolve + appeal decisions. */
+    isOwner: Boolean = false,
+    /** Record a resolution (owner, while the dispute is open). */
+    onResolve: ((String) -> Unit)? = null,
+    /** Withdraw the report (reporter, while the dispute is open). */
+    onWithdraw: ((String) -> Unit)? = null,
+    /** Appeal a closed outcome (either party). */
+    onAppeal: ((String) -> Unit)? = null,
+    /** Decide a submitted appeal (owner). */
+    onDecideAppeal: ((reportId: String, appealId: String) -> Unit)? = null
 ) {
     val reason = ReportReason.fromCode(report.reason)
     val dateFmt = remember { SimpleDateFormat("MMM d, yyyy", Locale.getDefault()) }
@@ -60,6 +79,10 @@ fun ConflictCard(
         "COUNTERPARTY_RESPONDED" -> DorjaColors.BentoBlueBg to DorjaColors.BentoBlueText
         else -> DorjaColors.BentoAmberBg to DorjaColors.BentoAmberText
     }
+
+    val disputeOpen = report.state == "OPEN" || report.state == "COUNTERPARTY_RESPONDED"
+    val disputeClosed = report.state == "RESOLVED" || report.state == "WITHDRAWN"
+    val pendingAppeal = appeals.firstOrNull { it.state == "SUBMITTED" || it.state == "UNDER_REVIEW" }
 
     Column(modifier = modifier.fillMaxWidth()) {
         // Header: reason + state
@@ -162,12 +185,85 @@ fun ConflictCard(
         if (appeals.isNotEmpty()) {
             Spacer(modifier = Modifier.height(6.dp))
             appeals.forEach { appeal ->
-                Text(
-                    text = "Appeal (${appeal.state.replace('_', ' ').lowercase()}) ${dateFmt.format(Date(appeal.createdAt))}: ${appeal.grounds}",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = DorjaColors.Gray700,
-                    fontSize = 10.sp
-                )
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(DorjaColors.BentoPurpleBg, RoundedCornerShape(8.dp))
+                        .padding(8.dp)
+                ) {
+                    Text(
+                        text = "Appeal · ${appeal.state.replace('_', ' ').lowercase()} · ${dateFmt.format(Date(appeal.createdAt))}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = DorjaColors.BentoPurpleText,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = appeal.grounds,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = DorjaColors.BentoPurpleText,
+                        fontSize = 10.sp
+                    )
+                    if (appeal.state == "UPHELD" || appeal.state == "OVERTURNED") {
+                        if (appeal.decisionNote.isNotBlank()) {
+                            Text(
+                                text = "Decision: ${appeal.decisionNote}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = DorjaColors.BentoPurpleText,
+                                fontSize = 10.sp
+                            )
+                        }
+                    }
+                    // Owner can decide a submitted appeal
+                    if (appeal.state == "SUBMITTED" && onDecideAppeal != null && isOwner) {
+                        Spacer(modifier = Modifier.height(4.dp))
+                        TextButton(onClick = { onDecideAppeal(report.id, appeal.id) }) {
+                            Text("Decide this appeal", color = DorjaColors.BentoPurpleIcon, fontSize = 12.sp)
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+            }
+        }
+
+        // ── Actions — close the loop on every state ──
+        Spacer(modifier = Modifier.height(6.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (disputeOpen && onResolve != null && isOwner) {
+                Button(
+                    onClick = { onResolve(report.id) },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = DorjaColors.BentoGreenBg,
+                        contentColor = DorjaColors.BentoGreenText
+                    ),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                ) {
+                    Icon(Icons.Default.Gavel, contentDescription = null, modifier = Modifier.size(13.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Resolve", fontSize = 12.sp)
+                }
+            }
+            if (disputeOpen && onWithdraw != null && viewerId != null && viewerId == report.reportedByUserId) {
+                OutlinedButton(
+                    onClick = { onWithdraw(report.id) },
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                ) {
+                    Text("Withdraw report", fontSize = 12.sp, color = DorjaColors.Gray700)
+                }
+            }
+            if (disputeClosed && onAppeal != null && pendingAppeal == null) {
+                OutlinedButton(
+                    onClick = { onAppeal(report.id) },
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                ) {
+                    Icon(Icons.Default.Gavel, contentDescription = null, tint = DorjaColors.BentoPurpleIcon, modifier = Modifier.size(13.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Appeal outcome", fontSize = 12.sp, color = DorjaColors.BentoPurpleIcon)
+                }
             }
         }
 

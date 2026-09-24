@@ -12,13 +12,62 @@ data class User(
     @PrimaryKey val id: String,
     val username: String,
     val displayName: String,
-    val role: String, // SELLER or BUYER
+    val role: String, // SELLER, BUYER or ADMIN (at most one ADMIN exists)
     val phone: String,
     val email: String = "",
     val bio: String = "",
     val location: String = "",
     val countryCode: String = "BD",
     val avatarUrl: String? = null,
+    // Set when an admin approves the identity submission (atlas §3).
+    val isIdentityVerified: Boolean = false,
+    val identityVerifiedAt: Long? = null,
+    val createdAt: Long = System.currentTimeMillis()
+)
+
+/**
+ * Identity verification submission (atlas §2/§3). The full document number is
+ * NEVER stored — only a masked preview and a salt-free integrity hash so an
+ * admin can detect duplicate submissions without holding the raw number.
+ */
+@Entity(tableName = "identity_verifications")
+data class IdentityVerification(
+    @PrimaryKey val id: String,
+    val userId: String,
+    val countryCode: String,
+    val documentKind: String,              // NID / Aadhaar / Social Security / … per country
+    val holderName: String,                // name as written on the document
+    val documentNumberMasked: String,      // "•••• 4821"
+    val documentNumberHash: String,        // SHA-256(countryCode + full number)
+    val documentImageFileName: String? = null, // private-storage copy of the attached photo
+    val status: String = "SUBMITTED",      // SUBMITTED, UNDER_REVIEW, APPROVED, REJECTED
+    val submittedAt: Long = System.currentTimeMillis(),
+    val reviewedAt: Long? = null,
+    val reviewedByUserId: String? = null,
+    val reviewNote: String = ""
+)
+
+/** Local credential: SHA-256(salt + password). Never store the raw password. */
+@Entity(tableName = "user_credentials")
+data class UserCredential(
+    @PrimaryKey val userId: String,
+    val salt: String,
+    val passwordHash: String
+)
+
+/**
+ * Record of a third-party check performed while reviewing an identity
+ * submission (atlas §8 — third-party-verified evidence trail).
+ */
+@Entity(tableName = "third_party_checks")
+data class ThirdPartyCheck(
+    @PrimaryKey val id: String,
+    val subjectUserId: String,
+    val verificationId: String,
+    val checkType: String,        // ISSUER_DATABASE, DOCUMENT_AUTHENTICITY, SANCTIONS_SCREENING
+    val result: String,           // PASS, FLAGGED, INCONCLUSIVE
+    val checkedByUserId: String,  // admin who ran/recorded it
+    val note: String = "",
     val createdAt: Long = System.currentTimeMillis()
 )
 
@@ -125,6 +174,9 @@ data class LegalDocument(
     val checkedAt: Long? = null,
     val expiryState: String = EvidenceExpiry.UNKNOWN.code,
     val limitationNote: String = DEFAULT_SELF_DECLARED_NOTE,
+    // App-private copy of the picked file. Set when the user attaches a real
+    // document; null for structured entries created without a file.
+    val localFilePath: String? = null,
     // GDPR-style retention: when set, the evidence row is removed automatically
     // once this timestamp passes (atlas §3 + Phase 3 minimisation rule).
     // null = keep until the user deletes it.

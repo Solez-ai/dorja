@@ -64,7 +64,7 @@ fun ChatThreadScreen(
     val repository = DorjaApp.instance.repository
     val scope = rememberCoroutineScope()
     val currentUser by repository.currentUser.collectAsState()
-    val userId = currentUser?.id ?: "u1"
+    val userId = currentUser?.id ?: ""
 
     val messages by repository.getMessagesByConversation(conversationId).collectAsState(initial = emptyList())
     var inputText by remember { mutableStateOf("") }

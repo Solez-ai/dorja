@@ -8,6 +8,7 @@ import androidx.room.Query
 import androidx.room.Update
 import com.example.data.model.AppealRecord
 import com.example.data.model.Conversation
+import com.example.data.model.IdentityVerification
 import com.example.data.model.Listing
 import com.example.data.model.Message
 import com.example.data.model.ProfessionalEndorsement
@@ -17,7 +18,9 @@ import com.example.data.model.Report
 import com.example.data.model.ReportResponse
 import com.example.data.model.RoomItem
 import com.example.data.model.Scan
+import com.example.data.model.ThirdPartyCheck
 import com.example.data.model.User
+import com.example.data.model.UserCredential
 import com.example.data.model.Viewing
 import kotlinx.coroutines.flow.Flow
 
@@ -41,8 +44,74 @@ interface UserDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(users: List<User>)
 
+    @Query("SELECT * FROM users")
+    suspend fun getAllUsersSync(): List<User>
+
+    @Query("SELECT * FROM users WHERE role = 'ADMIN' LIMIT 1")
+    suspend fun getAdminUser(): User?
+
+    @Query("SELECT COUNT(*) FROM users WHERE role = 'ADMIN'")
+    suspend fun countAdmins(): Int
+
+    @Query("DELETE FROM users WHERE id = :id")
+    suspend fun deleteById(id: String)
+
     @Query("DELETE FROM users")
     suspend fun deleteAllUsers()
+}
+
+@Dao
+interface IdentityVerificationDao {
+    @Query("SELECT * FROM identity_verifications ORDER BY submittedAt DESC")
+    fun observeAll(): Flow<List<IdentityVerification>>
+
+    @Query("SELECT * FROM identity_verifications WHERE userId = :userId ORDER BY submittedAt DESC")
+    fun observeByUser(userId: String): Flow<List<IdentityVerification>>
+
+    @Query("SELECT * FROM identity_verifications WHERE userId = :userId ORDER BY submittedAt DESC")
+    suspend fun getByUserSync(userId: String): List<IdentityVerification>
+
+    @Query("SELECT * FROM identity_verifications WHERE id = :id")
+    suspend fun getById(id: String): IdentityVerification?
+
+    @Query("SELECT * FROM identity_verifications WHERE documentNumberHash = :hash LIMIT 1")
+    suspend fun getByHash(hash: String): IdentityVerification?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(v: IdentityVerification)
+
+    @Query("UPDATE identity_verifications SET status = :status, reviewedAt = :reviewedAt, reviewedByUserId = :reviewedBy, reviewNote = :note WHERE id = :id")
+    suspend fun updateDecision(id: String, status: String, reviewedAt: Long, reviewedBy: String?, note: String)
+
+    @Query("DELETE FROM identity_verifications WHERE id = :id")
+    suspend fun deleteById(id: String)
+
+    @Query("DELETE FROM identity_verifications WHERE userId = :userId")
+    suspend fun deleteByUser(userId: String)
+}
+
+@Dao
+interface UserCredentialDao {
+    @Query("SELECT * FROM user_credentials WHERE userId = :userId")
+    suspend fun getByUser(userId: String): UserCredential?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(c: UserCredential)
+
+    @Query("DELETE FROM user_credentials WHERE userId = :userId")
+    suspend fun deleteByUser(userId: String)
+}
+
+@Dao
+interface ThirdPartyCheckDao {
+    @Query("SELECT * FROM third_party_checks ORDER BY createdAt DESC")
+    fun observeAll(): Flow<List<ThirdPartyCheck>>
+
+    @Query("SELECT * FROM third_party_checks WHERE verificationId = :verificationId ORDER BY createdAt DESC")
+    suspend fun getByVerificationSync(verificationId: String): List<ThirdPartyCheck>
+
+    @Insert
+    suspend fun insert(c: ThirdPartyCheck)
 }
 
 @Dao
@@ -364,6 +433,9 @@ interface LegalDocumentDao {
 
     @Query("DELETE FROM legal_documents WHERE listingId = :listingId")
     suspend fun deleteLegalDocumentsByListing(listingId: String)
+
+    @Query("SELECT * FROM legal_documents WHERE id = :id")
+    suspend fun getById(id: String): com.example.data.model.LegalDocument?
 
     @Query("SELECT * FROM legal_documents")
     suspend fun getAllLegalDocuments(): List<com.example.data.model.LegalDocument>

@@ -102,6 +102,18 @@ fun ExploreScreen(
     var selectedIntent by remember { mutableStateOf("ALL") }
     var selectedPropertyType by remember { mutableStateOf("ALL") }
 
+    // Trust gate: listings from identity-unverified accounts stay hidden from
+    // the buyer feed until an admin approves the seller's/buyer's documents.
+    val verifiedOwnerIds by produceState(initialValue = emptySet<String>(), key1 = allListings) {
+        val verified = mutableSetOf<String>()
+        allListings.map { it.ownerId }.distinct().forEach { ownerId ->
+            repository.getUserById(ownerId)?.let { user ->
+                if (user.isIdentityVerified) verified.add(ownerId)
+            }
+        }
+        value = verified
+    }
+
     val filteredListings = allListings.filter { listing ->
         val matchesQuery = searchQuery.isBlank() ||
                 listing.title.contains(searchQuery, ignoreCase = true) ||
@@ -111,7 +123,7 @@ fun ExploreScreen(
         val matchesIntent = selectedIntent == "ALL" || listing.intent.equals(selectedIntent, ignoreCase = true)
         val matchesType = selectedPropertyType == "ALL" || listing.propertyType.equals(selectedPropertyType, ignoreCase = true)
 
-        matchesQuery && matchesIntent && matchesType
+        matchesQuery && matchesIntent && matchesType && verifiedOwnerIds.contains(listing.ownerId)
     }
 
     Column(

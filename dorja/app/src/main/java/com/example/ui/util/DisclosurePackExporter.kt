@@ -159,6 +159,12 @@ object DisclosurePackExporter {
                 val level = EvidenceLevel.fromCode(doc.evidenceLevel)
                 drawWrapped("Evidence: ${level.label.uppercase(Locale.getDefault())}", bodyBold)
 
+                // Distinguish a file the user physically attached from a
+                // structured entry typed in without one (atlas §3 honesty rules).
+                if (!doc.localFilePath.isNullOrBlank()) {
+                    drawWrapped("File attached: stored copy on device", bodyPaint)
+                }
+
                 // Official source gets its own labelled line, not buried in notes
                 // (atlas §4: an official-source claim must be independently checkable).
                 val officialSource = doc.notes.lineSequence()

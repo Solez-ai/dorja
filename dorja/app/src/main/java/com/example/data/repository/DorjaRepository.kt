@@ -8,6 +8,7 @@ import com.example.data.model.EVIDENCE_STALENESS_MS
 import com.example.data.model.EvidenceExpiry
 import com.example.data.model.EvidenceLevel
 import com.example.data.model.EvidenceSummary
+import com.example.data.model.IdentityVerification
 import com.example.data.model.LegalDocument
 import com.example.data.model.Listing
 import com.example.data.model.Message
@@ -18,7 +19,9 @@ import com.example.data.model.Report
 import com.example.data.model.ReportResponse
 import com.example.data.model.RoomItem
 import com.example.data.model.Scan
+import com.example.data.model.ThirdPartyCheck
 import com.example.data.model.User
+import com.example.data.model.UserCredential
 import com.example.data.model.Viewing
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -27,10 +30,13 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import android.content.Context
 import android.net.Uri
+import java.io.File
+import java.io.FileOutputStream
 import java.util.UUID
 
-class DorjaRepository(private val database: DorjaDatabase) {
+class DorjaRepository(private val database: DorjaDatabase, private val appContext: Context? = null) {
     private val userDao = database.userDao()
     private val listingDao = database.listingDao()
     private val roomDao = database.roomDao()
@@ -45,14 +51,18 @@ class DorjaRepository(private val database: DorjaDatabase) {
     private val reportDao = database.reportDao()
     private val reportResponseDao = database.reportResponseDao()
     private val appealDao = database.appealDao()
+    private val identityVerificationDao = database.identityVerificationDao()
+    private val userCredentialDao = database.userCredentialDao()
+    private val thirdPartyCheckDao = database.thirdPartyCheckDao()
 
     private val _currentUser = MutableStateFlow<User?>(null)
     val currentUser: StateFlow<User?> = _currentUser.asStateFlow()
 
     init {
         CoroutineScope(Dispatchers.IO).launch {
-            val defaultUser = userDao.getUserById("u1")
-            _currentUser.value = defaultUser
+            // No seed accounts: a fresh install starts signed-out and the
+            // first real account is created through the auth screen.
+            _currentUser.value = null
         }
     }
 
@@ -69,12 +79,259 @@ class DorjaRepository(private val database: DorjaDatabase) {
         }
     }
 
-    /** Clears the active session (demo auth). The profile rows stay on device. */
+    /** Clears the active session. All accounts stay on the device. */
     fun logout() {
         CoroutineScope(Dispatchers.IO).launch {
             _currentUser.value = null
         }
     }
+
+    // ── Real auth: accounts are created with phone + password and verified ──
+
+    fun sha256(value: String): String {
+        val digest = java.security.MessageDigest.getInstance("SHA-256")
+            .digest(value.toByteArray(Charsets.UTF_8))
+        return digest.joinToString("") { "%02x".format(it) }
+    }
+
+    /**
+     * Creates a real account (BUYER, SELLER, or the single allowed ADMIN).
+     * Returns null on success or a user-facing error message.
+     */
+    suspend fun signUp(
+        displayName: String,
+        phone: String,
+        password: String,
+        role: String,
+        countryCode: String
+    ): String? {
+        val normalizedPhone = phone.replace(" ", "")
+        if (displayName.isBlank()) return "Please enter your full name."
+        if (normalizedPhone.length < 6) return "Please enter a valid phone number."
+        if (password.length < 6) return "Password must be at least 6 characters."
+        if (userDao.getAllUsersSync().any { it.phone.replace(" ", "") == normalizedPhone }) {
+            return "An account with this phone number already exists. Sign in instead."
+        }
+        if (role == "ADMIN" && userDao.countAdmins() > 0) {
+            return "An admin account already exists. Only one admin is allowed."
+        }
+        val id = "u_" + UUID.randomUUID().toString().take(10)
+        val user = User(
+            id = id,
+            username = displayName.lowercase().replace(Regex("[^a-z0-9]"), "").ifBlank { "user" } + id.takeLast(4),
+            displayName = displayName.trim(),
+            role = role,
+            phone = phone.trim(),
+            countryCode = countryCode
+        )
+        userDao.insertUser(user)
+        val salt = UUID.randomUUID().toString()
+        userCredentialDao.insert(
+            UserCredential(userId = id, salt = salt, passwordHash = sha256(salt + password))
+        )
+        _currentUser.value = user
+        return null
+    }
+
+    /** True when the platform's single admin account exists. */
+    suspend fun hasAdmin(): Boolean = userDao.countAdmins() > 0
+
+    /**
+     * One-time bootstrap for the device's admin account. Requires a name,
+     * phone and password; refuses if any admin already exists.
+     */
+    suspend fun createAdminAccount(
+        phone: String,
+        password: String,
+        displayName: String,
+        countryCode: String
+    ): String? {
+        if (userDao.countAdmins() > 0) {
+            return "An admin account already exists on this device."
+        }
+        return signUp(
+            displayName = displayName,
+            phone = phone,
+            password = password,
+            role = "ADMIN",
+            countryCode = countryCode
+        )
+    }
+
+    /** Signs in with phone + password. Returns null on success or an error message. */
+    suspend fun signIn(phone: String, password: String): String? {
+        val normalizedPhone = phone.replace(" ", "")
+        val user = userDao.getAllUsersSync().firstOrNull { it.phone.replace(" ", "") == normalizedPhone }
+            ?: return "No account exists for this phone number. Create one below."
+        val cred = userCredentialDao.getByUser(user.id)
+            ?: return "This account has no password set. Delete it in Settings → Accounts and create it again."
+        if (sha256(cred.salt + password) != cred.passwordHash) return "Incorrect password."
+        _currentUser.value = user
+        return null
+    }
+
+    /**
+     * Deletes an account and everything it owns (listings, viewings, reports,
+     * identity submissions). The single admin account cannot be deleted.
+     */
+    suspend fun deleteAccount(userId: String) {
+        val target = userDao.getUserById(userId) ?: return
+        if (target.role == "ADMIN") return
+        listingDao.getListingsByOwnerSync(userId).forEach { deleteListing(it.id) }
+        viewingDao.deleteViewingsForUser(userId)
+        reportDao.deleteByReporter(userId)
+        val ctx = appContext
+        identityVerificationDao.getByUserSync(userId).forEach { v ->
+            if (ctx != null) {
+                v.documentImageFileName?.let { name ->
+                    try { File(documentsDir(ctx), name).delete() } catch (_: Exception) {}
+                }
+            }
+        }
+        identityVerificationDao.deleteByUser(userId)
+        userCredentialDao.deleteByUser(userId)
+        userDao.deleteById(userId)
+        if (_currentUser.value?.id == userId) {
+            _currentUser.value = userDao.getAdminUser() ?: userDao.getAllUsersSync().firstOrNull()
+        }
+    }
+
+    // ── Identity verification (real submissions, admin-reviewed) ──
+
+    /** The country's identity document label, e.g. NID, Aadhaar, Social Security. */
+    fun identityCredentialName(countryCode: String): String =
+        CountryRegistry.identityCredential(countryCode).shortName
+
+    /**
+     * Submits the active user's identity document for admin review. Only a
+     * masked number and an integrity hash are stored — never the raw number.
+     */
+    suspend fun submitIdentityVerification(
+        countryCode: String,
+        documentNumber: String,
+        holderName: String,
+        documentImageUri: Uri? = null
+    ): Result<Unit> {
+        val user = _currentUser.value
+            ?: return Result.failure(IllegalStateException("No active account"))
+        val ctx = appContext
+            ?: return Result.failure(IllegalStateException("Storage unavailable"))
+        val cleanNumber = documentNumber.replace(" ", "")
+        if (cleanNumber.length < 4) {
+            return Result.failure(IllegalArgumentException("The document number looks too short."))
+        }
+        if (holderName.isBlank()) {
+            return Result.failure(IllegalArgumentException("Please enter the name exactly as on the document."))
+        }
+        val hash = sha256(countryCode.uppercase() + cleanNumber)
+        val existing = identityVerificationDao.getByHash(hash)
+        if (existing != null && existing.userId != user.id) {
+            return Result.failure(IllegalStateException("This document is already registered to another account."))
+        }
+        if (existing != null && existing.userId == user.id && existing.status != "REJECTED") {
+            return Result.failure(IllegalStateException("This document is already submitted and is under review or approved."))
+        }
+        var imageFileName: String? = null
+        if (documentImageUri != null) {
+            try {
+                val dir = documentsDir(ctx)
+                val name = "idv_" + UUID.randomUUID().toString().take(8) + ".img"
+                val outFile = File(dir, name)
+                ctx.contentResolver.openInputStream(documentImageUri)?.use { input ->
+                    FileOutputStream(outFile).use { output -> input.copyTo(output) }
+                }
+                imageFileName = name
+            } catch (_: Exception) {
+                imageFileName = null
+            }
+        }
+        identityVerificationDao.insert(
+            IdentityVerification(
+                id = "idv_" + UUID.randomUUID().toString().take(8),
+                userId = user.id,
+                countryCode = countryCode.uppercase(),
+                documentKind = CountryRegistry.identityCredential(countryCode).shortName,
+                holderName = holderName.trim(),
+                documentNumberMasked = "•••• " + cleanNumber.takeLast(4),
+                documentNumberHash = hash,
+                documentImageFileName = imageFileName
+            )
+        )
+        return Result.success(Unit)
+    }
+
+    fun observeVerificationsForUser(userId: String): Flow<List<IdentityVerification>> =
+        identityVerificationDao.observeByUser(userId)
+
+    fun observeAllVerifications(): Flow<List<IdentityVerification>> =
+        identityVerificationDao.observeAll()
+
+    fun getVerificationImageFile(v: IdentityVerification): File? {
+        val ctx = appContext ?: return null
+        val name = v.documentImageFileName ?: return null
+        val file = File(documentsDir(ctx), name)
+        return if (file.exists()) file else null
+    }
+
+    /** Admin decision on a submission. Only the admin account can review. */
+    suspend fun reviewVerification(
+        verificationId: String,
+        approve: Boolean,
+        note: String,
+        reviewerId: String
+    ): Result<Unit> {
+        val reviewer = userDao.getUserById(reviewerId)
+        if (reviewer?.role != "ADMIN") {
+            return Result.failure(IllegalStateException("Only the admin account can review verifications."))
+        }
+        val v = identityVerificationDao.getById(verificationId)
+            ?: return Result.failure(IllegalStateException("Submission not found."))
+        identityVerificationDao.updateDecision(
+            id = verificationId,
+            status = if (approve) "APPROVED" else "REJECTED",
+            reviewedAt = System.currentTimeMillis(),
+            reviewedBy = reviewerId,
+            note = note.trim()
+        )
+        userDao.getUserById(v.userId)?.let { subject ->
+            val updated = subject.copy(
+                isIdentityVerified = approve,
+                identityVerifiedAt = if (approve) System.currentTimeMillis() else null
+            )
+            userDao.updateUser(updated)
+            if (_currentUser.value?.id == subject.id) _currentUser.value = updated
+        }
+        return Result.success(Unit)
+    }
+
+    // ── Third-party checks recorded during admin review (atlas §8) ──
+
+    suspend fun addThirdPartyCheck(
+        verificationId: String,
+        subjectUserId: String,
+        checkType: String,
+        result: String,
+        note: String,
+        checkedByUserId: String
+    ) {
+        thirdPartyCheckDao.insert(
+            ThirdPartyCheck(
+                id = "tpc_" + UUID.randomUUID().toString().take(8),
+                verificationId = verificationId,
+                subjectUserId = subjectUserId,
+                checkType = checkType,
+                result = result,
+                note = note,
+                checkedByUserId = checkedByUserId
+            )
+        )
+    }
+
+    fun observeAllThirdPartyChecks(): Flow<List<ThirdPartyCheck>> =
+        thirdPartyCheckDao.observeAll()
+
+    suspend fun getThirdPartyChecksForVerificationSync(verificationId: String): List<ThirdPartyCheck> =
+        thirdPartyCheckDao.getByVerificationSync(verificationId)
 
     suspend fun updateUserProfile(
         displayName: String,
@@ -111,6 +368,9 @@ class DorjaRepository(private val database: DorjaDatabase) {
 
     // Listings
     fun getAllListings(): Flow<List<Listing>> = listingDao.getAllListings()
+
+    /** Every account registered on this device (for the account switcher). */
+    fun observeAllUsers(): Flow<List<User>> = userDao.getAllUsers()
     fun getListingsByOwner(ownerId: String): Flow<List<Listing>> = listingDao.getListingsByOwner(ownerId)
     suspend fun getListingsByOwnerSync(ownerId: String): List<Listing> = listingDao.getListingsByOwnerSync(ownerId)
     suspend fun getListingById(id: String): Listing? = listingDao.getListingById(id)
@@ -146,7 +406,8 @@ class DorjaRepository(private val database: DorjaDatabase) {
         buildingAgeYears: Int? = null,
         disasterContext: String? = null
     ): String {
-        val ownerId = _currentUser.value?.id ?: "u1"
+        val ownerId = _currentUser.value?.id
+            ?: throw IllegalStateException("No signed-in account")
         val id = "l_" + UUID.randomUUID().toString().take(8)
         val slug = title.lowercase().replace(" ", "-").replace(",", "")
         val has3D = customRooms.any { it.has3DScan } || !virtualTourUrl.isNullOrBlank()
@@ -499,22 +760,79 @@ class DorjaRepository(private val database: DorjaDatabase) {
         }
     }
 
-    // Helper to add a legal document picked from a Uri
-    suspend fun addLegalDocument(listingId: String, uri: Uri): Result<Unit> {
-        val doc = LegalDocument(
-            id = "ld_" + UUID.randomUUID().toString().take(8),
-            listingId = listingId,
-            documentType = "UNKNOWN",
-            documentTitle = uri.lastPathSegment ?: "Document",
-            documentNumber = "",
-            issuingAuthority = ""
-        )
-        legalDocumentDao.insertLegalDocument(doc)
-        return Result.success(Unit)
+    /**
+     * Attaches a real document file. The picked Uri is copied into the app's
+     * private documents directory so the record keeps working after restarts
+     * (content-provider grant URIs expire when the process dies).
+     */
+    suspend fun addLegalDocument(
+        listingId: String,
+        uri: Uri,
+        documentType: String = "UNKNOWN",
+        documentNumber: String = "",
+        issuingAuthority: String = "",
+        documentTitle: String? = null
+    ): Result<Unit> {
+        return try {
+            val ctx = appContext ?: return Result.failure(
+                IllegalStateException("Repository has no application context")
+            )
+            val dir = documentsDir(ctx)
+            val displayName = queryDisplayName(ctx, uri) ?: (uri.lastPathSegment ?: "document")
+            val safeBase = displayName.substringAfterLast('/').replace(Regex("[^A-Za-z0-9._-]"), "_")
+                .ifBlank { "document" }
+            val fileName = "ld_" + UUID.randomUUID().toString().take(8) + "_" + safeBase
+            val outFile = File(dir, fileName)
+            ctx.contentResolver.openInputStream(uri)?.use { input ->
+                FileOutputStream(outFile).use { output -> input.copyTo(output) }
+            } ?: return Result.failure(IllegalStateException("Could not read the picked file"))
+            val doc = LegalDocument(
+                id = "ld_" + UUID.randomUUID().toString().take(8),
+                listingId = listingId,
+                documentType = documentType,
+                documentTitle = documentTitle ?: displayName,
+                documentNumber = documentNumber,
+                issuingAuthority = issuingAuthority,
+                localFilePath = outFile.absolutePath
+            )
+            legalDocumentDao.insertLegalDocument(doc)
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
     }
 
+    /** Resolves the stored file for a document record, if one was attached. */
+    fun getLegalDocumentFile(doc: LegalDocument): File? {
+        val path = doc.localFilePath ?: return null
+        val file = File(path)
+        return if (file.exists()) file else null
+    }
+
+
     suspend fun deleteLegalDocument(docId: String) {
-        legalDocumentDao.deleteLegalDocumentById(docId)
+        legalDocumentDao.getById(docId)?.let { doc ->
+            doc.localFilePath?.let { path ->
+                try { File(path).delete() } catch (_: Exception) {}
+            }
+            legalDocumentDao.deleteLegalDocumentById(docId)
+        }
+    }
+
+    private fun documentsDir(ctx: Context): File {
+        val dir = File(ctx.filesDir, "legal_documents")
+        if (!dir.exists()) dir.mkdirs()
+        return dir
+    }
+
+    private fun queryDisplayName(ctx: Context, uri: Uri): String? {
+        return try {
+            ctx.contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+                if (cursor.moveToFirst()) cursor.getString(0) else null
+            }
+        } catch (_: Exception) {
+            null
+        }
     }
 
     // Chat & Conversations
@@ -708,6 +1026,13 @@ class DorjaRepository(private val database: DorjaDatabase) {
         }
     }
 
+    /** Reopens a resolved/withdrawn dispute after an appeal is overturned. */
+    suspend fun reopenReport(reportId: String) {
+        reportDao.getById(reportId)?.let { report ->
+            reportDao.update(report.copy(state = "OPEN", resolvedAt = null, resolutionNote = ""))
+        }
+    }
+
     suspend fun addAppeal(
         reportId: String,
         appealedByUserId: String,
@@ -737,7 +1062,6 @@ class DorjaRepository(private val database: DorjaDatabase) {
 
     suspend fun resetAllData() {
         database.clearAllTables()
-        DorjaDatabase.populateInitialData(database)
-        _currentUser.value = userDao.getUserById("u1")
+        _currentUser.value = null
     }
 }

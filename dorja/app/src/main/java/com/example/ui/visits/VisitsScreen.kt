@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -32,6 +33,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -72,7 +74,7 @@ fun VisitsScreen(
     val scope = rememberCoroutineScope()
     val currentUser by repository.currentUser.collectAsState()
     val isHost = currentUser?.role == "SELLER"
-    val userId = currentUser?.id ?: "u1"
+    val userId = currentUser?.id ?: ""
 
     val viewings by (if (isHost) repository.getViewingsForHost(userId) else repository.getViewingsForSeeker(userId))
         .collectAsState(initial = emptyList())
@@ -161,6 +163,11 @@ fun VisitsScreen(
                         onCheckIn = {
                             scope.launch {
                                 repository.checkInViewing(activeViewing.id)
+                            }
+                        },
+                        onCancel = {
+                            scope.launch {
+                                repository.cancelViewing(activeViewing.id)
                             }
                         }
                     )
@@ -257,8 +264,40 @@ private fun ActiveViewingBentoCard(
     viewing: Viewing,
     isHost: Boolean,
     onOpenPass: () -> Unit,
-    onCheckIn: () -> Unit
+    onCheckIn: () -> Unit,
+    onCancel: () -> Unit
 ) {
+    var showCancelConfirm by remember { mutableStateOf(false) }
+
+    if (showCancelConfirm) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showCancelConfirm = false },
+            title = { Text(L("visits_cancel_title"), fontWeight = FontWeight.Bold) },
+            text = {
+                Text(
+                    L("visits_cancel_body"),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = DorjaColors.Gray700
+                )
+            },
+            confirmButton = {
+                DorjaButton(
+                    text = L("visits_cancel_cta"),
+                    containerColor = DorjaColors.Error,
+                    onClick = {
+                        showCancelConfirm = false
+                        onCancel()
+                    },
+                    modifier = Modifier.widthIn(min = 130.dp)
+                )
+            },
+            dismissButton = {
+                TextButton(onClick = { showCancelConfirm = false }) {
+                    Text(L("visits_cancel_keep"), color = DorjaColors.Gray700)
+                }
+            }
+        )
+    }
     var listingTitle by remember(viewing.listingId) { mutableStateOf("Listing #${viewing.listingId}") }
     LaunchedEffect(viewing.listingId) {
         withContext(Dispatchers.IO) {
@@ -346,6 +385,22 @@ private fun ActiveViewingBentoCard(
                         icon = Icons.Default.CheckCircle,
                         modifier = Modifier.weight(1f)
                     )
+                }
+            }
+
+            if (viewing.status == "CONFIRMED") {
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    TextButton(onClick = { showCancelConfirm = true }) {
+                        Text(
+                            L("visits_cancel_link"),
+                            color = DorjaColors.Error,
+                            fontSize = 12.sp
+                        )
+                    }
                 }
             }
         }

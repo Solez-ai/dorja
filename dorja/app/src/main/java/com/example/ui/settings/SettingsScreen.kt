@@ -2,6 +2,7 @@ package com.example.ui.settings
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -16,8 +17,11 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.DeleteSweep
+import androidx.compose.material.icons.filled.PersonAdd
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -40,6 +44,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
@@ -58,9 +63,41 @@ import com.example.ui.theme.DorjaColors
 import com.example.ui.theme.ThemeSettings
 import kotlinx.coroutines.launch
 
+@Composable
+private fun SettingsActionRow(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    subtitle: String,
+    tint: androidx.compose.ui.graphics.Color,
+    onClick: () -> Unit,
+    testTag: String? = null
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(DorjaColors.Sand100)
+            .clickable(onClick = onClick)
+            .padding(12.dp)
+            .let { m -> if (testTag != null) m.then(Modifier.testTag(testTag)) else m },
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))
+        Spacer(modifier = Modifier.width(10.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.titleSmall, color = DorjaColors.Ink950, fontWeight = FontWeight.Bold)
+            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = DorjaColors.Gray700)
+        }
+        Icon(Icons.Default.ChevronRight, contentDescription = null, tint = DorjaColors.Gray500)
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen() {
+fun SettingsScreen(
+    /** Called after signing out; true opens the auth screen in sign-up mode. */
+    onLoggedOut: (startInSignUp: Boolean) -> Unit = {}
+) {
     val repository = DorjaApp.instance.repository
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -269,6 +306,49 @@ fun SettingsScreen() {
                             onClick = { showResetDialog = true },
                             icon = Icons.Default.DeleteSweep,
                             modifier = Modifier.fillMaxWidth().testTag("settings_clear_data")
+                        )
+                    }
+                }
+            }
+
+            // ── Account session: sign out / create another account ──
+            item {
+                BentoCard(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = L("settings_accounts_section"),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = DorjaColors.Gray500,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        SettingsActionRow(
+                            icon = Icons.AutoMirrored.Filled.Logout,
+                            title = L("settings_sign_out"),
+                            subtitle = L("settings_sign_out_sub"),
+                            tint = DorjaColors.BentoBlueIcon,
+                            onClick = {
+                                scope.launch {
+                                    repository.logout()
+                                    onLoggedOut(false)
+                                }
+                            },
+                            testTag = "settings_sign_out"
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        SettingsActionRow(
+                            icon = Icons.Default.PersonAdd,
+                            title = L("settings_new_account"),
+                            subtitle = L("settings_new_account_sub"),
+                            tint = DorjaColors.BentoGreenIcon,
+                            onClick = {
+                                scope.launch {
+                                    repository.logout()
+                                    onLoggedOut(true)
+                                }
+                            },
+                            testTag = "settings_new_account"
                         )
                     }
                 }

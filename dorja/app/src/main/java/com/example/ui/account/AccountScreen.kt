@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Apartment
+import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.DataUsage
@@ -31,6 +32,7 @@ import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.FlightTakeoff
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Lock
@@ -46,6 +48,7 @@ import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -63,6 +66,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
@@ -72,7 +76,9 @@ import androidx.compose.ui.unit.sp
 import com.example.DorjaApp
 import com.example.data.country.CountryRegistry
 import com.example.data.model.EvidenceSummary
+import com.example.data.model.IdentityVerification
 import com.example.data.model.Report
+import com.example.data.model.User
 import com.example.ui.components.BentoCard
 import com.example.ui.components.BentoMetricTile
 import com.example.ui.components.CountryPicker
@@ -383,6 +389,148 @@ fun AccountScreen(
 
     val user = currentUser!!
 
+    // Real account management: every account registered on this device.
+    val allAccounts by repository.observeAllUsers().collectAsState(initial = emptyList())
+    val myVerifications by repository.observeVerificationsForUser(user.id)
+        .collectAsState(initial = emptyList<IdentityVerification>())
+    var showVerifyDialog by remember { mutableStateOf(false) }
+    var verifyDocNumber by remember { mutableStateOf("") }
+    var verifyHolderName by remember { mutableStateOf("") }
+    var verifyImageUri by remember { mutableStateOf<android.net.Uri?>(null) }
+    var verifyBusy by remember { mutableStateOf(false) }
+    var verifyError by remember { mutableStateOf("") }
+    var accountPendingDelete by remember { mutableStateOf<User?>(null) }
+    val idvImagePicker = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.GetContent()
+    ) { uri -> if (uri != null) verifyImageUri = uri }
+
+    val latestVerification = myVerifications.firstOrNull()
+    val credentialName = CountryRegistry.identityCredential(user.countryCode).shortName
+
+    // ── Identity verification submit dialog ──
+    if (showVerifyDialog) {
+        AlertDialog(
+            onDismissRequest = { if (!verifyBusy) showVerifyDialog = false },
+            icon = { Icon(Icons.Default.Badge, contentDescription = null, tint = DorjaColors.BentoBlueIcon) },
+            title = { Text(Lf("account_verify_title_fmt", credentialName), fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        L("account_verify_intro"),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = DorjaColors.Gray700
+                    )
+                    OutlinedTextField(
+                        value = verifyHolderName,
+                        onValueChange = { verifyHolderName = it },
+                        label = { Text(L("account_verify_name")) },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+                    OutlinedTextField(
+                        value = verifyDocNumber,
+                        onValueChange = { verifyDocNumber = it },
+                        label = { Text(Lf("account_verify_number_fmt", credentialName)) },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = DorjaColors.Sand100,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(enabled = !verifyBusy) { idvImagePicker.launch("image/*") }
+                    ) {
+                        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Image, contentDescription = null, tint = DorjaColors.Jol600, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = verifyImageUri?.let { L("account_verify_photo_set") } ?: L("account_verify_photo_add"),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (verifyImageUri != null) DorjaColors.Ink950 else DorjaColors.Gray700,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+                    Text(
+                        L("account_verify_privacy"),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = DorjaColors.Gray500
+                    )
+                    if (verifyError.isNotBlank()) {
+                        Text(verifyError, style = MaterialTheme.typography.bodySmall, color = DorjaColors.Error)
+                    }
+                }
+            },
+            confirmButton = {
+                DorjaButton(
+                    text = if (verifyBusy) L("common_loading") else L("account_verify_submit"),
+                    enabled = !verifyBusy,
+                    onClick = {
+                        verifyBusy = true
+                        verifyError = ""
+                        scope.launch {
+                            val result = repository.submitIdentityVerification(
+                                countryCode = user.countryCode,
+                                documentNumber = verifyDocNumber,
+                                holderName = verifyHolderName,
+                                documentImageUri = verifyImageUri
+                            )
+                            verifyBusy = false
+                            result.fold(
+                                onSuccess = {
+                                    verifyDocNumber = ""; verifyHolderName = ""; verifyImageUri = null
+                                    showVerifyDialog = false
+                                },
+                                onFailure = { e -> verifyError = e.message ?: L("account_verify_failed") }
+                            )
+                        }
+                    },
+                    modifier = Modifier.widthIn(min = 130.dp)
+                )
+            },
+            dismissButton = {
+                TextButton(onClick = { showVerifyDialog = false }, enabled = !verifyBusy) {
+                    Text(L("common_cancel"), color = DorjaColors.Gray700)
+                }
+            }
+        )
+    }
+
+    // ── Delete account confirmation ──
+    accountPendingDelete?.let { target ->
+        AlertDialog(
+            onDismissRequest = { accountPendingDelete = null },
+            icon = { Icon(Icons.Default.DeleteForever, contentDescription = null, tint = DorjaColors.Error) },
+            title = { Text(L("account_delete_title_fmt", target.displayName), fontWeight = FontWeight.Bold) },
+            text = {
+                Text(
+                    L("account_delete_body"),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = DorjaColors.Gray700
+                )
+            },
+            confirmButton = {
+                DorjaButton(
+                    text = L("account_delete_confirm"),
+                    containerColor = DorjaColors.Error,
+                    onClick = {
+                        scope.launch {
+                            repository.deleteAccount(target.id)
+                            accountPendingDelete = null
+                        }
+                    },
+                    modifier = Modifier.widthIn(min = 120.dp)
+                )
+            },
+            dismissButton = {
+                TextButton(onClick = { accountPendingDelete = null }) {
+                    Text(L("common_cancel"), color = DorjaColors.Gray700)
+                }
+            }
+        )
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -527,54 +675,145 @@ fun AccountScreen(
                 }
             }
 
-            // Quick Account Switch Bento Card
+            // ── Identity verification — real submission, admin-reviewed ──
             item {
-                val targetUserId = if (user.role == "SELLER") "u2" else "u1"
-                val targetUserLabel = if (user.role == "SELLER") "Samin (Buyer)" else "Shovro (Host)"
-                BentoCard(
-                    modifier = Modifier.fillMaxWidth(),
-                    onClick = {
-                        scope.launch {
-                            repository.switchUser(targetUserId)
-                        }
-                    }
-                ) {
-                    Row(
-                        modifier = Modifier.padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(DorjaColors.BentoPurpleBg),
-                            contentAlignment = Alignment.Center
-                        ) {
+                BentoCard(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(
-                                imageVector = Icons.Default.SwapHoriz,
+                                Icons.Default.VerifiedUser,
                                 contentDescription = null,
-                                tint = DorjaColors.BentoPurpleIcon,
-                                modifier = Modifier.size(22.dp)
+                                tint = if (user.isIdentityVerified) DorjaColors.BentoGreenIcon else DorjaColors.BentoAmberIcon,
+                                modifier = Modifier.size(20.dp)
                             )
-                        }
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column(modifier = Modifier.weight(1f)) {
+                            Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = if (user.role == "SELLER") L("account_switch_to_buyer") else L("account_switch_to_host"),
+                                text = Lf("account_verify_card_title_fmt", credentialName),
                                 style = MaterialTheme.typography.titleSmall,
                                 color = DorjaColors.Ink950,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.weight(1f)
                             )
-                            Text(
-                                text = Lf("account_switch_subtitle", targetUserLabel),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = DorjaColors.Gray700
+                            DorjaBadge(
+                                text = when {
+                                    user.isIdentityVerified -> L("account_verified")
+                                    latestVerification?.status == "SUBMITTED" || latestVerification?.status == "UNDER_REVIEW" -> L("account_under_review")
+                                    latestVerification?.status == "REJECTED" -> L("account_rejected")
+                                    else -> L("account_unverified")
+                                },
+                                backgroundColor = when {
+                                    user.isIdentityVerified -> DorjaColors.BentoGreenBg
+                                    latestVerification?.status == "REJECTED" -> DorjaColors.ErrorContainer
+                                    else -> DorjaColors.BentoAmberBg
+                                },
+                                textColor = when {
+                                    user.isIdentityVerified -> DorjaColors.BentoGreenText
+                                    latestVerification?.status == "REJECTED" -> DorjaColors.Error
+                                    else -> DorjaColors.BentoAmberText
+                                }
                             )
                         }
-                        Icon(
-                            imageVector = Icons.Default.ChevronRight,
-                            contentDescription = null,
-                            tint = DorjaColors.Gray500
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = when {
+                                user.isIdentityVerified -> L("account_verified_body")
+                                latestVerification?.status == "REJECTED" -> Lf("account_rejected_body_fmt", latestVerification?.reviewNote.orEmpty())
+                                latestVerification != null -> Lf("account_pending_body_fmt", latestVerification.documentKind, latestVerification.documentNumberMasked)
+                                else -> Lf("account_unverified_body_fmt", credentialName)
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = DorjaColors.Gray700
+                        )
+                        if (!user.isIdentityVerified) {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            DorjaButton(
+                                text = Lf("account_verify_cta_fmt", credentialName),
+                                onClick = { showVerifyDialog = true },
+                                icon = Icons.Default.Badge,
+                                modifier = Modifier.fillMaxWidth().testTag("account_verify_button")
+                            )
+                        }
+                    }
+                }
+            }
+
+            // ── Accounts on this device — switch or delete, all real ──
+            item {
+                BentoCard(modifier = Modifier.fillMaxWidth()) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = L("account_devices_accounts"),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = DorjaColors.Gray500,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(10.dp))
+                        allAccounts.forEach { acct ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(if (acct.id == user.id) DorjaColors.BentoBlueBg.copy(alpha = 0.4f) else Color.Transparent)
+                                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    Icons.Default.Person,
+                                    contentDescription = null,
+                                    tint = when (acct.role) {
+                                        "SELLER" -> DorjaColors.BentoBlueIcon
+                                        "ADMIN" -> DorjaColors.BentoPurpleIcon
+                                        else -> DorjaColors.BentoGreenIcon
+                                    },
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = acct.displayName + if (acct.id == user.id) " · " + L("account_you") else "",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        color = DorjaColors.Ink950,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = acct.role.lowercase().replaceFirstChar { it.uppercase() } + " · " + acct.phone,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = DorjaColors.Gray700
+                                    )
+                                }
+                                if (acct.isIdentityVerified) {
+                                    Icon(
+                                        Icons.Default.CheckCircle,
+                                        contentDescription = L("account_verified"),
+                                        tint = DorjaColors.BentoGreenIcon,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                                if (acct.id != user.id && acct.role != "ADMIN") {
+                                    TextButton(onClick = { scope.launch { repository.switchUser(acct.id) } }) {
+                                        Text(L("account_switch"), color = DorjaColors.Jol600, fontSize = 12.sp)
+                                    }
+                                    IconButton(
+                                        onClick = { accountPendingDelete = acct },
+                                        modifier = Modifier.size(30.dp)
+                                    ) {
+                                        Icon(
+                                            Icons.Default.DeleteForever,
+                                            contentDescription = L("account_delete_short"),
+                                            tint = DorjaColors.Gray500,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                }
+                            }
+                            HorizontalDivider(color = DorjaColors.BentoCardBorder.copy(alpha = 0.4f))
+                        }
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = L("account_admin_singleton_note"),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = DorjaColors.Gray500
                         )
                     }
                 }
@@ -595,13 +834,14 @@ fun AccountScreen(
                         SecurityRow(
                             title = Lf(
                                 "account_identity_verification_fmt",
-                                CountryRegistry.identityCredential(user.countryCode).shortName
+                                credentialName
                             ),
-                            status = L("account_status_passed"),
-                            icon = Icons.Default.Shield
+                            status = if (user.isIdentityVerified) L("account_status_passed") else L("account_status_pending"),
+                            icon = Icons.Default.Shield,
+                            positive = user.isIdentityVerified
                         )
-                        SecurityRow(title = L("account_safeview_gps"), status = L("account_status_active"), icon = Icons.Default.Lock)
-                        SecurityRow(title = L("account_local_persistence"), status = L("account_status_on_device"), icon = Icons.Default.CheckCircle)
+                        SecurityRow(title = L("account_safeview_gps"), status = L("account_status_active"), icon = Icons.Default.Lock, positive = true)
+                        SecurityRow(title = L("account_local_persistence"), status = L("account_status_on_device"), icon = Icons.Default.CheckCircle, positive = true)
                     }
                 }
             }
@@ -945,7 +1185,7 @@ private fun PrivacyActionRow(
 }
 
 @Composable
-private fun SecurityRow(title: String, status: String, icon: ImageVector) {
+private fun SecurityRow(title: String, status: String, icon: ImageVector, positive: Boolean) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -954,10 +1194,18 @@ private fun SecurityRow(title: String, status: String, icon: ImageVector) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Icon(icon, contentDescription = null, tint = DorjaColors.BentoGreenIcon, modifier = Modifier.size(16.dp))
+            Icon(
+                icon, contentDescription = null,
+                tint = if (positive) DorjaColors.BentoGreenIcon else DorjaColors.BentoAmberIcon,
+                modifier = Modifier.size(16.dp)
+            )
             Spacer(modifier = Modifier.width(8.dp))
             Text(title, style = MaterialTheme.typography.bodyMedium, color = DorjaColors.Ink950)
         }
-        DorjaBadge(text = status, backgroundColor = DorjaColors.BentoGreenBg, textColor = DorjaColors.BentoGreenText)
+        DorjaBadge(
+            text = status,
+            backgroundColor = if (positive) DorjaColors.BentoGreenBg else DorjaColors.BentoAmberBg,
+            textColor = if (positive) DorjaColors.BentoGreenText else DorjaColors.BentoAmberText
+        )
     }
 }

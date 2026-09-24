@@ -58,7 +58,7 @@ fun InboxScreen(
 ) {
     val repository = DorjaApp.instance.repository
     val currentUser by repository.currentUser.collectAsState()
-    val userId = currentUser?.id ?: "u1"
+    val userId = currentUser?.id ?: ""
     val conversations by repository.getConversationsForUser(userId).collectAsState(initial = emptyList())
 
     Column(

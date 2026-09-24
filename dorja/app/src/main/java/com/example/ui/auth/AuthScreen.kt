@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Phone
@@ -34,12 +35,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -47,30 +48,39 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.DorjaApp
-import com.example.R
-import com.example.ui.components.CountryPicker
+import com.example.ui.i18n.L
+import com.example.ui.i18n.Lf
 import com.example.ui.components.DorjaButton
+import com.example.ui.components.DorjaChip
 import com.example.ui.components.DorjaLogo
 import com.example.ui.components.DorjaCard
 import com.example.ui.theme.DorjaColors
+import kotlinx.coroutines.launch
 
 @Composable
 fun AuthScreen(
+    startInSignUp: Boolean = false,
     onLoginSuccess: () -> Unit
 ) {
     val repository = DorjaApp.instance.repository
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
 
+    var isSignUpMode by remember { mutableStateOf(startInSignUp) }
+    var displayName by remember { mutableStateOf("") }
     var phone by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
-    var isSignUpMode by remember { mutableStateOf(false) }
-    var displayName by remember { mutableStateOf("") }
-    val context = LocalContext.current
+    var role by remember { mutableStateOf("BUYER") }
     var countryCode by remember {
         mutableStateOf(
             if (com.example.ui.i18n.LocaleSettings.isLanguagePinned()) com.example.ui.i18n.LocaleSettings.countryCode.value
-            else repository.currentUser.value?.countryCode ?: "BD"
+            else "BD"
         )
     }
+    var errorMessage by remember { mutableStateOf("") }
+    var busy by remember { mutableStateOf(false) }
+
+    val credentialName = com.example.data.country.CountryRegistry.identityCredential(countryCode).shortName
 
     Box(
         modifier = Modifier
@@ -104,7 +114,7 @@ fun AuthScreen(
                     letterSpacing = 2.sp
                 )
                 Text(
-                    text = "Property Trust Platform",
+                    text = L("app_tagline"),
                     style = MaterialTheme.typography.bodySmall,
                     color = DorjaColors.Gray700
                 )
@@ -118,7 +128,7 @@ fun AuthScreen(
                 ) {
                     Column(modifier = Modifier.padding(20.dp)) {
                         Text(
-                            text = if (isSignUpMode) "Create Account" else "Sign In",
+                            text = if (isSignUpMode) L("auth_create_account") else L("auth_sign_in"),
                             style = MaterialTheme.typography.titleMedium,
                             color = DorjaColors.Ink950,
                             fontWeight = FontWeight.Bold
@@ -129,7 +139,7 @@ fun AuthScreen(
                             OutlinedTextField(
                                 value = displayName,
                                 onValueChange = { displayName = it },
-                                label = { Text("Full Name") },
+                                label = { Text(L("auth_name")) },
                                 leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
                                 singleLine = true,
                                 modifier = Modifier
@@ -141,12 +151,34 @@ fun AuthScreen(
                                 )
                             )
                             Spacer(modifier = Modifier.height(12.dp))
+
+                            Text(
+                                text = L("auth_joining_as"),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = DorjaColors.Gray700
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                DorjaChip(
+                                    selected = role == "BUYER",
+                                    label = L("account_role_buyer"),
+                                    onClick = { role = "BUYER" },
+                                    modifier = Modifier.testTag("auth_role_buyer")
+                                )
+                                DorjaChip(
+                                    selected = role == "SELLER",
+                                    label = L("account_role_host"),
+                                    onClick = { role = "SELLER" },
+                                    modifier = Modifier.testTag("auth_role_seller")
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(12.dp))
                         }
 
                         OutlinedTextField(
                             value = phone,
                             onValueChange = { phone = it },
-                            label = { Text("Phone Number") },
+                            label = { Text(L("auth_phone")) },
                             leadingIcon = { Icon(Icons.Default.Phone, contentDescription = null) },
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
@@ -163,7 +195,7 @@ fun AuthScreen(
                         OutlinedTextField(
                             value = password,
                             onValueChange = { password = it },
-                            label = { Text("Password") },
+                            label = { Text(L("auth_password")) },
                             leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
                             singleLine = true,
                             visualTransformation = PasswordVisualTransformation(),
@@ -182,18 +214,57 @@ fun AuthScreen(
                             selected = countryCode,
                             onSelect = { code ->
                                 countryCode = code
-                                repository.setUserCountryCode(code)
                                 com.example.ui.i18n.LocaleSettings.applyCountry(context, code)
                             },
                             modifier = Modifier.fillMaxWidth()
                         )
-                        Spacer(modifier = Modifier.height(20.dp))
+
+                        if (isSignUpMode) {
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Text(
+                                text = Lf("auth_signup_verify_note_fmt", credentialName),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = DorjaColors.Gray700
+                            )
+                        }
+
+                        if (errorMessage.isNotBlank()) {
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = DorjaColors.ErrorContainer,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    text = errorMessage,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = DorjaColors.Error,
+                                    modifier = Modifier.padding(10.dp)
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
 
                         DorjaButton(
-                            text = if (isSignUpMode) "Register Account" else "Sign In",
+                            text = if (busy) L("common_loading") else if (isSignUpMode) L("auth_register_cta") else L("auth_sign_in"),
+                            enabled = !busy,
                             onClick = {
-                                // Default to active session
-                                onLoginSuccess()
+                                busy = true
+                                errorMessage = ""
+                                scope.launch {
+                                    val error = if (isSignUpMode) {
+                                        repository.signUp(displayName, phone, password, role, countryCode)
+                                    } else {
+                                        repository.signIn(phone, password)
+                                    }
+                                    busy = false
+                                    if (error == null) {
+                                        onLoginSuccess()
+                                    } else {
+                                        errorMessage = error
+                                    }
+                                }
                             },
                             testTag = "auth_submit_button"
                         )
@@ -201,11 +272,14 @@ fun AuthScreen(
                         Spacer(modifier = Modifier.height(8.dp))
 
                         TextButton(
-                            onClick = { isSignUpMode = !isSignUpMode },
+                            onClick = {
+                                errorMessage = ""
+                                isSignUpMode = !isSignUpMode
+                            },
                             modifier = Modifier.align(Alignment.CenterHorizontally)
                         ) {
                             Text(
-                                text = if (isSignUpMode) "Already have an account? Sign In" else "New to DORJA? Create Account",
+                                text = if (isSignUpMode) L("auth_have_account") else L("auth_new_here"),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = DorjaColors.Jol600
                             )
@@ -213,51 +287,45 @@ fun AuthScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(28.dp))
+                Spacer(modifier = Modifier.height(24.dp))
 
-                // Quick Switch Demo Section
+                // First-run bootstrap: the device's single admin account is
+                // created here. The button disappears once an admin exists.
                 Column(modifier = Modifier.fillMaxWidth()) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        HorizontalDivider(modifier = Modifier.weight(1f), color = DorjaColors.Sand300)
-                        Text(
-                            text = "  1-TAP DEMO SWITCH  ",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = DorjaColors.Gray500,
-                            fontFamily = FontFamily.Monospace
-                        )
-                        HorizontalDivider(modifier = Modifier.weight(1f), color = DorjaColors.Sand300)
+                    var adminExists by remember { mutableStateOf<Boolean?>(null) }
+                    androidx.compose.runtime.LaunchedEffect(Unit) {
+                        adminExists = repository.hasAdmin()
                     }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // Seller Quick Login
-                    DorjaButton(
-                        text = "Login as Seller: Shovro",
-                        onClick = {
-                            repository.switchUser("u1")
-                            onLoginSuccess()
-                        },
-                        icon = Icons.Default.Storefront,
-                        containerColor = DorjaColors.Jol600,
-                        testTag = "demo_login_seller"
-                    )
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    // Buyer Quick Login
-                    DorjaButton(
-                        text = "Login as Buyer: Samin Yeasar",
-                        onClick = {
-                            repository.switchUser("u2")
-                            onLoginSuccess()
-                        },
-                        icon = Icons.Default.Person,
-                        containerColor = DorjaColors.Ink950,
-                        testTag = "demo_login_buyer"
-                    )
+                    if (adminExists == false) {
+                        HorizontalDivider(color = DorjaColors.Sand300)
+                        Spacer(modifier = Modifier.height(14.dp))
+                        DorjaButton(
+                            text = L("auth_create_admin_cta"),
+                            onClick = {
+                                busy = true
+                                errorMessage = ""
+                                scope.launch {
+                                    val error = repository.createAdminAccount(phone, password, displayName, countryCode)
+                                    busy = false
+                                    if (error == null) {
+                                        onLoginSuccess()
+                                    } else {
+                                        errorMessage = error
+                                    }
+                                }
+                            },
+                            icon = Icons.Default.AdminPanelSettings,
+                            containerColor = DorjaColors.Ink950,
+                            testTag = "auth_create_admin"
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = L("auth_admin_note"),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = DorjaColors.Gray500
+                        )
+                        Spacer(modifier = Modifier.height(14.dp))
+                    }
                 }
             }
 
@@ -274,7 +342,7 @@ fun AuthScreen(
                 )
                 Spacer(modifier = Modifier.width(6.dp))
                 Text(
-                    text = stringResource(id = R.string.auth_footer),
+                    text = L("auth_footer"),
                     style = MaterialTheme.typography.labelSmall,
                     color = DorjaColors.Gray500
                 )

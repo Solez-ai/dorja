@@ -205,6 +205,7 @@ fun CreateListingScreen(
 ) {
     val repository = DorjaApp.instance.repository
     val scope = rememberCoroutineScope()
+    val context = androidx.compose.ui.platform.LocalContext.current
 
     // 1. Basic Listing Info
     var title by remember { mutableStateOf("") }
@@ -2504,6 +2505,9 @@ fun CreateListingScreen(
                         ?: photoAssignments.firstOrNull()?.url
 
                     scope.launch {
+                        // Refuses cleanly when there is no signed-in account
+                        // (listing creation requires a real, verified owner).
+                        val outcome = runCatching {
                         val newId = repository.createListingWithRooms(
                             title = title,
                             intent = intent,
@@ -2546,6 +2550,14 @@ fun CreateListingScreen(
                         }
                         createdListingId = newId
                         onListingCreated(newId)
+                        }
+                        outcome.exceptionOrNull()?.let { e ->
+                            android.widget.Toast.makeText(
+                                context,
+                                e.message ?: "Could not publish the listing",
+                                android.widget.Toast.LENGTH_LONG
+                            ).show()
+                        }
                     }
                 },
                 modifier = Modifier

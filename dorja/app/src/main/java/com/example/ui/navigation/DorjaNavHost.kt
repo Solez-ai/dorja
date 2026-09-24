@@ -26,6 +26,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Home
@@ -66,6 +67,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.DorjaApp
 import com.example.ui.account.AccountScreen
+import com.example.ui.admin.AdminScreen
 import com.example.ui.auth.AuthScreen
 import com.example.ui.chat.ChatThreadScreen
 import com.example.ui.chat.InboxScreen
@@ -91,7 +93,9 @@ import kotlinx.coroutines.withContext
 
 sealed class Screen(val route: String) {
     object Splash : Screen("splash")
-    object Auth : Screen("auth")
+    object Auth : Screen("auth?signup={signup}") {
+        fun createRoute(startInSignUp: Boolean = false) = "auth?signup=$startInSignUp"
+    }
     object Main : Screen("main")
     object PropertyDetail : Screen("property_detail/{listingId}") {
         fun createRoute(listingId: String) = "property_detail/$listingId"
@@ -164,8 +168,12 @@ fun DorjaNavHost() {
             )
         }
 
-        composable(Screen.Auth.route) {
+        composable(
+            route = Screen.Auth.route,
+            arguments = listOf(navArgument("signup") { type = NavType.StringType; defaultValue = "false" })
+        ) { backStackEntry ->
             AuthScreen(
+                startInSignUp = backStackEntry.arguments?.getString("signup") == "true",
                 onLoginSuccess = {
                     navController.navigate(Screen.Main.route) {
                         popUpTo(Screen.Auth.route) { inclusive = true }
@@ -175,6 +183,16 @@ fun DorjaNavHost() {
         }
 
         composable(Screen.Main.route) {
+            // Return to the auth screen whenever the session ends (logout or
+            // account deletion) — screens below require a signed-in user.
+            val sessionUser by DorjaApp.instance.repository.currentUser.collectAsState()
+            androidx.compose.runtime.LaunchedEffect(sessionUser) {
+                if (sessionUser == null) {
+                    navController.navigate(Screen.Auth.createRoute(false)) {
+                        popUpTo(0) { inclusive = true }
+                    }
+                }
+            }
             MainContainer(
                 onNavigateToDetail = { listingId ->
                     navController.navigate(Screen.PropertyDetail.createRoute(listingId))
@@ -200,8 +218,8 @@ fun DorjaNavHost() {
                 onNavigateToRelocation = { origin, dest ->
                     navController.navigate(Screen.RelocationMode.createRoute(origin, dest))
                 },
-                onLogout = {
-                    navController.navigate(Screen.Auth.route) {
+                onLogout = { startInSignUp ->
+                    navController.navigate(Screen.Auth.createRoute(startInSignUp)) {
                         popUpTo(0) { inclusive = true }
                     }
                 },
@@ -336,13 +354,15 @@ fun MainContainer(
     onNavigateToPass: (String) -> Unit,
     onNavigateToHandover: (String) -> Unit,
     onNavigateToRelocation: (String, String) -> Unit = { _, _ -> },
-    onLogout: () -> Unit = {},
+    /** Sign out; the flag opens the auth screen directly in sign-up mode. */
+    onLogout: (startInSignUp: Boolean) -> Unit = {},
     /** Incremented by outside screens (e.g. AI sheet) to request the Settings tab. */
     settingsTabRequest: Int = 0
 ) {
     val repository = DorjaApp.instance.repository
     val currentUser by repository.currentUser.collectAsState()
     val isHost = currentUser?.role == "SELLER"
+    val isAdmin = currentUser?.role == "ADMIN"
 
     var currentHostTab by remember { mutableStateOf(HostTab.PROPERTIES) }
     var currentBuyerTab by remember { mutableStateOf(BuyerTab.EXPLORE) }
@@ -365,7 +385,13 @@ fun MainContainer(
         label = "drawerProgress"
     )
 
-    val activeTabTitle = L(if (isHost) currentHostTab.titleKey else currentBuyerTab.titleKey)
+    val activeTabTitle = L(
+        when {
+            isAdmin -> "tab_admin"
+            isHost -> currentHostTab.titleKey
+            else -> currentBuyerTab.titleKey
+        }
+    )
 
     Box(
         modifier = Modifier
@@ -402,16 +428,18 @@ fun MainContainer(
         DrawerSidebar(
             userName = currentUser?.displayName ?: "DORJA User",
             activeLabel = activeTabTitle,
-            items = if (isHost) {
+            items = if (isAdmin) {
+                listOf(DrawerItem(L("tab_admin"), Icons.Default.AdminPanelSettings, "tab_admin"))
+            } else if (isHost) {
                 HostTab.values().map { DrawerItem(L(it.titleKey), it.icon, it.tag) }
             } else {
                 BuyerTab.values().map { DrawerItem(L(it.titleKey), it.icon, it.tag) }
             },
             onNavigate = { tag ->
-                if (isHost) {
-                    HostTab.values().firstOrNull { it.tag == tag }?.let { currentHostTab = it }
-                } else {
-                    BuyerTab.values().firstOrNull { it.tag == tag }?.let { currentBuyerTab = it }
+                when {
+                    isAdmin -> Unit // single admin tab; nothing to switch
+                    isHost -> HostTab.values().firstOrNull { it.tag == tag }?.let { currentHostTab = it }
+                    else -> BuyerTab.values().firstOrNull { it.tag == tag }?.let { currentBuyerTab = it }
                 }
                 drawerOpen = false
             },
@@ -419,7 +447,7 @@ fun MainContainer(
             onLogout = {
                 drawerOpen = false
                 repository.logout()
-                onLogout()
+                onLogout(false)
             }
         )
 
@@ -491,7 +519,9 @@ fun MainContainer(
                 }
 
                 Box(modifier = Modifier.fillMaxSize()) {
-                    if (isHost) {
+                    if (isAdmin) {
+                        AdminScreen()
+                    } else if (isHost) {
                         when (currentHostTab) {
                             HostTab.PROPERTIES -> HostListingsScreen(
                                 onCreateListing = onNavigateToCreateListing,
@@ -504,7 +534,7 @@ fun MainContainer(
                                 onNavigateToSellerSuite = onNavigateToCreateListing,
                                 onNavigateToRelocation = onNavigateToRelocation
                             )
-                            HostTab.SETTINGS -> SettingsScreen()
+                            HostTab.SETTINGS -> SettingsScreen(onLoggedOut = onLogout)
                         }
                     } else {
                         when (currentBuyerTab) {
@@ -515,7 +545,7 @@ fun MainContainer(
                                 onNavigateToSellerSuite = onNavigateToCreateListing,
                                 onNavigateToRelocation = onNavigateToRelocation
                             )
-                            BuyerTab.SETTINGS -> SettingsScreen()
+                            BuyerTab.SETTINGS -> SettingsScreen(onLoggedOut = onLogout)
                         }
                     }
                 }

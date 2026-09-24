@@ -83,7 +83,9 @@ import androidx.compose.material.icons.filled.SquareFoot
 import androidx.compose.material.icons.filled.ViewInAr
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Gavel
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.ListItem
@@ -124,8 +126,10 @@ import com.example.data.country.CountryRegistry
 import com.example.data.country.LiveabilityField
 import com.example.ui.util.DisclosurePackExporter
 import androidx.compose.ui.res.stringResource
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import com.example.data.model.AppealRecord
 import com.example.data.model.EvidenceLevel
+import com.example.data.model.LegalDocument
 import com.example.data.model.Report
 import com.example.data.model.ReportResponse
 import com.example.data.model.RoomItem
@@ -152,6 +156,7 @@ import com.example.ui.theme.DorjaColors
 import com.example.ui.theme.LocalDarkTheme
 import com.example.ui.util.Formatters
 import kotlinx.coroutines.launch
+import java.io.File
 
 data class GalleryPhotoItem(
     val url: String,
@@ -231,12 +236,6 @@ fun PropertyDetailScreen(
         }
     }
 
-val legalDocPicker = rememberLauncherForActivityResult(
-    contract = ActivityResultContracts.GetContent()
-) { uri: Uri? ->
-    uri?.let { scope.launch { repository.addLegalDocument(listingId, it) } }
-}
-
     DisposableEffect(hasAudioPermission) {
         if (hasAudioPermission && voiceHelper.isAvailable()) {
             voiceHelper.startListening(onResult = { recognized ->
@@ -261,6 +260,19 @@ val legalDocPicker = rememberLauncherForActivityResult(
     var showEndorsementDialog by remember { mutableStateOf(false) }
     var showReportDialog by remember { mutableStateOf(false) }
     var showRespondDialog by remember { mutableStateOf(false) }
+    var showResolveDialog by remember { mutableStateOf(false) }
+    var showAppealDialog by remember { mutableStateOf(false) }
+    var showDocUploadSheet by remember { mutableStateOf(false) }
+    var resolveReportId by remember { mutableStateOf("") }
+    var appealReportId by remember { mutableStateOf("") }
+    var resolveNote by remember { mutableStateOf("") }
+    var appealGrounds by remember { mutableStateOf("") }
+    var docTypeInput by remember { mutableStateOf("") }
+    var docNumberInput by remember { mutableStateOf("") }
+    var docAuthorityInput by remember { mutableStateOf("") }
+    var pickedDocUri by remember { mutableStateOf<Uri?>(null) }
+    var docBusy by remember { mutableStateOf(false) }
+    var docPendingDelete by remember { mutableStateOf<LegalDocument?>(null) }
 
     // Report dialog state (Phase 5)
     var reportReason by remember { mutableStateOf(ReportReason.INACCURATE_CLAIM.code) }
@@ -279,6 +291,20 @@ val legalDocPicker = rememberLauncherForActivityResult(
     var endField1 by remember { mutableStateOf("") }
     var endField2 by remember { mutableStateOf("") }
     var endField3 by remember { mutableStateOf("") }
+
+    // Appeal awaiting a decision (owner) — set from a ConflictCard action
+    var pendingAppealDecision by remember { mutableStateOf<Pair<String, String>?>(null) }
+
+    val legalDocPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        // The file is copied into app storage when the upload sheet is saved,
+        // so the document keeps working after app restarts.
+        if (uri != null) {
+            pickedDocUri = uri
+            showDocUploadSheet = true
+        }
+    }
 
     if (listing == null) {
         Box(
@@ -554,7 +580,7 @@ val legalDocPicker = rememberLauncherForActivityResult(
                             scope.launch {
                                 repository.addReport(
                                     listingId = safeListing.id,
-                                    reportedByUserId = currentUser?.id ?: "u2",
+                                    reportedByUserId = currentUser?.id ?: "",
                                     reason = reportReason,
                                     details = reportDetails.trim(),
                                     subjectClaim = reportClaim.trim()
@@ -637,6 +663,282 @@ val legalDocPicker = rememberLauncherForActivityResult(
             },
             dismissButton = {
                 TextButton(onClick = { showRespondDialog = false }) {
+                    Text("Cancel", color = DorjaColors.Gray700)
+                }
+            }
+        )
+    }
+
+    // ── Resolve a dispute (owner) ──
+    if (showResolveDialog) {
+        AlertDialog(
+            onDismissRequest = { showResolveDialog = false },
+            icon = { Icon(Icons.Default.Gavel, contentDescription = null, tint = DorjaColors.Teal900) },
+            title = { Text("Record a Resolution", fontWeight = FontWeight.Bold) },
+            text = {
+                Column {
+                    Text(
+                        "Describe how the claim conflict was settled. The note is recorded neutrally on both sides' records.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = DorjaColors.Gray700
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    OutlinedTextField(
+                        value = resolveNote,
+                        onValueChange = { resolveNote = it },
+                        label = { Text("Resolution note") },
+                        placeholder = { Text("e.g. Seller supplied the up-to-date khatian; claim withdrawn by reporter.") },
+                        modifier = Modifier.fillMaxWidth(),
+                        maxLines = 3
+                    )
+                }
+            },
+            confirmButton = {
+                DorjaButton(
+                    text = "Mark Resolved",
+                    enabled = resolveNote.isNotBlank(),
+                    onClick = {
+                        scope.launch {
+                            repository.resolveReport(resolveReportId, resolveNote.trim())
+                            resolveNote = ""; resolveReportId = ""
+                            showResolveDialog = false
+                        }
+                    },
+                    modifier = Modifier.widthIn(min = 140.dp)
+                )
+            },
+            dismissButton = {
+                TextButton(onClick = { showResolveDialog = false }) {
+                    Text("Cancel", color = DorjaColors.Gray700)
+                }
+            }
+        )
+    }
+
+    // ── Appeal a closed outcome (either party) ──
+    if (showAppealDialog) {
+        AlertDialog(
+            onDismissRequest = { showAppealDialog = false },
+            icon = { Icon(Icons.Default.Gavel, contentDescription = null, tint = DorjaColors.BentoPurpleIcon) },
+            title = { Text("Appeal the Outcome", fontWeight = FontWeight.Bold) },
+            text = {
+                Column {
+                    Text(
+                        "Appeals stay on the record. The listing owner reviews the grounds and upholds or overturns the outcome.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = DorjaColors.Gray700
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    OutlinedTextField(
+                        value = appealGrounds,
+                        onValueChange = { appealGrounds = it },
+                        label = { Text("Grounds for appeal") },
+                        placeholder = { Text("e.g. The resolution ignored the sub-registry receipt I attached.") },
+                        modifier = Modifier.fillMaxWidth(),
+                        maxLines = 3
+                    )
+                }
+            },
+            confirmButton = {
+                DorjaButton(
+                    text = "Submit Appeal",
+                    enabled = appealGrounds.isNotBlank(),
+                    onClick = {
+                        scope.launch {
+                            repository.addAppeal(
+                                reportId = appealReportId,
+                                appealedByUserId = currentUser?.id ?: safeListing.ownerId,
+                                grounds = appealGrounds.trim()
+                            )
+                            appealGrounds = ""; appealReportId = ""
+                            showAppealDialog = false
+                        }
+                    },
+                    modifier = Modifier.widthIn(min = 140.dp)
+                )
+            },
+            dismissButton = {
+                TextButton(onClick = { showAppealDialog = false }) {
+                    Text("Cancel", color = DorjaColors.Gray700)
+                }
+            }
+        )
+    }
+
+    // ── Decide a submitted appeal (owner) ──
+    pendingAppealDecision?.let { (reportId, appealId) ->
+        AlertDialog(
+            onDismissRequest = { pendingAppealDecision = null },
+            icon = { Icon(Icons.Default.Gavel, contentDescription = null, tint = DorjaColors.BentoPurpleIcon) },
+            title = { Text("Decide Appeal", fontWeight = FontWeight.Bold) },
+            text = {
+                Text(
+                    "Uphold keeps the recorded outcome. Overturn reopens the dispute for a new response and resolution.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = DorjaColors.Gray700
+                )
+            },
+            confirmButton = {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    DorjaButton(
+                        text = "Uphold",
+                        onClick = {
+                            scope.launch {
+                                repository.decideAppeal(reportId, appealId, upheld = true, decisionNote = "Outcome stands after review")
+                                pendingAppealDecision = null
+                            }
+                        },
+                        modifier = Modifier.widthIn(min = 100.dp)
+                    )
+                    OutlinedButton(
+                        onClick = {
+                            scope.launch {
+                                repository.decideAppeal(reportId, appealId, upheld = false, decisionNote = "Outcome overturned — dispute reopened")
+                                repository.reopenReport(reportId)
+                                pendingAppealDecision = null
+                            }
+                        }
+                    ) {
+                        Text("Overturn & reopen", color = DorjaColors.Gray700)
+                    }
+                }
+            }
+        )
+    }
+
+    // ── Document upload sheet — file + metadata, copied into app storage ──
+    if (showDocUploadSheet) {
+        AlertDialog(
+            onDismissRequest = { if (!docBusy) showDocUploadSheet = false },
+            icon = { Icon(Icons.Default.Description, contentDescription = null, tint = DorjaColors.Jol600) },
+            title = { Text("Attach a Document", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        "The file is copied into DORJA's private storage so this record survives app restarts. It is labelled self-declared until a professional or issuer confirms it.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = DorjaColors.Gray700
+                    )
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = DorjaColors.Sand100,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(enabled = !docBusy) { legalDocPicker.launch("*/*") }
+                    ) {
+                        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.Add, contentDescription = null, tint = DorjaColors.Jol600, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = pickedDocUri?.let { uri ->
+                                    queryDocDisplayName(context, uri) ?: "File selected"
+                                } ?: "Choose a file (PDF, image, any type)",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (pickedDocUri != null) DorjaColors.Ink950 else DorjaColors.Gray700,
+                                fontWeight = if (pickedDocUri != null) FontWeight.Bold else FontWeight.Normal,
+                                maxLines = 1,
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        listOf("TITLE_DEED", "KHATIAN", "COMPLETION_CERT", "SATHEEN", "MUTATION", "OTHER").forEach { type ->
+                            DorjaChip(
+                                selected = docTypeInput == type,
+                                label = type.replace('_', ' ').lowercase().replaceFirstChar { it.uppercase() },
+                                onClick = { docTypeInput = type }
+                            )
+                        }
+                    }
+                    OutlinedTextField(
+                        value = docNumberInput,
+                        onValueChange = { docNumberInput = it },
+                        label = { Text("Document / deed number (optional)") },
+                        placeholder = { Text("e.g. KHT-DHN-8849/2018") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+                    OutlinedTextField(
+                        value = docAuthorityInput,
+                        onValueChange = { docAuthorityInput = it },
+                        label = { Text("Issuing authority (optional)") },
+                        placeholder = { Text("e.g. Sub-registry office, Dhaka") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+                }
+            },
+            confirmButton = {
+                DorjaButton(
+                    text = if (docBusy) "Saving…" else "Attach",
+                    enabled = pickedDocUri != null && !docBusy,
+                    onClick = {
+                        val uri = pickedDocUri ?: return@DorjaButton
+                        docBusy = true
+                        scope.launch {
+                            val result = repository.addLegalDocument(
+                                listingId = listingId,
+                                uri = uri,
+                                documentType = docTypeInput.ifBlank { "UNKNOWN" },
+                                documentNumber = docNumberInput.trim(),
+                                issuingAuthority = docAuthorityInput.trim()
+                            )
+                            docBusy = false
+                            if (result.isSuccess) {
+                                pickedDocUri = null; docTypeInput = ""; docNumberInput = ""; docAuthorityInput = ""
+                                showDocUploadSheet = false
+                            } else {
+                                android.widget.Toast.makeText(
+                                    context,
+                                    "Could not attach the file. Try a different one.",
+                                    android.widget.Toast.LENGTH_LONG
+                                ).show()
+                            }
+                        }
+                    },
+                    modifier = Modifier.widthIn(min = 120.dp)
+                )
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showDocUploadSheet = false },
+                    enabled = !docBusy
+                ) {
+                    Text("Cancel", color = DorjaColors.Gray700)
+                }
+            }
+        )
+    }
+
+    // ── Delete document confirmation ──
+    docPendingDelete?.let { doc ->
+        AlertDialog(
+            onDismissRequest = { docPendingDelete = null },
+            icon = { Icon(Icons.Default.Delete, contentDescription = null, tint = DorjaColors.Error) },
+            title = { Text("Delete Document", fontWeight = FontWeight.Bold) },
+            text = {
+                Text(
+                    "\"${doc.documentTitle}\" and its stored file will be removed from this listing's record.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = DorjaColors.Gray700
+                )
+            },
+            confirmButton = {
+                DorjaButton(
+                    text = "Delete",
+                    containerColor = DorjaColors.Error,
+                    onClick = {
+                        scope.launch {
+                            repository.deleteLegalDocument(doc.id)
+                            docPendingDelete = null
+                        }
+                    },
+                    modifier = Modifier.widthIn(min = 110.dp)
+                )
+            },
+            dismissButton = {
+                TextButton(onClick = { docPendingDelete = null }) {
                     Text("Cancel", color = DorjaColors.Gray700)
                 }
             }
@@ -841,7 +1143,7 @@ val legalDocPicker = rememberLauncherForActivityResult(
                     text = "Confirm & Generate Pass",
                     onClick = {
                         scope.launch {
-                            val seekerId = currentUser?.id ?: "u2"
+                            val seekerId = currentUser?.id ?: ""
                             val viewing = repository.requestViewing(
                                 listingId = safeListing.id,
                                 seekerId = seekerId,
@@ -1483,16 +1785,34 @@ val legalDocPicker = rememberLauncherForActivityResult(
                             }
                         }
                         legalDocs.forEach { doc ->
+                            val storedFile = repository.getLegalDocumentFile(doc)
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
+                                    .clickable(enabled = storedFile != null) {
+                                        // Open the stored copy through FileProvider
+                                        val uri = FileProvider.getUriForFile(
+                                            context,
+                                            "${context.packageName}.fileprovider",
+                                            storedFile!!
+                                        )
+                                        val open = Intent(Intent.ACTION_VIEW).apply {
+                                            setDataAndType(uri, docMimeType(storedFile.name))
+                                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                        }
+                                        try {
+                                            context.startActivity(open)
+                                        } catch (_: Exception) {
+                                            Toast.makeText(context, "No app can open this file type", Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
                                     .padding(horizontal = 16.dp, vertical = 8.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Description,
                                     contentDescription = null,
-                                    tint = DorjaColors.Gray500,
+                                    tint = if (storedFile != null) DorjaColors.Jol600 else DorjaColors.Gray500,
                                     modifier = Modifier.size(18.dp)
                                 )
                                 Spacer(modifier = Modifier.width(12.dp))
@@ -1504,10 +1824,24 @@ val legalDocPicker = rememberLauncherForActivityResult(
                                         fontWeight = FontWeight.Medium
                                     )
                                     Text(
-                                        text = "Type: ${doc.documentType}",
+                                        text = buildString {
+                                            append("Type: ${doc.documentType.replace('_', ' ').lowercase().replaceFirstChar { it.uppercase() }}")
+                                            if (doc.documentNumber.isNotBlank()) append(" · No. ${doc.documentNumber}")
+                                            if (storedFile != null) append(" · tap to open")
+                                        },
                                         style = MaterialTheme.typography.labelSmall,
                                         color = DorjaColors.Gray500
                                     )
+                                }
+                                if (isOwner) {
+                                    IconButton(onClick = { docPendingDelete = doc }) {
+                                        Icon(
+                                            imageVector = Icons.Default.Delete,
+                                            contentDescription = "Delete document",
+                                            tint = DorjaColors.Gray500,
+                                            modifier = Modifier.size(17.dp)
+                                        )
+                                    }
                                 }
                                 EvidenceBadge(level = EvidenceLevel.fromCode(doc.evidenceLevel))
                             }
@@ -1706,7 +2040,23 @@ val legalDocPicker = rememberLauncherForActivityResult(
                             ConflictCard(
                                 report = report,
                                 responses = reportResponsesById[report.id] ?: emptyList(),
-                                appeals = reportAppealsById[report.id] ?: emptyList()
+                                appeals = reportAppealsById[report.id] ?: emptyList(),
+                                viewerId = currentUser?.id,
+                                isOwner = isOwner,
+                                onResolve = { reportId ->
+                                    resolveReportId = reportId
+                                    showResolveDialog = true
+                                },
+                                onWithdraw = { reportId ->
+                                    scope.launch { repository.withdrawReport(reportId) }
+                                },
+                                onAppeal = { reportId ->
+                                    appealReportId = reportId
+                                    showAppealDialog = true
+                                },
+                                onDecideAppeal = { reportId, appealId ->
+                                    pendingAppealDecision = reportId to appealId
+                                }
                             )
                             Spacer(modifier = Modifier.height(10.dp))
                         }
@@ -1863,7 +2213,7 @@ val legalDocPicker = rememberLauncherForActivityResult(
                         color = Color.Transparent,
                         border = BorderStroke(1.dp, if (LocalDarkTheme.current) Color.White.copy(alpha = 0.35f) else DorjaColors.Gray300),
                         onClick = {
-                            val seekerId = currentUser?.id ?: "u2"
+                            val seekerId = currentUser?.id ?: ""
                             onChatWithSeller(safeListing.id, seekerId, safeListing.ownerId)
                         },
                         modifier = Modifier.testTag("chat_with_seller_button")
@@ -1943,6 +2293,32 @@ val legalDocPicker = rememberLauncherForActivityResult(
  *  - "dorja" or any close phonetic rendering (j/g/y soft-g variants)
  *  - any combination of the two, in any order
  */
+/** Mime type guess for opening a stored document with an external viewer. */
+private fun docMimeType(fileName: String): String = when {
+    fileName.endsWith(".pdf", ignoreCase = true) -> "application/pdf"
+    fileName.endsWith(".png", ignoreCase = true) -> "image/png"
+    fileName.endsWith(".jpg", ignoreCase = true) || fileName.endsWith(".jpeg", ignoreCase = true) -> "image/jpeg"
+    fileName.endsWith(".webp", ignoreCase = true) -> "image/webp"
+    fileName.endsWith(".gif", ignoreCase = true) -> "image/gif"
+    fileName.endsWith(".txt", ignoreCase = true) || fileName.endsWith(".csv", ignoreCase = true) -> "text/plain"
+    else -> "*/*"
+}
+
+/** Best-effort display name for a picked document Uri (no persistence). */
+private fun queryDocDisplayName(context: android.content.Context, uri: Uri): String? {
+    return try {
+        context.contentResolver.query(
+            uri,
+            arrayOf(android.provider.OpenableColumns.DISPLAY_NAME),
+            null, null, null
+        )?.use { cursor ->
+            if (cursor.moveToFirst()) cursor.getString(0) else null
+        }
+    } catch (_: Exception) {
+        null
+    }
+}
+
 private fun matchesWakeWord(lower: String): Boolean {
     if (lower.contains("hey")) return true
     // d + o + (r | l) + soft consonant + final vowel — covers dorja/doria/dorga/dolja…

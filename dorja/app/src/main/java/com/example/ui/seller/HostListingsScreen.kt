@@ -81,7 +81,7 @@ fun HostListingsScreen(
     val repository = DorjaApp.instance.repository
     val scope = rememberCoroutineScope()
     val currentUser by repository.currentUser.collectAsState()
-    val ownerId = currentUser?.id ?: "u1"
+    val ownerId = currentUser?.id ?: ""
 
     val myListings by repository.getListingsByOwner(ownerId).collectAsState(initial = emptyList())
     var listingToDelete by remember { mutableStateOf<Listing?>(null) }
