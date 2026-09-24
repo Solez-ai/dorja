@@ -62,7 +62,7 @@ data class DorjaStrings(
             "admin_check_intro" to "Log what was verified and how. Checks stay attached to the submission forever.",
             "admin_check_ref" to "Reference / note",
             "admin_no_checks" to "No third-party checks recorded yet. Run and log checks while reviewing a submission.",
-            "admin_no_agents" to "Accounts appear here once buyers or sellers sign up and submit documents.",
+            "admin_no_agents" to "No buyer or seller account has been created on this device yet.",
             "admin_check_type" to "Check type",
             "admin_check_result" to "Result",
             "admin_check_issuer_db" to "Issuer DB",

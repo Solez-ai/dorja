@@ -85,13 +85,12 @@ fun AdminScreen() {
     val checks by repository.observeAllThirdPartyChecks().collectAsState(initial = emptyList())
 
     val pending = verifications.filter { it.status == "SUBMITTED" || it.status == "UNDER_REVIEW" }
-    var loadedUsers by remember { mutableStateOf<Map<String, User>>(emptyMap()) }
-    androidx.compose.runtime.LaunchedEffect(verifications) {
-        val ids = verifications.map { it.userId }.distinct()
-        val map = mutableMapOf<String, User>()
-        ids.forEach { id -> repository.getUserById(id)?.let { map[id] = it } }
-        loadedUsers = map
-    }
+    // Every account on the device (the admin's own row excluded): the agent
+    // register must list buyers and sellers whether or not they have
+    // submitted documents yet.
+    val allUsers by repository.observeAllUsers().collectAsState(initial = emptyList())
+    val loadedUsers: Map<String, User> = remember(allUsers) { allUsers.associateBy { it.id } }
+    val agents: List<User> = remember(allUsers) { allUsers.filter { it.role != "ADMIN" } }
 
     var decideTarget by remember { mutableStateOf<Pair<IdentityVerification, Boolean>?>(null) }
     var reviewNote by remember { mutableStateOf("") }
@@ -440,7 +439,7 @@ fun AdminScreen() {
                     fontWeight = FontWeight.Bold
                 )
             }
-            if (loadedUsers.isEmpty()) {
+            if (agents.isEmpty()) {
                 item {
                     Text(
                         L("admin_no_agents"),
@@ -449,8 +448,8 @@ fun AdminScreen() {
                     )
                 }
             } else {
-                items(loadedUsers.size) { index ->
-                    val user = loadedUsers.values.elementAt(index)
+                items(agents.size) { index ->
+                    val user = agents[index]
                     BentoCard(modifier = Modifier.fillMaxWidth()) {
                         Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
                             Icon(
