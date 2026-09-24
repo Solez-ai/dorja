@@ -32,8 +32,8 @@ class MainActivity : ComponentActivity() {
             val currentUser by DorjaApp.instance.repository.currentUser.collectAsState()
             val context = LocalContext.current
             // Keep the app language/country pinned to the user's explicit Settings
-            // choice. Switching demo accounts must NOT re-seed the locale from the
-            // freshly-loaded profile row (whose countryCode is stale seed data).
+            // choice. Switching accounts must NOT re-seed the locale from the
+            // freshly-loaded profile row.
             LaunchedEffect(Unit) {
                 LocaleSettings.setPinnedLanguageTag(LocaleSettings.languageTag.value)
             }
