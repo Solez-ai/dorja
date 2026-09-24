@@ -52,6 +52,7 @@ import com.example.ui.components.DorjaBadge
 import com.example.ui.components.DorjaButton
 import com.example.ui.components.DorjaCard
 import com.example.ui.theme.DorjaColors
+import com.example.ui.theme.LocalDarkTheme
 import com.example.ui.util.Formatters
 import com.example.ui.util.QrCodeGenerator
 import kotlinx.coroutines.launch
@@ -91,14 +92,14 @@ fun ViewingPassScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(DorjaColors.Paper50)
+            .background(DorjaColors.CanvasBg)
             .testTag("viewing_pass_screen")
     ) {
-        // Top Header
+        // Top Header — cream canvas that melts into the page, dark ink in dark mode
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(DorjaColors.White)
+                .background(DorjaColors.CanvasBg)
                 .padding(top = 44.dp, start = 16.dp, end = 16.dp, bottom = 12.dp)
         ) {
             Row(
@@ -110,7 +111,7 @@ fun ViewingPassScreen(
                     modifier = Modifier
                         .size(40.dp)
                         .clip(CircleShape)
-                        .background(DorjaColors.Paper50)
+                        .background(DorjaColors.Sand100)
                         .testTag("pass_back_button")
                 ) {
                     Icon(
@@ -148,12 +149,12 @@ fun ViewingPassScreen(
             } else {
                 val pass = viewing!!
 
-                // Main Pass Card
+                // Main Pass Card — mint accent ring in light mode, soft border in dark
                 DorjaCard(
                     modifier = Modifier.fillMaxWidth(),
-                    backgroundColor = DorjaColors.White,
-                    borderColor = DorjaColors.Jol600,
-                    borderWidth = 1.5.dp
+                    backgroundColor = DorjaColors.BentoCardBg,
+                    borderColor = if (LocalDarkTheme.current) DorjaColors.BentoCardBorder else DorjaColors.BentoGreenIcon,
+                    borderWidth = if (LocalDarkTheme.current) 0.5.dp else 1.5.dp
                 ) {
                     Column(
                         modifier = Modifier.padding(20.dp),
@@ -168,13 +169,13 @@ fun ViewingPassScreen(
                             DorjaBadge(
                                 text = "DORJA SAFEVIEW PASS",
                                 icon = Icons.Default.Shield,
-                                backgroundColor = DorjaColors.Teal100,
-                                textColor = DorjaColors.Teal900
+                                backgroundColor = DorjaColors.BentoGreenBg,
+                                textColor = DorjaColors.BentoGreenText
                             )
                             DorjaBadge(
                                 text = pass.status,
-                                backgroundColor = if (pass.status == "CHECKED_IN") DorjaColors.Teal100 else DorjaColors.Sand100,
-                                textColor = if (pass.status == "CHECKED_IN") DorjaColors.Teal900 else DorjaColors.Ink950
+                                backgroundColor = if (pass.status == "CHECKED_IN") DorjaColors.BentoGreenBg else DorjaColors.Sand100,
+                                textColor = if (pass.status == "CHECKED_IN") DorjaColors.BentoGreenText else DorjaColors.Ink950
                             )
                         }
 

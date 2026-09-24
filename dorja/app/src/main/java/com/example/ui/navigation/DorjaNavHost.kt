@@ -85,6 +85,7 @@ import com.example.ui.tour.TourViewerScreen
 import com.example.ui.scanner.RoomScannerScreen
 import com.example.ui.visits.VisitsScreen
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -348,9 +349,12 @@ fun MainContainer(
     var drawerOpen by remember { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
 
-    // Honor Settings-tab requests coming from stacked destinations (Hey Dorja sheet)
+    // Honor Settings-tab requests coming from stacked destinations (Hey Dorja sheet).
+    // Guards against a race where MainContainer leaves composition while its
+    // state vars are being written (intermittent crash when the drawer/menu
+    // actions run during teardown).
     LaunchedEffect(settingsTabRequest) {
-        if (settingsTabRequest > 0) {
+        if (settingsTabRequest > 0 && isActive) {
             if (isHost) currentHostTab = HostTab.SETTINGS else currentBuyerTab = BuyerTab.SETTINGS
         }
     }

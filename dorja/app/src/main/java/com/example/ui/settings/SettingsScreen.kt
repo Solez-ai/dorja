@@ -1,6 +1,7 @@
 package com.example.ui.settings
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -118,6 +119,7 @@ fun SettingsScreen() {
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .background(DorjaColors.CanvasBg)
             .testTag("settings_screen")
     ) {
         Row(
@@ -194,7 +196,7 @@ fun SettingsScreen() {
                                     checkedThumbColor = androidx.compose.ui.graphics.Color.White,
                                     checkedTrackColor = DorjaColors.Jol600,
                                     uncheckedThumbColor = DorjaColors.Gray500,
-                                    uncheckedTrackColor = DorjaColors.Sand100
+                                    uncheckedTrackColor = DorjaColors.Sand300
                                 )
                             )
                         }

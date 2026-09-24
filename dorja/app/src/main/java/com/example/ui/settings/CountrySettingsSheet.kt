@@ -61,7 +61,7 @@ fun CountrySettingsSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = DorjaColors.White
+        containerColor = DorjaColors.BentoCardBg
     ) {
         Column(
             modifier = Modifier
@@ -104,8 +104,8 @@ fun CountrySettingsSheet(
                     Icon(Icons.Default.Search, contentDescription = null, tint = DorjaColors.Gray500)
                 },
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = DorjaColors.White,
-                    unfocusedContainerColor = DorjaColors.White,
+                    focusedContainerColor = DorjaColors.CanvasBg,
+                    unfocusedContainerColor = DorjaColors.CanvasBg,
                     focusedBorderColor = DorjaColors.BentoBlueIcon,
                     unfocusedBorderColor = DorjaColors.BentoCardBorder
                 )
@@ -151,10 +151,14 @@ private fun CountrySettingsRow(
     Surface(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
+            .clip(RoundedCornerShape(12.dp))
             .clickable(onClick = onClick),
-        color = if (isSelected) DorjaColors.BentoBlueBg else DorjaColors.White,
-        shape = RoundedCornerShape(10.dp)
+        color = if (isSelected) DorjaColors.BentoBlueBg else DorjaColors.BentoCardBg,
+        shape = RoundedCornerShape(12.dp),
+        border = androidx.compose.foundation.BorderStroke(
+            0.5.dp,
+            if (isSelected) DorjaColors.BentoBlueIcon.copy(alpha = 0.45f) else DorjaColors.BentoCardBorder
+        )
     ) {
         Row(
             modifier = Modifier

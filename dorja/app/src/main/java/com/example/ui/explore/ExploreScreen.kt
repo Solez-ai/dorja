@@ -76,6 +76,7 @@ import com.example.ui.components.DorjaOutlinedButton
 import com.example.ui.i18n.L
 import com.example.ui.i18n.Lf
 import com.example.ui.theme.DorjaColors
+import com.example.ui.theme.LocalDarkTheme
 import com.example.ui.util.Formatters
 import com.example.ui.components.DorjaLogo
 
@@ -119,10 +120,15 @@ fun ExploreScreen(
             .background(DorjaColors.CanvasBg)
             .testTag("explore_screen")
     ) {
-        // Top Header with Gradient Background
+        // Top Header — glass panel: warm white in light mode, deep ink in dark
         Surface(
             modifier = Modifier.fillMaxWidth(),
-            color = DorjaColors.InverseBg
+            color = if (LocalDarkTheme.current) DorjaColors.InverseBg else DorjaColors.White,
+            border = if (LocalDarkTheme.current) {
+                null
+            } else {
+                BorderStroke(width = 1.dp, color = DorjaColors.BentoCardBorder)
+            }
         ) {
             Column(
                 modifier = Modifier
@@ -136,21 +142,20 @@ fun ExploreScreen(
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
                         DorjaLogo(
-                            modifier = Modifier.size(40.dp),
-                            outlined = true
+                            modifier = Modifier.size(40.dp)
                         )
                         Spacer(modifier = Modifier.width(12.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = L("explore_header"),
                                 style = MaterialTheme.typography.titleMedium,
-                                color = DorjaColors.InverseFg,
+                                color = DorjaColors.Ink950,
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
                                 text = L("explore_subtitle"),
                                 style = MaterialTheme.typography.labelSmall,
-                                color = DorjaColors.InverseFg.copy(alpha = 0.72f),
+                                color = DorjaColors.Gray600,
                                 maxLines = 1,
                                 overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                             )

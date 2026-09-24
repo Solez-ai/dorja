@@ -906,14 +906,15 @@ val legalDocPicker = rememberLauncherForActivityResult(
     // ═════════════════════════════════════════════════════════════════════
     //  THE REDESIGNED SURFACE
     //
-    //  One continuous dark canvas. The photo gallery fills the entire top;
-    //  an editorial sheet slides over it with a rounded top edge. Stats are
-    //  a snap-scrolling ribbon, rooms are story cards, every action floats.
+    //  One continuous canvas: deep ink in dark mode, warm cream in light
+    //  mode. The photo gallery fills the entire top; an editorial sheet
+    //  slides over it with a rounded top edge. Stats are a snap-scrolling
+    //  ribbon, rooms are story cards, every action floats.
     // ═════════════════════════════════════════════════════════════════════
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(DorjaColors.InverseBg)
+            .background(if (LocalDarkTheme.current) DorjaColors.InverseBg else DorjaColors.CanvasBg)
             .testTag("property_detail_screen")
     ) {
         LazyColumn(
@@ -931,7 +932,7 @@ val legalDocPicker = rememberLauncherForActivityResult(
                             .fillMaxWidth()
                             .height(430.dp)
                             .offset(y = heroParallax.dp / 2f)
-                            .background(DorjaColors.InverseBg)
+                            .background(if (LocalDarkTheme.current) DorjaColors.InverseBg else DorjaColors.Sand100)
                     ) {
                         HorizontalPager(
                             state = pagerState,
@@ -1054,10 +1055,14 @@ val legalDocPicker = rememberLauncherForActivityResult(
                             .height(300.dp)
                             .background(
                                 Brush.linearGradient(
-                                    listOf(
+                                    if (LocalDarkTheme.current) listOf(
                                         DorjaColors.InverseBg,
                                         DorjaColors.DrawerSidebar,
                                         DorjaColors.InverseBg
+                                    ) else listOf(
+                                        DorjaColors.Sand100,
+                                        DorjaColors.Jol100.copy(alpha = 0.55f),
+                                        DorjaColors.Sand100
                                     )
                                 )
                             ),
@@ -1162,7 +1167,7 @@ val legalDocPicker = rememberLauncherForActivityResult(
                         }
                         Surface(
                             shape = RoundedCornerShape(16.dp),
-                            color = DorjaColors.InverseBg,
+                            color = if (LocalDarkTheme.current) DorjaColors.InverseBg else DorjaColors.BentoBlueBg,
                             modifier = Modifier
                                 .clickable {
                                     val lat = safeListing.approximateLat ?: 23.8041
@@ -1176,7 +1181,7 @@ val legalDocPicker = rememberLauncherForActivityResult(
                             Icon(
                                 imageVector = Icons.Default.LocationOn,
                                 contentDescription = "Open in Google Maps",
-                                tint = Color.White,
+                                tint = if (LocalDarkTheme.current) Color.White else DorjaColors.BentoBlueIcon,
                                 modifier = Modifier
                                     .padding(14.dp)
                                     .size(22.dp)
@@ -2298,7 +2303,7 @@ private fun RoomStoryCard(
                     } catch (_: Exception) { false }
                     Surface(
                         shape = RoundedCornerShape(50),
-                        color = DorjaColors.InverseBg.copy(alpha = 0.85f),
+                        color = if (LocalDarkTheme.current) DorjaColors.InverseBg.copy(alpha = 0.85f) else DorjaColors.BentoBlueBg,
                         modifier = Modifier
                             .align(Alignment.TopEnd)
                             .padding(8.dp)
@@ -2310,14 +2315,14 @@ private fun RoomStoryCard(
                             Icon(
                                 imageVector = Icons.Default.ViewInAr,
                                 contentDescription = null,
-                                tint = DorjaColors.DrawerAccent,
+                                tint = DorjaColors.BentoBlueIcon,
                                 modifier = Modifier.size(11.dp)
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
                                 text = if (isV2) "360°" else "3D",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = Color.White,
+                                color = DorjaColors.BentoBlueText,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 9.sp
                             )
@@ -2459,10 +2464,11 @@ private fun PaperTrailCard(
  */
 @Composable
 private fun HeyDorjaPill(onClick: () -> Unit) {
+    // Fully opaque in both modes — the pill must never read as disabled.
     Surface(
         shape = CircleShape,
-        color = if (LocalDarkTheme.current) DorjaColors.White.copy(alpha = 0.12f) else DorjaColors.BentoGreenBg,
-        border = BorderStroke(1.dp, DorjaColors.DrawerAccent.copy(alpha = if (LocalDarkTheme.current) 0.5f else 0.65f)),
+        color = DorjaColors.BentoGreenBg,
+        border = BorderStroke(1.dp, DorjaColors.BentoGreenIcon.copy(alpha = 0.55f)),
         onClick = onClick
     ) {
         Row(
@@ -2475,13 +2481,13 @@ private fun HeyDorjaPill(onClick: () -> Unit) {
                 text = "Dorja",
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.Bold,
-                color = DorjaColors.DrawerAccent
+                color = DorjaColors.BentoGreenText
             )
             Spacer(modifier = Modifier.width(4.dp))
             Icon(
                 imageVector = Icons.Default.Mic,
                 contentDescription = null,
-                tint = DorjaColors.DrawerAccent,
+                tint = DorjaColors.BentoGreenIcon,
                 modifier = Modifier.size(14.dp)
             )
         }

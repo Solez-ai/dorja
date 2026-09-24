@@ -121,11 +121,17 @@ fun Modifier.pressScale(
         .pointerInput(Unit) {
             awaitPointerEventScope {
                 while (true) {
-                    awaitFirstDown(false)
-                    if (hapticBump) {
-                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                    }
+                    awaitFirstDown(requireUnconsumed = false)
+                    // Every side effect (haptic, animation, onClick) is launched
+                    // into the coroutine scope instead of running synchronously
+                    // inside the pointer-event dispatch. Calling app code directly
+                    // from the gesture path can throw once the node is disposed
+                    // mid-gesture (observed as an intermittent crash when opening
+                    // the drawer while a card was pressed).
                     scope.launch {
+                        if (hapticBump) {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        }
                         scale.animateTo(
                             0.97f,
                             animationSpec = spring(
@@ -145,7 +151,7 @@ fun Modifier.pressScale(
                         )
                     }
                     if (up != null) {
-                        onClick()
+                        scope.launch { onClick() }
                     }
                 }
             }

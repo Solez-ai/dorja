@@ -86,17 +86,18 @@ fun HostListingsScreen(
     val myListings by repository.getListingsByOwner(ownerId).collectAsState(initial = emptyList())
     var listingToDelete by remember { mutableStateOf<Listing?>(null) }
 
-    if (listingToDelete != null) {
+    val listingSnapshot = listingToDelete
+    if (listingSnapshot != null) {
         AlertDialog(
             onDismissRequest = { listingToDelete = null },
             title = { Text(L("host_delete_title"), fontWeight = FontWeight.Bold) },
-            text = { Text(Lf("host_delete_body", listingToDelete!!.title)) },
+            text = { Text(Lf("host_delete_body", listingSnapshot.title)) },
             confirmButton = {
                 DorjaButton(
                     text = L("common_delete"),
                     onClick = {
                         scope.launch {
-                            repository.deleteListing(listingToDelete!!.id)
+                            repository.deleteListing(listingSnapshot.id)
                             listingToDelete = null
                         }
                     },
