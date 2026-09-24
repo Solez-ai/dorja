@@ -286,6 +286,38 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--ember); outline
 
 /* End Quiet Momentum interaction layer. */
 
+/* Quiet Momentum what's-new pass: a release-log section that borrows the feature grid's ink field and the detail band's check-list rhythm. */
+.whats-new-section { background: var(--ink-deep); color: #f8f5ef; }
+.whats-new-head { display: grid; grid-template-columns: 150px minmax(0, 1fr) auto; gap: 40px; align-items: start; }
+.whats-new-section .section-rail { color: #83d7d0; }
+.whats-new-section .section-rail span:first-child { color: #ed9e71; }
+.whats-new-lead h2 { margin: 0 0 19px; font: 800 clamp(41px, 5vw, 70px)/1.04 var(--font-display); letter-spacing: -.06em; }
+.whats-new-sub { max-width: 470px; margin: 0; color: #b9c9d4; font-size: 14px; line-height: 1.75; }
+.whats-new-cta { display: inline-flex; align-items: center; gap: 9px; margin-top: 6px; padding: 15px 18px; background: var(--ember); color: #fff; font: 800 11px/1 var(--font-display); letter-spacing: .04em; white-space: nowrap; transition: transform .16s cubic-bezier(.23,1,.32,1), background .18s ease; }
+.whats-new-cta:hover { background: var(--teal); transform: translateY(-2px); }
+.whats-new-grid { margin-top: 73px; margin-left: 190px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-top: 1px solid rgba(255,255,255,.2); border-left: 1px solid rgba(255,255,255,.2); }
+.whats-new-card { padding: 27px 29px 24px; border-right: 1px solid rgba(255,255,255,.2); border-bottom: 1px solid rgba(255,255,255,.2); transition: background .22s ease; }
+.whats-new-card:hover { background: rgba(29,163,162,.14); }
+.whats-new-top { display: flex; justify-content: space-between; align-items: center; color: #7ad2cd; }
+.whats-new-top span { padding: 5px 7px; border: 1px solid rgba(237,158,111,.55); color: #ed9e71; font: 800 8px/1 var(--font-display); letter-spacing: .16em; }
+.whats-new-card h3 { margin: 34px 0 12px; font: 700 22px/1.12 var(--font-display); letter-spacing: -.04em; }
+.whats-new-card > p { max-width: 380px; margin: 0 0 18px; color: #c9d5dc; font-size: 13px; line-height: 1.7; }
+.whats-new-points { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+.whats-new-points li { display: flex; align-items: center; gap: 8px; color: #dfe8ee; font: 600 11px/1.45 var(--font-display); letter-spacing: .015em; }
+.whats-new-points svg { flex: 0 0 auto; color: #68d2cb; }
+
+@media (max-width: 1020px) { .whats-new-grid { margin-left: 140px; grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 700px) {
+  .whats-new-head { display: block; }
+  .whats-new-cta { margin-top: 22px; }
+  .whats-new-grid { margin: 48px 0 0; grid-template-columns: 1fr; }
+  .whats-new-card { padding: 24px 21px; }
+  .whats-new-card h3 { margin-top: 26px; }
+}
+@media (prefers-reduced-motion: reduce) { .whats-new-cta, .whats-new-card { transition: none !important; } }
+
+/* End Quiet Momentum what's-new pass. */
+
 /* Quiet Momentum cursor pack: the supplied MacOSCursor pointer intent, translated to CSS for the static site. */
 :root { --dorja-mac-pointer: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath d='M5 3l13 9-6 1 3 7-2 1-3-7-5 4z' fill='white' stroke='%23082b4f' stroke-width='1.4' stroke-linejoin='round'/%3E%3C/svg%3E") 4 3, pointer; }
 .site-shell a, .site-shell button { cursor: var(--dorja-mac-pointer); }

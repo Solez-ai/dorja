@@ -10,11 +10,15 @@ import {
   Check,
   ChevronRight,
   FileCheck2,
+  Globe2,
   Landmark,
+  Languages,
   Menu,
   MessageSquareText,
+  MessagesSquare,
   ScanLine,
   ShieldCheck,
+  UsersRound,
   X,
 } from "lucide-react";
 import { publicUrl } from "@/lib/assets";
@@ -67,6 +71,51 @@ const journey = [
   ["02", "Verify", "Review documentation, seller verification, and the information behind the listing."],
   ["03", "Visit safely", "Use a verified SafeView pass before sharing the detail of a physical visit."],
   ["04", "Handover", "Keep each promise and document clear from the listing to the keys."],
+];
+
+const whatsNew = [
+  {
+    icon: Globe2,
+    title: "Country-aware identity verification",
+    description:
+      "Buyers and sellers now submit national ID per country — NID, Aadhaar, Social Security and more — with only a masked number and integrity hash ever stored on the device.",
+    points: ["Per-country document kinds", "Masked number + SHA-256 hash", "Admin approval with third-party checks"],
+  },
+  {
+    icon: ShieldCheck,
+    title: "A real admin console",
+    description:
+      "One admin per device reviews identity submissions, runs issuer, authenticity and sanctions checks, and keeps a full audit trail before a listing can be trusted.",
+    points: ["Verification queue with evidence", "Agent register for all accounts", "Every action recorded"],
+  },
+  {
+    icon: UsersRound,
+    title: "Real accounts, end to end",
+    description:
+      "Buyers and sellers create, switch and delete real accounts with salted-hashed passwords and phone-based sign-in. No demo data — every listing is somebody’s actual property.",
+    points: ["Phone + salted SHA-256 auth", "Multiple accounts per device", "Zero seeded listings"],
+  },
+  {
+    icon: Languages,
+    title: "40 languages, 4 done completely",
+    description:
+      "The whole interface ships in 40 languages, with Bangla, Hindi, Urdu and Italian translated to the last string — including full right-to-left layouts for Urdu.",
+    points: ["Bangla · Hindi · Urdu · Italian complete", "RTL layouts for Urdu, Arabic, Farsi", "Falls back to English gracefully"],
+  },
+  {
+    icon: ScanLine,
+    title: "Scans that belong to the room",
+    description:
+      "360° panoramas are captured with the phone’s own camera and gyroscope, stitched on device, and replayed with gyro panning — no special hardware.",
+    points: ["Gyro-driven 360° viewer", "On-device panorama stitching", "Works with any phone camera"],
+  },
+  {
+    icon: MessagesSquare,
+    title: "Negotiation with a paper trail",
+    description:
+      "Encrypted inbox, dispute records with both sides kept side by side, and neutral appeal tracking — conversations stay useful when they get serious.",
+    points: ["Encrypted in-app messaging", "Balanced dispute records", "Neutral appeal history"],
+  },
 ];
 
 type LightboxItem = { src: string; alt: string; label: string };
@@ -141,6 +190,7 @@ export default function Home() {
           <a href="#why-dorja">Why Dorja</a>
           <a href="#features">Trust system</a>
           <a href="#experience">App experience</a>
+          <a href="#whats-new">What's new</a>
           <a href="#journey">How it works</a>
         </nav>
 
@@ -162,6 +212,7 @@ export default function Home() {
             <a href="#why-dorja" onClick={closeMenu}>Why Dorja</a>
             <a href="#features" onClick={closeMenu}>Trust system</a>
             <a href="#experience" onClick={closeMenu}>App experience</a>
+            <a href="#whats-new" onClick={closeMenu}>What's new</a>
             <a href="#journey" onClick={closeMenu}>How it works</a>
             <a className="mobile-nav-cta" href={alphaBetaUrl} target="_blank" rel="noopener noreferrer" onClick={closeMenu}>Try the alpha / beta <ArrowRight size={17} /></a>
           </nav>
@@ -318,9 +369,43 @@ export default function Home() {
           </div>
         </section>
 
+        <section className={`whats-new-section section-pad ${revealClass("whats-new")}`} data-reveal="whats-new" id="whats-new" aria-labelledby="whats-new-heading">
+          <div className="whats-new-head">
+            <div className="section-rail"><span>04</span><span>FRESH OUT OF THE BUILD</span></div>
+            <div className="whats-new-lead">
+              <p className="section-kicker">Shipped in the latest alpha / beta</p>
+              <h2 id="whats-new-heading">Newly on <em>Dorja.</em></h2>
+              <p className="whats-new-sub">
+                Every build is released straight to this page as an APK. The latest drop reworked accounts,
+                verification and language coverage from the ground up.
+              </p>
+            </div>
+            <a className="whats-new-cta" href={alphaBetaUrl} target="_blank" rel="noopener noreferrer">
+              Get the latest build <ArrowRight size={17} />
+            </a>
+          </div>
+          <div className="whats-new-grid">
+            {whatsNew.map((item) => {
+              const Icon = item.icon;
+              return (
+                <article className="whats-new-card" key={item.title}>
+                  <div className="whats-new-top"><Icon size={26} strokeWidth={1.6} /><span>NEW</span></div>
+                  <h3>{item.title}</h3>
+                  <p>{item.description}</p>
+                  <ul className="whats-new-points">
+                    {item.points.map((point) => (
+                      <li key={point}><Check size={14} /> {point}</li>
+                    ))}
+                  </ul>
+                </article>
+              );
+            })}
+          </div>
+        </section>
+
         <section className={`journey-section section-pad ${revealClass("journey")}`} data-reveal="journey" id="journey" aria-labelledby="journey-heading">
           <div className="journey-lead">
-            <div className="section-rail"><span>04</span><span>THE JOURNEY</span></div>
+            <div className="section-rail"><span>05</span><span>THE JOURNEY</span></div>
             <p className="section-kicker">From search to keys</p>
             <h2 id="journey-heading">One journey.<br /><em>Fewer blind spots.</em></h2>
             <button
