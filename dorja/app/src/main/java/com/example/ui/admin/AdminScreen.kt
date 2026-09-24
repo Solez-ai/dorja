@@ -61,6 +61,7 @@ import com.example.ui.components.DorjaChip
 import com.example.ui.components.DorjaLogo
 import com.example.ui.components.DorjaOutlinedButton
 import com.example.ui.i18n.L
+import com.example.ui.i18n.Lf
 import com.example.ui.theme.DorjaColors
 import com.example.ui.util.Formatters
 import kotlinx.coroutines.launch
@@ -119,7 +120,7 @@ fun AdminScreen() {
                         value = reviewNote,
                         onValueChange = { reviewNote = it },
                         label = { Text(L("admin_review_note")) },
-                        placeholder = { Text("e.g. Matched against issuer portal record") },
+                        placeholder = { Text(L("admin_review_note_hint")) },
                         modifier = Modifier.fillMaxWidth(),
                         maxLines = 3
                     )
@@ -127,7 +128,7 @@ fun AdminScreen() {
             },
             confirmButton = {
                 DorjaButton(
-                    text = if (approve) "Approve" else "Reject",
+                    text = if (approve) L("admin_approve") else L("admin_reject"),
                     containerColor = if (approve) DorjaColors.Jol600 else DorjaColors.Error,
                     onClick = {
                         scope.launch {
@@ -146,7 +147,7 @@ fun AdminScreen() {
             },
             dismissButton = {
                 TextButton(onClick = { decideTarget = null }) {
-                    Text("Cancel", color = DorjaColors.Gray700)
+                    Text(L("common_cancel"), color = DorjaColors.Gray700)
                 }
             }
         )
@@ -165,23 +166,23 @@ fun AdminScreen() {
                         style = MaterialTheme.typography.bodySmall,
                         color = DorjaColors.Gray700
                     )
-                    Text("Check type", style = MaterialTheme.typography.labelSmall, color = DorjaColors.Gray700)
+                    Text(L("admin_check_type"), style = MaterialTheme.typography.labelSmall, color = DorjaColors.Gray700)
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        DorjaChip(selected = checkType == "ISSUER_DATABASE", label = "Issuer DB", onClick = { checkType = "ISSUER_DATABASE" })
-                        DorjaChip(selected = checkType == "DOCUMENT_AUTHENTICITY", label = "Doc authenticity", onClick = { checkType = "DOCUMENT_AUTHENTICITY" })
-                        DorjaChip(selected = checkType == "SANCTIONS_SCREENING", label = "Sanctions", onClick = { checkType = "SANCTIONS_SCREENING" })
+                        DorjaChip(selected = checkType == "ISSUER_DATABASE", label = L("admin_check_issuer_db"), onClick = { checkType = "ISSUER_DATABASE" })
+                        DorjaChip(selected = checkType == "DOCUMENT_AUTHENTICITY", label = L("admin_check_doc_auth"), onClick = { checkType = "DOCUMENT_AUTHENTICITY" })
+                        DorjaChip(selected = checkType == "SANCTIONS_SCREENING", label = L("admin_check_sanctions"), onClick = { checkType = "SANCTIONS_SCREENING" })
                     }
-                    Text("Result", style = MaterialTheme.typography.labelSmall, color = DorjaColors.Gray700)
+                    Text(L("admin_check_result"), style = MaterialTheme.typography.labelSmall, color = DorjaColors.Gray700)
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        DorjaChip(selected = checkResult == "PASS", label = "Pass", onClick = { checkResult = "PASS" })
-                        DorjaChip(selected = checkResult == "FLAGGED", label = "Flagged", onClick = { checkResult = "FLAGGED" })
-                        DorjaChip(selected = checkResult == "INCONCLUSIVE", label = "Inconclusive", onClick = { checkResult = "INCONCLUSIVE" })
+                        DorjaChip(selected = checkResult == "PASS", label = L("admin_check_pass"), onClick = { checkResult = "PASS" })
+                        DorjaChip(selected = checkResult == "FLAGGED", label = L("admin_check_flagged"), onClick = { checkResult = "FLAGGED" })
+                        DorjaChip(selected = checkResult == "INCONCLUSIVE", label = L("admin_check_inconclusive"), onClick = { checkResult = "INCONCLUSIVE" })
                     }
                     OutlinedTextField(
                         value = checkNote,
                         onValueChange = { checkNote = it },
                         label = { Text(L("admin_check_ref")) },
-                        placeholder = { Text("e.g. Issuer portal case #48211 — name and number match") },
+                        placeholder = { Text(L("admin_check_ref_hint")) },
                         modifier = Modifier.fillMaxWidth(),
                         maxLines = 2
                     )
@@ -189,7 +190,7 @@ fun AdminScreen() {
             },
             confirmButton = {
                 DorjaButton(
-                    text = "Record check",
+                    text = L("admin_check_record_cta"),
                     onClick = {
                         scope.launch {
                             repository.addThirdPartyCheck(
@@ -209,7 +210,7 @@ fun AdminScreen() {
             },
             dismissButton = {
                 TextButton(onClick = { checkTarget = null }) {
-                    Text("Cancel", color = DorjaColors.Gray700)
+                    Text(L("common_cancel"), color = DorjaColors.Gray700)
                 }
             }
         )
@@ -256,7 +257,7 @@ fun AdminScreen() {
                     Icon(Icons.Default.AdminPanelSettings, contentDescription = null, tint = DorjaColors.BentoPurpleIcon, modifier = Modifier.size(13.dp))
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        text = "ADMIN",
+                        text = L("admin_role_admin"),
                         style = MaterialTheme.typography.labelSmall,
                         color = DorjaColors.BentoPurpleText,
                         fontWeight = FontWeight.Bold,
@@ -400,25 +401,26 @@ fun AdminScreen() {
                         "FLAGGED" -> DorjaColors.ErrorContainer to DorjaColors.Error
                         else -> DorjaColors.BentoAmberBg to DorjaColors.BentoAmberText
                     }
+                    val noNoteLabel = L("admin_no_note")
                     BentoCard(modifier = Modifier.fillMaxWidth()) {
                         Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.Default.FactCheck, contentDescription = null, tint = fg, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(10.dp))
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = "${c.checkType.replace('_', ' ')} · ${c.result}",
+                                    text = checkTypeLabel(c.checkType) + " · " + checkResultLabel(c.result),
                                     style = MaterialTheme.typography.titleSmall,
                                     color = DorjaColors.Ink950,
                                     fontWeight = FontWeight.Bold
                                 )
                                 Text(
-                                    text = (c.note.ifBlank { "No note" }) + " · " + Formatters.formatDateTime(c.createdAt),
+                                    text = c.note.ifBlank { noNoteLabel } + " · " + Formatters.formatDateTime(c.createdAt),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = DorjaColors.Gray700
                                 )
                             }
                             DorjaBadge(
-                                text = if (c.result == "PASS") "PASS" else c.result,
+                                text = checkResultLabel(c.result),
                                 backgroundColor = bg,
                                 textColor = fg
                             )
@@ -466,13 +468,13 @@ fun AdminScreen() {
                                     fontWeight = FontWeight.Bold
                                 )
                                 Text(
-                                    text = "${user.role.lowercase().replaceFirstChar { it.uppercase() }} · ${user.phone}",
+                                    text = roleLabel(user.role) + " · " + user.phone,
                                     style = MaterialTheme.typography.labelSmall,
                                     color = DorjaColors.Gray700
                                 )
                             }
                             DorjaBadge(
-                                text = if (user.isIdentityVerified) "VERIFIED" else "UNVERIFIED",
+                                text = if (user.isIdentityVerified) L("admin_agent_verified") else L("admin_agent_unverified"),
                                 backgroundColor = if (user.isIdentityVerified) DorjaColors.BentoGreenBg else DorjaColors.BentoAmberBg,
                                 textColor = if (user.isIdentityVerified) DorjaColors.BentoGreenText else DorjaColors.BentoAmberText
                             )
@@ -531,11 +533,13 @@ private fun VerificationCard(
                         color = DorjaColors.Gray700
                     )
                 }
-                DorjaBadge(text = v.status, backgroundColor = bg, textColor = fg)
+                DorjaBadge(text = verificationStatusLabel(v.status), backgroundColor = bg, textColor = fg)
             }
             Spacer(modifier = Modifier.height(4.dp))
+            val unknownAccountLabel = L("admin_unknown_account")
+            val submittedLabel = Lf("admin_submitted_at_fmt", dateFmt.format(Date(v.submittedAt)))
             Text(
-                text = (subject?.displayName ?: "Unknown account") + " · submitted " + dateFmt.format(Date(v.submittedAt)),
+                text = (subject?.displayName ?: unknownAccountLabel) + " · " + submittedLabel,
                 style = MaterialTheme.typography.labelSmall,
                 color = DorjaColors.Gray500
             )
@@ -544,7 +548,7 @@ private fun VerificationCard(
                 Spacer(modifier = Modifier.height(10.dp))
                 Image(
                     bitmap = bmp,
-                    contentDescription = "Attached document photo",
+                    contentDescription = L("admin_doc_photo_cd"),
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(max = 220.dp)
@@ -556,7 +560,7 @@ private fun VerificationCard(
                 Spacer(modifier = Modifier.height(8.dp))
                 checksForV.forEach { c ->
                     Text(
-                        text = "• ${c.checkType.replace('_', ' ').lowercase().replaceFirstChar { it.uppercase() }}: ${c.result}${if (c.note.isNotBlank()) " — ${c.note}" else ""}",
+                        text = "• " + checkTypeLabel(c.checkType) + ": " + checkResultLabel(c.result) + (if (c.note.isNotBlank()) " — " + c.note else ""),
                         style = MaterialTheme.typography.labelSmall,
                         color = DorjaColors.Gray700,
                         fontSize = 10.sp
@@ -567,7 +571,7 @@ private fun VerificationCard(
             if (v.reviewNote.isNotBlank()) {
                 Spacer(modifier = Modifier.height(6.dp))
                 Text(
-                    text = "Review note: ${v.reviewNote}",
+                    text = Lf("admin_review_note_fmt", v.reviewNote),
                     style = MaterialTheme.typography.labelSmall,
                     color = DorjaColors.Gray700
                 )
@@ -598,4 +602,40 @@ private fun VerificationCard(
             }
         }
     }
+}
+
+// ── Localised labels for stored enum codes ────────────────────────────────
+// The database keeps stable codes (APPROVED, ISSUER_DATABASE, …); every
+// screen renders them through these helpers so the admin console reads in
+// the user's language instead of raw codes.
+
+@Composable
+private fun verificationStatusLabel(status: String): String = when (status) {
+    "APPROVED" -> L("account_verified")
+    "REJECTED" -> L("account_rejected")
+    else -> L("account_under_review")
+}
+
+@Composable
+private fun checkTypeLabel(code: String): String = when (code) {
+    "ISSUER_DATABASE" -> L("admin_check_issuer_db")
+    "DOCUMENT_AUTHENTICITY" -> L("admin_check_doc_auth")
+    "SANCTIONS_SCREENING" -> L("admin_check_sanctions")
+    else -> code.replace('_', ' ')
+}
+
+@Composable
+private fun checkResultLabel(code: String): String = when (code) {
+    "PASS" -> L("admin_check_pass")
+    "FLAGGED" -> L("admin_check_flagged")
+    "INCONCLUSIVE" -> L("admin_check_inconclusive")
+    else -> code
+}
+
+@Composable
+private fun roleLabel(role: String): String = when (role) {
+    "SELLER" -> L("account_role_host")
+    "BUYER" -> L("account_role_buyer")
+    "ADMIN" -> L("admin_role_admin")
+    else -> role
 }
