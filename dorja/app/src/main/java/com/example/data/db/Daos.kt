@@ -100,6 +100,9 @@ interface UserCredentialDao {
 
     @Query("DELETE FROM user_credentials WHERE userId = :userId")
     suspend fun deleteByUser(userId: String)
+
+    @Query("DELETE FROM user_credentials")
+    suspend fun deleteAll()
 }
 
 @Dao

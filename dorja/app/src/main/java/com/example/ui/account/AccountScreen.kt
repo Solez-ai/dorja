@@ -50,6 +50,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.Surface
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -409,6 +410,9 @@ fun AccountScreen(
 
     // ── Identity verification submit dialog ──
     if (showVerifyDialog) {
+        // Resolved in the composable scope: L() cannot be called from the
+        // coroutine lambda that performs the submission.
+        val verifyFailedMessage = L("account_verify_failed")
         AlertDialog(
             onDismissRequest = { if (!verifyBusy) showVerifyDialog = false },
             icon = { Icon(Icons.Default.Badge, contentDescription = null, tint = DorjaColors.BentoBlueIcon) },
@@ -445,7 +449,7 @@ fun AccountScreen(
                             Icon(Icons.Default.Image, contentDescription = null, tint = DorjaColors.Jol600, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = verifyImageUri?.let { L("account_verify_photo_set") } ?: L("account_verify_photo_add"),
+                                text = if (verifyImageUri != null) L("account_verify_photo_set") else L("account_verify_photo_add"),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = if (verifyImageUri != null) DorjaColors.Ink950 else DorjaColors.Gray700,
                                 modifier = Modifier.weight(1f)
@@ -482,7 +486,7 @@ fun AccountScreen(
                                     verifyDocNumber = ""; verifyHolderName = ""; verifyImageUri = null
                                     showVerifyDialog = false
                                 },
-                                onFailure = { e -> verifyError = e.message ?: L("account_verify_failed") }
+                                onFailure = { e -> verifyError = e.message ?: verifyFailedMessage }
                             )
                         }
                     },
@@ -502,7 +506,7 @@ fun AccountScreen(
         AlertDialog(
             onDismissRequest = { accountPendingDelete = null },
             icon = { Icon(Icons.Default.DeleteForever, contentDescription = null, tint = DorjaColors.Error) },
-            title = { Text(L("account_delete_title_fmt", target.displayName), fontWeight = FontWeight.Bold) },
+            title = { Text(Lf("account_delete_title_fmt", target.displayName), fontWeight = FontWeight.Bold) },
             text = {
                 Text(
                     L("account_delete_body"),

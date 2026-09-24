@@ -98,7 +98,6 @@ fun AdminScreen() {
     var checkType by remember { mutableStateOf("ISSUER_DATABASE") }
     var checkResult by remember { mutableStateOf("PASS") }
     var checkNote by remember { mutableStateOf("") }
-    val pending = verifications.filter { it.status == "SUBMITTED" || it.status == "UNDER_REVIEW" }
     val decided = verifications.filter { it.status == "APPROVED" || it.status == "REJECTED" }
 
 

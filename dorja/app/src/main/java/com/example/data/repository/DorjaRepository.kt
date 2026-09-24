@@ -632,9 +632,9 @@ class DorjaRepository(private val database: DorjaDatabase, private val appContex
     suspend fun eraseAllMyData() {
         deleteAllMyContent()
         userDao.deleteAllUsers()
+        userCredentialDao.deleteAll()
         database.clearAllTables()
-        DorjaDatabase.populateInitialData(database)
-        _currentUser.value = userDao.getUserById("u1")
+        _currentUser.value = null
     }
 
     // Rooms
