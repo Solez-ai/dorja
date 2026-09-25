@@ -24,3 +24,9 @@ doc/DORJA.pptx
 docs/*
 !docs/index.html
 .gitattributes
+
+# Python fine-tuning env (ai-finetune)
+.venv/
+__pycache__/
+adapter*.safetensors
+checkpoints/
