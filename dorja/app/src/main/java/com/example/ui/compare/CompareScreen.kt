@@ -209,7 +209,8 @@ private fun ComparePickStage(
                 scrollVelocity = scrollVelocity,
                 photoIndex = 0,
                 onPhotoSwipe = {},
-                scrollPxScale = 0.9f
+                scrollPxScale = 0.9f,
+                modifier = Modifier.weight(1f)
             )
             Box(
                 Modifier
@@ -220,7 +221,8 @@ private fun ComparePickStage(
             ComparePickFeedPane(
                 candidates = candidates,
                 sharedScroll = sharedScroll,
-                onPick = onPick
+                onPick = onPick,
+                modifier = Modifier.weight(1f)
             )
         }
 
@@ -266,14 +268,14 @@ private fun DecayVelocity(velocity: MutableState<Float>) {
 private fun ComparePickFeedPane(
     candidates: List<Listing>,
     sharedScroll: Animatable<Float, AnimationVector1D>,
-    onPick: (String) -> Unit
+    onPick: (String) -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val dark = LocalDarkTheme.current
     val scope = rememberCoroutineScope()
 
     Column(
-        Modifier
-            .weight(1f)
+        modifier
             .fillMaxHeight()
             .statusBarsPadding()
     ) {
@@ -461,7 +463,8 @@ private fun CompareSplitStage(
                 scrollVelocity = scrollVelocity,
                 photoIndex = syncedPhotoIndex,
                 onPhotoSwipe = swipePhoto,
-                onOpen3d = open3d
+                onOpen3d = open3d,
+                modifier = Modifier.weight(1f)
             )
 
             // ── The squircle divider + drag scroller + 3D button ──
@@ -484,7 +487,8 @@ private fun CompareSplitStage(
                 scrollVelocity = scrollVelocity,
                 photoIndex = syncedPhotoIndex,
                 onPhotoSwipe = swipePhoto,
-                onOpen3d = open3d
+                onOpen3d = open3d,
+                modifier = Modifier.weight(1f)
             )
         }
 
@@ -586,7 +590,8 @@ private fun ComparePropertyPane(
     photoIndex: Int,
     onPhotoSwipe: (Int) -> Unit,
     onOpen3d: () -> Unit = {},
-    scrollPxScale: Float = 1f
+    scrollPxScale: Float = 1f,
+    modifier: Modifier = Modifier
 ) {
     val dark = LocalDarkTheme.current
     val scope = rememberCoroutineScope()
@@ -594,8 +599,7 @@ private fun ComparePropertyPane(
     val scrollProgress = if (scrollRangePx <= 0f) 0f else sharedScroll.value / scrollRangePx
 
     Box(
-        Modifier
-            .weight(1f)
+        modifier
             .fillMaxHeight()
             .pointerInput(scrollRangePx) {
                 detectDragGestures { change, drag ->
@@ -700,7 +704,7 @@ private fun CompareHeroRow(
                     .graphicsLayer {
                         if (blur > 0.5f && Build.VERSION.SDK_INT >= 31) {
                             renderEffect = android.graphics.RenderEffect
-                                .createBlurEffect(blur, blur, android.graphics.RenderEffect.ShaderMode.CLAMP)
+                                .createBlurEffect(blur, blur, android.graphics.RenderEffect.EDGE_TREATMENT_CLAMP)
                                 .asComposeRenderEffect()
                         } else {
                             renderEffect = null
@@ -832,7 +836,7 @@ private fun CompareRoomRow(
                         .graphicsLayer {
                             if (blur > 0.5f && Build.VERSION.SDK_INT >= 31) {
                                 renderEffect = android.graphics.RenderEffect
-                                    .createBlurEffect(blur, blur, android.graphics.RenderEffect.ShaderMode.CLAMP)
+                                    .createBlurEffect(blur, blur, android.graphics.RenderEffect.EDGE_TREATMENT_CLAMP)
                                     .asComposeRenderEffect()
                             } else {
                                 renderEffect = null
