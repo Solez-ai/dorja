@@ -102,8 +102,9 @@ fun ExploreScreen(
     var selectedIntent by remember { mutableStateOf("ALL") }
     var selectedPropertyType by remember { mutableStateOf("ALL") }
 
-    // Trust gate: listings from identity-unverified accounts stay hidden from
-    // the buyer feed until an admin approves the seller's/buyer's documents.
+    // Trust signal: the feed shows EVERY active listing, but each card marks
+    // whether the owner's identity is admin-approved yet. Hiding unverified
+    // listings entirely made new hosts' properties invisible to buyers.
     val verifiedOwnerIds by produceState(initialValue = emptySet<String>(), key1 = allListings) {
         val verified = mutableSetOf<String>()
         allListings.map { it.ownerId }.distinct().forEach { ownerId ->
@@ -123,7 +124,7 @@ fun ExploreScreen(
         val matchesIntent = selectedIntent == "ALL" || listing.intent.equals(selectedIntent, ignoreCase = true)
         val matchesType = selectedPropertyType == "ALL" || listing.propertyType.equals(selectedPropertyType, ignoreCase = true)
 
-        matchesQuery && matchesIntent && matchesType && verifiedOwnerIds.contains(listing.ownerId)
+        matchesQuery && matchesIntent && matchesType
     }
 
     Column(
@@ -375,7 +376,8 @@ fun ExploreScreen(
                         listing = listing,
                         onClick = { onSelectListing(listing.id) },
                         repository = repository,
-                        docsByListing = docsByListing
+                        docsByListing = docsByListing,
+                        ownerVerified = verifiedOwnerIds.contains(listing.ownerId)
                     )
                 }
             }
@@ -389,7 +391,8 @@ private fun ExploreListingCard(
     listing: Listing,
     onClick: () -> Unit,
     repository: DorjaRepository,
-    docsByListing: Map<String, List<LegalDocument>>
+    docsByListing: Map<String, List<LegalDocument>>,
+    ownerVerified: Boolean
 ) {
     BentoCard(
         modifier = Modifier
@@ -435,19 +438,32 @@ private fun ExploreListingCard(
                             )
                         }
                     }
-                } else {
+                } else if (!ownerVerified) {
+                    // Owner identity not yet admin-approved — honest signal on
+                    // the card instead of hiding the listing entirely.
                     Surface(
                         shape = RoundedCornerShape(6.dp),
                         color = DorjaColors.BentoAmberBg
                     ) {
-                        Text(
-                            text = "PENDING",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = DorjaColors.BentoAmberText,
-                            fontSize = 9.sp,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp)
-                        )
+                        Row(
+                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 3.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Shield,
+                                contentDescription = null,
+                                tint = DorjaColors.BentoAmberText,
+                                modifier = Modifier.size(11.dp)
+                            )
+                            Spacer(modifier = Modifier.width(3.dp))
+                            Text(
+                                text = L("explore_owner_unverified"),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = DorjaColors.BentoAmberText,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                 }
             }

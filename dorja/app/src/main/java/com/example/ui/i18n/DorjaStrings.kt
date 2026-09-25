@@ -380,6 +380,11 @@ data class DorjaStrings(
             "compare_3d_missing" to "No 3D scan for this property",
             "compare_sync_photo" to "Photos swipe together on both sides",
             "compare_sync_scroll" to "Drag the center scroller to move both properties",
+            // ── Trust visibility + admin console additions ──
+            "explore_owner_unverified" to "ID PENDING",
+            "admin_awaiting_accounts" to "ACCOUNTS AWAITING VERIFICATION",
+            "admin_no_awaiting_accounts" to "Every account is identity-verified.",
+            "admin_submission_status" to "Submission: %1\$s",
             // ── Inbox extras ──
             "inbox_encrypted_title" to "Encrypted Inbox",
             "inbox_encrypted_subtitle" to "Zero-leak real estate messaging channel",

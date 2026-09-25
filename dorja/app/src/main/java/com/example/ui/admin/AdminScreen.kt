@@ -101,6 +101,17 @@ fun AdminScreen() {
     var checkNote by remember { mutableStateOf("") }
     val decided = verifications.filter { it.status == "APPROVED" || it.status == "REJECTED" }
 
+    // Accounts without an APPROVED identity submission on file. This catches
+    // brand-new users who have not submitted documents yet — previously they
+    // were invisible here until paperwork arrived.
+    val accountsAwaiting: List<User> = remember(allUsers, verifications) {
+        allUsers.filter { user ->
+            user.role != "ADMIN" &&
+                !user.isIdentityVerified &&
+                verifications.none { it.userId == user.id && it.status == "APPROVED" }
+        }
+    }
+
 
     // ── Decide dialog (approve / reject with note) ──
     decideTarget?.let { (v, approve) ->
@@ -424,6 +435,62 @@ fun AdminScreen() {
                                 text = checkResultLabel(c.result),
                                 backgroundColor = bg,
                                 textColor = fg
+                            )
+                        }
+                    }
+                }
+            }
+
+            // ── Accounts awaiting verification ──
+            item {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = L("admin_awaiting_accounts"),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = DorjaColors.Gray500,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            if (accountsAwaiting.isEmpty()) {
+                item {
+                    Text(
+                        L("admin_no_awaiting_accounts"),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = DorjaColors.Gray500
+                    )
+                }
+            } else {
+                items(accountsAwaiting.size) { index ->
+                    val user = accountsAwaiting[index]
+                    val submission = verifications.firstOrNull { it.userId == user.id }
+                    BentoCard(modifier = Modifier.fillMaxWidth()) {
+                        Row(modifier = Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                Icons.Default.Group,
+                                contentDescription = null,
+                                tint = if (user.role == "SELLER") DorjaColors.BentoBlueIcon else DorjaColors.BentoGreenIcon,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = user.displayName,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    color = DorjaColors.Ink950,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = roleLabel(user.role) + " · " + user.phone,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = DorjaColors.Gray700
+                                )
+                            }
+                            DorjaBadge(
+                                text = if (submission == null) L("admin_agent_unverified")
+                                else Lf("admin_submission_status", submission.status),
+                                backgroundColor = DorjaColors.BentoAmberBg,
+                                textColor = DorjaColors.BentoAmberText
                             )
                         }
                     }

@@ -366,6 +366,10 @@ object DorjaTranslationsPriority {
         "compare_3d_missing" to "এই প্রপার্টির কোনো ৩ডি স্ক্যান নেই",
         "compare_sync_photo" to "দুই পাশের ছবি একসাথে স্লাইড হয়",
         "compare_sync_scroll" to "দুটি প্রপার্টি একসাথে সরাতে মাঝের স্ক্রলার টানুন",
+        "explore_owner_unverified" to "আইডি মুলতুবি",
+        "admin_awaiting_accounts" to "যাচাইয়ের অপেক্ষায় অ্যাকাউন্ট",
+        "admin_no_awaiting_accounts" to "প্রতিটি অ্যাকাউন্ট পরিচয়-যাচাইকৃত।",
+        "admin_submission_status" to "জমা: %1\$s",
     )
 
     val HINDI: Map<String, String> = mapOf(
@@ -725,7 +729,11 @@ object DorjaTranslationsPriority {
         "compare_3d_hint" to "घूमने के लिए खींचें · ज़ूम के लिए पिंच करें — दोनों व्यू एक साथ चलते हैं",
         "compare_3d_missing" to "इस प्रॉपर्टी का कोई 3डी स्कैन नहीं है",
         "compare_sync_photo" to "दोनों तरफ़ की तस्वीरें एक साथ स्वाइप होती हैं",
-        "compare_sync_scroll" to "दोनों प्रॉपर्टी एक साथ हिलाने के लिए बीच का स्क्रॉलर खींचें",
+        "compare_sync_scroll" to "দোনোं प्रॉपर्टी एक साथ हिलाने के लिए बीच का स्क्रॉलर खींचें",
+        "explore_owner_unverified" to "आईडी लंबित",
+        "admin_awaiting_accounts" to "सत्यापन प्रतीक्षित खाते",
+        "admin_no_awaiting_accounts" to "हर खाता पहचान-सत्यापित है।",
+        "admin_submission_status" to "जमा: %1\$s",
     )
 
     val URDU: Map<String, String> = mapOf(
@@ -1086,6 +1094,10 @@ object DorjaTranslationsPriority {
         "compare_3d_missing" to "اس پراپرٹی کا کوئی 3ڈی سکین نہیں ہے",
         "compare_sync_photo" to "دونوں طرف کی تصاویر ساتھ ساتھ سوائپ ہوتی ہیں",
         "compare_sync_scroll" to "دونوں پراپرٹیز ساتھ حرکت دینے کے لیے درمیانی اسکرولر کھینچیں",
+        "explore_owner_unverified" to "شناختی دستاویز زیر التوا",
+        "admin_awaiting_accounts" to "تصدیق کے منتظر اکاؤنٹس",
+        "admin_no_awaiting_accounts" to "ہر اکاؤنٹ شناختی تصدیق شدہ ہے۔",
+        "admin_submission_status" to "جمع: %1\$s",
     )
 
     val ITALIAN: Map<String, String> = mapOf(
@@ -1446,5 +1458,9 @@ object DorjaTranslationsPriority {
         "compare_3d_missing" to "Nessuna scansione 3D per questa proprietà",
         "compare_sync_photo" to "Le foto scorrono insieme su entrambi i lati",
         "compare_sync_scroll" to "Trascina lo scroller centrale per muovere entrambe le proprietà",
+        "explore_owner_unverified" to "ID IN ATTESA",
+        "admin_awaiting_accounts" to "ACCOUNT IN ATTESA DI VERIFICA",
+        "admin_no_awaiting_accounts" to "Ogni account è verificato nell'identità.",
+        "admin_submission_status" to "Invio: %1\$s",
     )
 }

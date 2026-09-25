@@ -39,6 +39,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
@@ -56,6 +57,7 @@ import com.example.ui.components.DorjaChip
 import com.example.ui.components.DorjaLogo
 import com.example.ui.components.DorjaCard
 import com.example.ui.theme.DorjaColors
+import com.example.ui.theme.LocalDarkTheme
 import kotlinx.coroutines.launch
 
 @Composable
@@ -316,7 +318,11 @@ fun AuthScreen(
                                 }
                             },
                             icon = Icons.Default.AdminPanelSettings,
-                            containerColor = DorjaColors.Ink950,
+                            // Black with white text in dark mode; white with
+                            // black text in light mode (Ink950 is semantic and
+                            // inverts, which read as disabled here).
+                            containerColor = if (LocalDarkTheme.current) Color(0xFF000000) else Color(0xFFFFFFFF),
+                            contentColor = if (LocalDarkTheme.current) Color.White else DorjaColors.Ink950,
                             testTag = "auth_create_admin"
                         )
                         Spacer(modifier = Modifier.height(6.dp))
