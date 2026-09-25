@@ -81,16 +81,17 @@ fun AssistantScreen(onBack: () -> Unit) {
         onDispose { assistant.unload() }
     }
 
+    // L() is composable — resolve the fallback strings during composition;
+    // send() below is a plain function and must not call them itself.
+    val unmatchedText = L("assistant_unmatched")
+    val errorText = L("assistant_error")
+
     fun send() {
         val text = input.trim()
         if (text.isEmpty() || busy || !ready) return
         input = ""
         messages = messages + AiMessage(text, fromUser = true)
         busy = true
-        // L() is composable — resolve the fallback strings here, not inside
-        // the coroutine below.
-        val unmatchedText = L("assistant_unmatched")
-        val errorText = L("assistant_error")
         scope.launch {
             val reply = when (val turn = assistant.ask(text)) {
                 is DorjaAssistant.Turn.Result -> turn.message
