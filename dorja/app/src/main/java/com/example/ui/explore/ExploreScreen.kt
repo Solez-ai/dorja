@@ -36,6 +36,7 @@ import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.SquareFoot
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.VerifiedUser
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ViewInAr
 import androidx.compose.material3.Icon
@@ -85,7 +86,8 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ExploreScreen(
-    onSelectListing: (String) -> Unit
+    onSelectListing: (String) -> Unit,
+    onOpenAssistant: () -> Unit = {}
 ) {
     val repository = DorjaApp.instance.repository
     val scope = rememberCoroutineScope()
@@ -224,13 +226,25 @@ fun ExploreScreen(
                     )
                 },
                 trailingIcon = {
-                    if (searchQuery.isNotBlank()) {
-                        IconButton(onClick = { searchQuery = "" }) {
+                    Row {
+                        IconButton(
+                            onClick = onOpenAssistant,
+                            modifier = Modifier.testTag("explore_open_assistant")
+                        ) {
                             Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = L("explore_clear_search"),
-                                tint = DorjaColors.Gray500
+                                imageVector = Icons.Default.AutoAwesome,
+                                contentDescription = L("assistant_title"),
+                                tint = DorjaColors.Jol600
                             )
+                        }
+                        if (searchQuery.isNotBlank()) {
+                            IconButton(onClick = { searchQuery = "" }) {
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = L("explore_clear_search"),
+                                    tint = DorjaColors.Gray500
+                                )
+                            }
                         }
                     }
                 },

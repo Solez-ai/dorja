@@ -70,6 +70,7 @@ import androidx.navigation.navArgument
 import com.example.DorjaApp
 import com.example.ui.account.AccountScreen
 import com.example.ui.admin.AdminScreen
+import com.example.ui.assistant.AssistantScreen
 import com.example.ui.auth.AuthScreen
 import com.example.ui.chat.ChatThreadScreen
 import com.example.ui.compare.CompareScreen
@@ -126,6 +127,9 @@ sealed class Screen(val route: String) {
     object RelocationMode : Screen("relocation_mode?origin={origin}&dest={dest}") {
         fun createRoute(origin: String, destination: String) = "relocation_mode?origin=$origin&dest=$destination"
     }
+
+    /** Global on-device AI assistant (Needle-class model via the Cactus SDK). */
+    object Assistant : Screen("assistant")
 }
 
 enum class HostTab(val titleKey: String, val icon: ImageVector, val tag: String) {
@@ -219,6 +223,9 @@ fun DorjaNavHost() {
                 onNavigateToPass = { viewingId ->
                     navController.navigate(Screen.ViewingPass.createRoute(viewingId))
                 },
+                onNavigateToAssistant = {
+                    navController.navigate(Screen.Assistant.route)
+                },
                 onNavigateToHandover = { listingId ->
                     navController.navigate(Screen.HandoverPassport.createRoute(listingId))
                 },
@@ -271,6 +278,10 @@ fun DorjaNavHost() {
                 listingId = listingId,
                 onBack = { navController.popBackStack() }
             )
+        }
+
+        composable(Screen.Assistant.route) {
+            AssistantScreen(onBack = { navController.popBackStack() })
         }
 
         composable(
@@ -372,6 +383,7 @@ fun MainContainer(
     onNavigateToChatThread: (String) -> Unit,
     onNavigateToPass: (String) -> Unit,
     onNavigateToHandover: (String) -> Unit,
+    onNavigateToAssistant: () -> Unit = {},
     onNavigateToRelocation: (String, String) -> Unit = { _, _ -> },
     /** Sign out; the flag opens the auth screen directly in sign-up mode. */
     onLogout: (startInSignUp: Boolean) -> Unit = {},
@@ -572,7 +584,10 @@ fun MainContainer(
                         }
                     } else {
                         when (currentBuyerTab) {
-                            BuyerTab.EXPLORE -> ExploreScreen(onSelectListing = onNavigateToDetail)
+                            BuyerTab.EXPLORE -> ExploreScreen(
+                                onSelectListing = onNavigateToDetail,
+                                onOpenAssistant = onNavigateToAssistant
+                            )
                             BuyerTab.VISITS -> VisitsScreen(onOpenPass = onNavigateToPass)
                             BuyerTab.INBOX -> InboxScreen(onOpenConversation = onNavigateToChatThread)
                             BuyerTab.ACCOUNT -> AccountScreen(

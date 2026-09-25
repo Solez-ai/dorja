@@ -370,6 +370,16 @@ object DorjaTranslationsPriority {
         "admin_awaiting_accounts" to "যাচাইয়ের অপেক্ষায় অ্যাকাউন্ট",
         "admin_no_awaiting_accounts" to "প্রতিটি অ্যাকাউন্ট পরিচয়-যাচাইকৃত।",
         "admin_submission_status" to "জমা: %1\$s",
+        "assistant_title" to "দরজা এআই",
+        "assistant_subtitle" to "ডিভাইসেই · প্রাইভেট",
+        "assistant_ready" to "প্রস্তুত",
+        "assistant_failed" to "আবার চেষ্টা করুন",
+        "assistant_downloading" to "প্রস্তুত হচ্ছে…",
+        "assistant_welcome" to "আমি লিস্টিং খুঁজে দিতে পারি, তুলনা করতে পারি এবং DORJA কীভাবে কাজ করে বলতে পারি — সবই আপনার ডিভাইসে।",
+        "assistant_input_hint" to "প্রপার্টি সম্পর্কে জিজ্ঞাসা করুন…",
+        "assistant_unmatched" to "এটা আমি কোনো কাজে মেলাতে পারিনি। লিস্টিং, ভিজিট, স্ক্যান বা ভেরিফিকেশন নিয়ে জিজ্ঞাসা করুন।",
+        "assistant_error" to "অ্যাসিস্ট্যান্ট মডেল লোড হয়নি। আবার চেষ্টা করতে স্ট্যাটাসে ট্যাপ করুন।",
+        "common_send" to "পাঠান",
     )
 
     val HINDI: Map<String, String> = mapOf(
@@ -734,6 +744,16 @@ object DorjaTranslationsPriority {
         "admin_awaiting_accounts" to "सत्यापन प्रतीक्षित खाते",
         "admin_no_awaiting_accounts" to "हर खाता पहचान-सत्यापित है।",
         "admin_submission_status" to "जमा: %1\$s",
+        "assistant_title" to "Dorja AI",
+        "assistant_subtitle" to "डिवाइस पर · प्राइवेट",
+        "assistant_ready" to "तैयार",
+        "assistant_failed" to "पुनः प्रयास करें",
+        "assistant_downloading" to "तैयार हो रहा है…",
+        "assistant_welcome" to "मैं लिस्टिंग खोज सकता हूँ, तुलना कर सकता हूँ और DORJA कैसे काम करता है बता सकता हूँ — सब आपके डिवाइस पर।",
+        "assistant_input_hint" to "प्रॉपर्टी के बारे में पूछें…",
+        "assistant_unmatched" to "मैं इसे किसी काम से नहीं मिला सका। लिस्टिंग, विज़िट, स्कैन या सत्यापन के बारे में पूछें।",
+        "assistant_error" to "असिस्टेंट मॉडल लोड नहीं हुआ। पुनः प्रयास के लिए स्थिति पर टैप करें।",
+        "common_send" to "भेजें",
     )
 
     val URDU: Map<String, String> = mapOf(
@@ -1098,6 +1118,16 @@ object DorjaTranslationsPriority {
         "admin_awaiting_accounts" to "تصدیق کے منتظر اکاؤنٹس",
         "admin_no_awaiting_accounts" to "ہر اکاؤنٹ شناختی تصدیق شدہ ہے۔",
         "admin_submission_status" to "جمع: %1\$s",
+        "assistant_title" to "Dorja AI",
+        "assistant_subtitle" to "آلے پر · نجی",
+        "assistant_ready" to "تیار",
+        "assistant_failed" to "دوبارہ کوشش کریں",
+        "assistant_downloading" to "تیار ہو رہا ہے…",
+        "assistant_welcome" to "میں لسٹنگ تلاش کر سکتا ہوں، موازنہ کر سکتا ہوں اور DORJA کیسے کام کرتا ہے بتا سکتا ہوں — سب آپ کے آلے پر۔",
+        "assistant_input_hint" to "پراپرٹی کے بارے میں پوچھیں…",
+        "assistant_unmatched" to "میں اسے کسی کام سے نہیں ملا سکا۔ لسٹنگ، وزٹ، سکین یا تصدیق کے بارے میں پوچھیں۔",
+        "assistant_error" to "اسسٹنٹ ماڈل لوڈ نہیں ہوا۔ دوبارہ کوشش کے لیے حالت پر ٹیپ کریں۔",
+        "common_send" to "بھیجیں",
     )
 
     val ITALIAN: Map<String, String> = mapOf(
@@ -1462,5 +1492,15 @@ object DorjaTranslationsPriority {
         "admin_awaiting_accounts" to "ACCOUNT IN ATTESA DI VERIFICA",
         "admin_no_awaiting_accounts" to "Ogni account è verificato nell'identità.",
         "admin_submission_status" to "Invio: %1\$s",
+        "assistant_title" to "Dorja AI",
+        "assistant_subtitle" to "Sul dispositivo · privato",
+        "assistant_ready" to "PRONTO",
+        "assistant_failed" to "TOCCA PER RIPROVARE",
+        "assistant_downloading" to "PREPARAZIONE…",
+        "assistant_welcome" to "Posso cercare annunci, confrontare opzioni e spiegare come funziona DORJA — tutto sul tuo dispositivo.",
+        "assistant_input_hint" to "Chiedi informazioni sulle proprietà…",
+        "assistant_unmatched" to "Non ho trovato un'azione per questa richiesta. Prova con annunci, visite, scansioni o verifica.",
+        "assistant_error" to "Il modello dell'assistente non si è caricato. Tocca lo stato per riprovare.",
+        "common_send" to "Invia",
     )
 }

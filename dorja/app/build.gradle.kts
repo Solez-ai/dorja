@@ -86,6 +86,8 @@ dependencies {
   // implementation(libs.androidx.camera.core)
   // implementation(libs.androidx.camera.lifecycle)
     implementation("com.google.code.gson:gson:2.10.1")
+  // On-device AI: tool-calling assistant (Needle-class local model).
+  implementation("com.cactuscompute:cactus:1.4.1-beta")
   // NOTE: OpenCV was removed — its AAR bundles ~100MB of native .so libs for
   // every ABI, which ballooned the APK past 150MB. Stitching is done by the
   // gyro-based equirectangular pipeline in RoomScannerScreen.kt instead.

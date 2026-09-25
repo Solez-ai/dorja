@@ -25,6 +25,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         LocaleSettings.init(applicationContext)
         ThemeSettings.init(applicationContext)
+        // Required by the Cactus SDK before any on-device AI call.
+        com.cactus.CactusContextInitializer.initialize(this)
         enableEdgeToEdge()
         setContent {
             val tag by LocaleSettings.languageTag.collectAsState()
