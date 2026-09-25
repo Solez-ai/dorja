@@ -236,17 +236,12 @@ fun PanoramaViewerScreen(
         }
     }
 
-    // Force landscape orientation for immersive tour view. The fold-rotation
-    // engine is suspended while we own the window orientation.
+    // Force landscape orientation for immersive tour view
     DisposableEffect(Unit) {
-        com.example.ui.transition.FoldRotation.suspended = true
         val activity = ctx as? ComponentActivity
         val original = activity?.requestedOrientation
         activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-        onDispose {
-            com.example.ui.transition.FoldRotation.suspended = false
-            activity?.requestedOrientation = original ?: ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-        }
+        onDispose { activity?.requestedOrientation = original ?: ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED }
     }
 
     Box(Modifier.fillMaxSize().background(Color.Black)) {

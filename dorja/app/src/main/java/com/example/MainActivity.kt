@@ -18,7 +18,6 @@ import com.example.ui.i18n.LocaleSettings
 import com.example.ui.navigation.DorjaNavHost
 import com.example.ui.theme.DorjaTheme
 import com.example.ui.theme.ThemeSettings
-import com.example.ui.transition.FoldRotationHost
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -53,10 +52,7 @@ class MainActivity : ComponentActivity() {
                     LocalDorjaLocale provides strings,
                     LocalLayoutDirection provides if (strings.rtl) LayoutDirection.Rtl else LayoutDirection.Ltr
                 ) {
-                    // Book-fold orientation transition around the whole app.
-                    FoldRotationHost {
-                        DorjaNavHost()
-                    }
+                    DorjaNavHost()
                 }
             }
         }
