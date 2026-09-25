@@ -1,7 +1,7 @@
 package com.example.ui.transition
 
-import android.app.ActivityInfo
 import android.content.Context
+import android.content.pm.ActivityInfo
 import android.content.res.Configuration
 import android.hardware.Sensor
 import android.hardware.SensorEvent
@@ -31,21 +31,19 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.GraphicsLayer
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.asComposeRenderEffect
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.rememberGraphicsLayer
-import androidx.compose.ui.graphics.toImageBitmap
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.Constraints
+import androidx.core.view.drawToBitmap
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import kotlin.math.atan2
@@ -65,11 +63,8 @@ object FoldRotation {
 
 enum class FoldOrientation { PORTRAIT, LANDSCAPE_CW, LANDSCAPE_CCW }
 
-/** One in-flight transition: the portrait frame captured before the commit and the committed frame captured after. */
-private class FoldFrame(
-    val old: ImageBitmap,
-    val new: ImageBitmap?,
-)
+/** The portrait frame captured just before the orientation commit. */
+private class FoldFrame(val old: ImageBitmap)
 
 /** Tunables for the fold feel. */
 private object FoldSpec {
@@ -108,12 +103,8 @@ fun FoldRotationHost(
     val configuration = LocalConfiguration.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val scope = rememberCoroutineScope()
-    val oldLayer = rememberGraphicsLayer()
-    val newLayer = rememberGraphicsLayer()
 
     var orientation by remember { mutableStateOf(FoldOrientation.PORTRAIT) }
-    var captureOld by remember { mutableStateOf(false) }
-    var captureNew by remember { mutableStateOf(false) }
     var frame by remember { mutableStateOf<FoldFrame?>(null) }
     val progress = remember { Animatable(1f) }
 
@@ -192,11 +183,8 @@ fun FoldRotationHost(
                                 scope.launch {
                                     foldTo(
                                         target = target,
+                                        activity = context as? ComponentActivity,
                                         orientationSetter = { orientation = it },
-                                        captureOldSetter = { captureOld = it },
-                                        captureNewSetter = { captureNew = it },
-                                        oldLayer = oldLayer,
-                                        newLayer = newLayer,
                                         frameSetter = { frame = it },
                                         progress = progress,
                                     )
@@ -237,27 +225,19 @@ fun FoldRotationHost(
     }
 
     // ── Root: portrait-locked window, content laid out at swapped dims and rotated ──
+    val windowLandscape = windowOrientation == Configuration.ORIENTATION_LANDSCAPE
+    val rotated = !windowLandscape && orientation != FoldOrientation.PORTRAIT
     Box(modifier = modifier.fillMaxSize()) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .drawWithContent {
-                    // Frame capture for the fold textures happens here, before
-                    // the regular draw, whenever the transition asks for it.
-                    if (captureOld) {
-                        captureOld = false
-                        oldLayer.record { this@drawWithContent.drawContent() }
+                .graphicsLayer {
+                    if (rotated) {
+                        rotationZ = if (orientation == FoldOrientation.LANDSCAPE_CW) 90f else -90f
+                        transformOrigin = TransformOrigin.Center
                     }
-                    if (captureNew) {
-                        captureNew = false
-                        newLayer.record { this@drawWithContent.drawContent() }
-                    }
-                    drawContent()
                 },
         ) {
-            val windowLandscape =
-                windowOrientation == Configuration.ORIENTATION_LANDSCAPE
-            val rotated = !windowLandscape && orientation != FoldOrientation.PORTRAIT
             Layout(content = { content() }) { measurables, constraints ->
                 val contentWidth = if (rotated) constraints.maxHeight else constraints.maxWidth
                 val contentHeight = if (rotated) constraints.maxWidth else constraints.maxHeight
@@ -268,12 +248,7 @@ fun FoldRotationHost(
                     placeable.placeRelative(
                         x = (constraints.maxWidth - contentWidth) / 2,
                         y = (constraints.maxHeight - contentHeight) / 2,
-                    ) {
-                        if (rotated) {
-                            rotationZ = if (orientation == FoldOrientation.LANDSCAPE_CW) 90f else -90f
-                            transformOrigin = TransformOrigin.Center
-                        }
-                    }
+                    )
                 }
             }
         }
@@ -286,38 +261,31 @@ fun FoldRotationHost(
 }
 
 /**
- * Drives one transition: capture the portrait frame → commit the orientation
- * (content re-lays-out rotated) → capture the landscape frame → animate the
- * fold overlay from 0 to 1 → drop the overlay so the live UI takes over.
+ * Drives one transition: capture the portrait frame off the decor view →
+ * commit the orientation (content re-lays-out rotated) → wait a couple of
+ * frames for the fresh layout → animate the fold overlay from 0 to 1 → drop
+ * the overlay so the live UI takes over.
  */
 private suspend fun foldTo(
     target: FoldOrientation,
+    activity: ComponentActivity?,
     orientationSetter: (FoldOrientation) -> Unit,
-    captureOldSetter: (Boolean) -> Unit,
-    captureNewSetter: (Boolean) -> Unit,
-    oldLayer: GraphicsLayer,
-    newLayer: GraphicsLayer,
     frameSetter: (FoldFrame?) -> Unit,
     progress: Animatable<Float, *>,
 ) {
-    // Two frame waits per capture: the first lets the invalidation reach the
-    // draw phase (where record happens), the second guarantees it landed.
-    captureOldSetter(true)
-    withFrameNanos { }
-    withFrameNanos { }
-    val oldBitmap = oldLayer.toImageBitmap()
-
-    orientationSetter(target)
-    captureNewSetter(true)
-    withFrameNanos { }
-    withFrameNanos { }
-    val newBitmap = try {
-        newLayer.toImageBitmap()
-    } catch (_: IllegalStateException) {
-        null
+    val oldBitmap = try {
+        activity?.window?.decorView?.drawToBitmap()?.asImageBitmap() ?: return
+    } catch (_: Exception) {
+        return
     }
 
-    frameSetter(FoldFrame(oldBitmap, newBitmap))
+    orientationSetter(target)
+    // Two frame waits: let the commit re-layout and land a fresh landscape
+    // frame under the overlay before the fold starts.
+    withFrameNanos { }
+    withFrameNanos { }
+
+    frameSetter(FoldFrame(oldBitmap))
     progress.snapTo(0f)
     try {
         progress.animateTo(1f, tween(FoldSpec.DURATION_MS, easing = FastOutSlowInEasing))
@@ -327,51 +295,33 @@ private suspend fun foldTo(
 }
 
 /**
- * The book-fold overlay. The old portrait frame is split at its vertical
+ * The book-fold overlay. The captured portrait frame is split at its vertical
  * spine: the left half holds and fades, the right half rotates toward the
  * viewer around the spine with progressive blur, dimming and edge shading,
- * while the committed landscape frame scales in underneath.
+ * while the live — already committed — landscape UI shows through underneath.
  */
 @Composable
 private fun FoldOverlay(frame: FoldFrame, progress: Float) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.55f * sin(progress * Math.PI).toFloat())),
-    ) {
-        // Committed landscape frame scaling in beneath the fold.
-        frame.new?.let { new ->
-            val reveal = ((progress - 0.45f) / 0.5f).coerceIn(0f, 1f)
-            Image(
-                bitmap = new,
-                contentDescription = null,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .graphicsLayer {
-                        alpha = reveal
-                        scaleX = 0.965f + 0.035f * reveal
-                        scaleY = scaleX
-                        transformOrigin = TransformOrigin.Center
-                    },
-            )
-        }
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val full = maxWidth
 
-        // Crease shadow at the spine, strongest mid-fold.
-        val crease = 0.4f * sin(progress * Math.PI).toFloat()
         Box(
-            modifier = Modifier
+            Modifier
                 .fillMaxSize()
-                .background(
-                    Brush.horizontalGradient(
-                        0f to Color.Transparent,
-                        0.5f to Color.Black.copy(alpha = crease),
-                        1f to Color.Transparent,
+                .background(Color.Black.copy(alpha = 0.55f * sin(progress * Math.PI).toFloat())),
+        ) {
+            // Crease shadow at the spine, strongest mid-fold.
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.horizontalGradient(
+                            0f to Color.Transparent,
+                            0.5f to Color.Black.copy(alpha = 0.4f * sin(progress * Math.PI).toFloat()),
+                            1f to Color.Transparent,
+                        ),
                     ),
-                ),
-        )
-
-        BoxWithConstraints(Modifier.fillMaxSize()) {
-            val halfWidth = maxWidth / 2
+            )
 
             // ── Folding page: right half of the old portrait frame ──
             // Progressive blur lives on an unrotated full-screen wrapper so
@@ -395,7 +345,7 @@ private fun FoldOverlay(frame: FoldFrame, progress: Float) {
                     Modifier
                         .align(Alignment.CenterEnd)
                         .fillMaxHeight()
-                        .width(halfWidth)
+                        .width(full / 2)
                         .clipToBounds()
                         .graphicsLayer {
                             rotationY = progress * 90f
@@ -409,9 +359,9 @@ private fun FoldOverlay(frame: FoldFrame, progress: Float) {
                         bitmap = frame.old,
                         contentDescription = null,
                         modifier = Modifier
-                            .width(maxWidth)
+                            .width(full)
                             .fillMaxHeight()
-                            .graphicsLayer { translationX = -maxWidth.toPx() / 2f },
+                            .graphicsLayer { translationX = -full.toPx() / 2f },
                     )
                     // Edge shading: dark near the spine, growing with the fold.
                     Box(
@@ -434,7 +384,7 @@ private fun FoldOverlay(frame: FoldFrame, progress: Float) {
                 Modifier
                     .align(Alignment.CenterStart)
                     .fillMaxHeight()
-                    .width(halfWidth)
+                    .width(full / 2)
                     .clipToBounds()
                     .graphicsLayer { alpha = hold },
             ) {
@@ -442,7 +392,7 @@ private fun FoldOverlay(frame: FoldFrame, progress: Float) {
                     bitmap = frame.old,
                     contentDescription = null,
                     modifier = Modifier
-                        .width(maxWidth)
+                        .width(full)
                         .fillMaxHeight(),
                 )
                 Box(
