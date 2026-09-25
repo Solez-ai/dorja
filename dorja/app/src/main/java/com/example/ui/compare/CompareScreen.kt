@@ -704,7 +704,7 @@ private fun CompareHeroRow(
                     .graphicsLayer {
                         if (blur > 0.5f && Build.VERSION.SDK_INT >= 31) {
                             renderEffect = android.graphics.RenderEffect
-                                .createBlurEffect(blur, blur, android.graphics.RenderEffect.EDGE_TREATMENT_CLAMP)
+                                .createBlurEffect(blur, blur, android.graphics.Shader.TileMode.CLAMP)
                                 .asComposeRenderEffect()
                         } else {
                             renderEffect = null
@@ -836,7 +836,7 @@ private fun CompareRoomRow(
                         .graphicsLayer {
                             if (blur > 0.5f && Build.VERSION.SDK_INT >= 31) {
                                 renderEffect = android.graphics.RenderEffect
-                                    .createBlurEffect(blur, blur, android.graphics.RenderEffect.EDGE_TREATMENT_CLAMP)
+                                    .createBlurEffect(blur, blur, android.graphics.Shader.TileMode.CLAMP)
                                     .asComposeRenderEffect()
                             } else {
                                 renderEffect = null
