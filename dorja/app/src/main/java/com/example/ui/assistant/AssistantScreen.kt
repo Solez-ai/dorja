@@ -87,14 +87,18 @@ fun AssistantScreen(onBack: () -> Unit) {
         input = ""
         messages = messages + AiMessage(text, fromUser = true)
         busy = true
+        // L() is composable — resolve the fallback strings here, not inside
+        // the coroutine below.
+        val unmatchedText = L("assistant_unmatched")
+        val errorText = L("assistant_error")
         scope.launch {
             val reply = when (val turn = assistant.ask(text)) {
                 is DorjaAssistant.Turn.Result -> turn.message
-                DorjaAssistant.Turn.Unmatched -> L("assistant_unmatched")
+                DorjaAssistant.Turn.Unmatched -> unmatchedText
                 is DorjaAssistant.Turn.Error -> {
                     failed = true
                     initAttempt++
-                    L("assistant_error")
+                    errorText
                 }
             }
             messages = messages + AiMessage(reply, fromUser = false)
