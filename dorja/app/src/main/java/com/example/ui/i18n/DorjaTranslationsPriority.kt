@@ -355,7 +355,17 @@ object DorjaTranslationsPriority {
         "common_done" to "সম্পন্ন",
         "common_share" to "শেয়ার",
         "common_more" to "আরও",
-        "common_search" to "খুঁজুন"
+        "common_search" to "খুঁজুন",
+        "compare_title" to "তুলনা",
+        "compare_pick_title" to "তুলনা",
+        "compare_pick_choose" to "তুলনা করার জন্য একটি প্রপার্টি বেছে নিন",
+        "compare_pick_empty" to "তুলনা করার মতো আর কোনো যাচাইকৃত প্রপার্টি নেই।",
+        "compare_see_3d" to "৩ডি স্ক্যান দেখুন",
+        "compare_open_3d" to "দুটি ৩ডি স্ক্যানই খুলুন",
+        "compare_3d_hint" to "ঘুরতে টানুন · জুম করতে চিমটি দিন — দুটি ভিউ একসাথে চলবে",
+        "compare_3d_missing" to "এই প্রপার্টির কোনো ৩ডি স্ক্যান নেই",
+        "compare_sync_photo" to "দুই পাশের ছবি একসাথে স্লাইড হয়",
+        "compare_sync_scroll" to "দুটি প্রপার্টি একসাথে সরাতে মাঝের স্ক্রলার টানুন",
     )
 
     val HINDI: Map<String, String> = mapOf(
@@ -705,7 +715,17 @@ object DorjaTranslationsPriority {
         "common_done" to "पूर्ण",
         "common_share" to "साझा करें",
         "common_more" to "और",
-        "common_search" to "खोजें"
+        "common_search" to "खोजें",
+        "compare_title" to "तुलना",
+        "compare_pick_title" to "तुलना",
+        "compare_pick_choose" to "तुलना के लिए एक प्रॉपर्टी चुनें",
+        "compare_pick_empty" to "तुलना के लिए अभी कोई और सत्यापित प्रॉपर्टी नहीं है।",
+        "compare_see_3d" to "3डी स्कैन देखें",
+        "compare_open_3d" to "दोनों 3डी स्कैन खोलें",
+        "compare_3d_hint" to "घूमने के लिए खींचें · ज़ूम के लिए पिंच करें — दोनों व्यू एक साथ चलते हैं",
+        "compare_3d_missing" to "इस प्रॉपर्टी का कोई 3डी स्कैन नहीं है",
+        "compare_sync_photo" to "दोनों तरफ़ की तस्वीरें एक साथ स्वाइप होती हैं",
+        "compare_sync_scroll" to "दोनों प्रॉपर्टी एक साथ हिलाने के लिए बीच का स्क्रॉलर खींचें",
     )
 
     val URDU: Map<String, String> = mapOf(
@@ -1055,7 +1075,17 @@ object DorjaTranslationsPriority {
         "common_done" to "مکمل",
         "common_share" to "شیئر کریں",
         "common_more" to "مزید",
-        "common_search" to "تلاش"
+        "common_search" to "تلاش",
+        "compare_title" to "موازنہ",
+        "compare_pick_title" to "موازنہ",
+        "compare_pick_choose" to "موازنے کے لیے ایک پراپرٹی منتخب کریں",
+        "compare_pick_empty" to "موازنے کے لیے ابھی کوئی اور تصدیق شدہ پراپرٹی نہیں ہے۔",
+        "compare_see_3d" to "3ڈی سکین دیکھیں",
+        "compare_open_3d" to "دونوں 3ڈی سکین کھولیں",
+        "compare_3d_hint" to "گھومنے کے لیے کھینچیں · زوم کے لیے پنچ کریں — دونوں مناظر ساتھ ساتھ چلتے ہیں",
+        "compare_3d_missing" to "اس پراپرٹی کا کوئی 3ڈی سکین نہیں ہے",
+        "compare_sync_photo" to "دونوں طرف کی تصاویر ساتھ ساتھ سوائپ ہوتی ہیں",
+        "compare_sync_scroll" to "دونوں پراپرٹیز ساتھ حرکت دینے کے لیے درمیانی اسکرولر کھینچیں",
     )
 
     val ITALIAN: Map<String, String> = mapOf(
@@ -1405,6 +1435,16 @@ object DorjaTranslationsPriority {
         "common_done" to "Fatto",
         "common_share" to "Condividi",
         "common_more" to "Altro",
-        "common_search" to "Cerca"
+        "common_search" to "Cerca",
+        "compare_title" to "Confronta",
+        "compare_pick_title" to "Confronta",
+        "compare_pick_choose" to "Scegli una proprietà da confrontare",
+        "compare_pick_empty" to "Nessun'altra proprietà verificata da confrontare per ora.",
+        "compare_see_3d" to "Vedi scansione 3D",
+        "compare_open_3d" to "Apri entrambe le scansioni 3D",
+        "compare_3d_hint" to "Trascina per guardare · pizzica per lo zoom — entrambe le viste si muovono insieme",
+        "compare_3d_missing" to "Nessuna scansione 3D per questa proprietà",
+        "compare_sync_photo" to "Le foto scorrono insieme su entrambi i lati",
+        "compare_sync_scroll" to "Trascina lo scroller centrale per muovere entrambe le proprietà",
     )
 }

@@ -369,6 +369,17 @@ data class DorjaStrings(
             "explore_empty_none" to "No active listings published yet. Properties listed by hosts will appear here.",
             "explore_empty_match" to "No properties match '%1\$s'.",
             "explore_clear_search" to "Clear search",
+            // ── Compare (buyer-only split-screen comparison) ──
+            "compare_title" to "Compare",
+            "compare_pick_title" to "Compare",
+            "compare_pick_choose" to "Choose a property to compare",
+            "compare_pick_empty" to "No other verified properties to compare yet.",
+            "compare_see_3d" to "See 3D scan",
+            "compare_open_3d" to "Open both 3D scans",
+            "compare_3d_hint" to "Drag to look around · pinch to zoom — both views move together",
+            "compare_3d_missing" to "No 3D scan for this property",
+            "compare_sync_photo" to "Photos swipe together on both sides",
+            "compare_sync_scroll" to "Drag the center scroller to move both properties",
             // ── Inbox extras ──
             "inbox_encrypted_title" to "Encrypted Inbox",
             "inbox_encrypted_subtitle" to "Zero-leak real estate messaging channel",

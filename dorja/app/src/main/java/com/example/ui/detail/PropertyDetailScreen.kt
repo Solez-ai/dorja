@@ -61,6 +61,7 @@ import androidx.compose.material.icons.filled.Bathtub
 import androidx.compose.material.icons.filled.Bed
 import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.CompareArrows
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
@@ -152,6 +153,7 @@ import com.example.ai.PropertyAiContext
 import com.example.ai.VoiceAssistantHelper
 import com.example.ui.ai.HeyDorjaAssistantSheet
 import com.example.ui.components.DorjaLogo
+import com.example.ui.i18n.L
 import com.example.ui.theme.DorjaColors
 import com.example.ui.theme.LocalDarkTheme
 import com.example.ui.util.Formatters
@@ -175,6 +177,8 @@ fun PropertyDetailScreen(
     onViewHandoverPassport: (String) -> Unit,
     /** Invoked when the AI sheet's "Go to Settings" asks for the Settings tab. */
     onOpenSettingsTab: () -> Unit = {},
+    /** Buyer-only: opens the landscape split-screen comparison stage. */
+    onOpenCompare: () -> Unit = {},
 
 ) {
     val repository = DorjaApp.instance.repository
@@ -2200,7 +2204,10 @@ fun PropertyDetailScreen(
                             )
                         }
                     }
-                    Spacer(modifier = Modifier.width(2.dp))
+                    if (currentUser?.role == "BUYER") {
+                        CompareButton(onClick = onOpenCompare)
+                        Spacer(modifier = Modifier.width(2.dp))
+                    }
                     HeyDorjaPill(onClick = {
                         if (!hasAudioPermission) {
                             audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
@@ -2262,7 +2269,10 @@ fun PropertyDetailScreen(
                             )
                         }
                     }
-                    Spacer(modifier = Modifier.width(2.dp))
+                    if (currentUser?.role == "BUYER") {
+                        CompareButton(onClick = onOpenCompare)
+                        Spacer(modifier = Modifier.width(2.dp))
+                    }
                     HeyDorjaPill(onClick = {
                         if (!hasAudioPermission) {
                             audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
@@ -2830,6 +2840,30 @@ private fun PaperTrailCard(
                 contentDescription = "Open",
                 tint = tint,
                 modifier = Modifier.size(18.dp)
+            )
+        }
+    }
+}
+
+/**
+ * Buyer-only circular compare button that sits beside the Hey Dorja pill in
+ * the floating action bar. Opens the landscape split-screen comparison stage.
+ */
+@Composable
+private fun CompareButton(onClick: () -> Unit) {
+    Surface(
+        shape = CircleShape,
+        color = DorjaColors.BentoBlueBg,
+        border = BorderStroke(1.dp, DorjaColors.BentoBlueIcon.copy(alpha = 0.55f)),
+        onClick = onClick,
+        modifier = Modifier.testTag("compare_button")
+    ) {
+        Box(contentAlignment = Alignment.Center, modifier = Modifier.size(40.dp)) {
+            Icon(
+                imageVector = Icons.Default.CompareArrows,
+                contentDescription = L("compare_title"),
+                tint = DorjaColors.BentoBlueIcon,
+                modifier = Modifier.size(19.dp)
             )
         }
     }

@@ -72,6 +72,7 @@ import com.example.ui.account.AccountScreen
 import com.example.ui.admin.AdminScreen
 import com.example.ui.auth.AuthScreen
 import com.example.ui.chat.ChatThreadScreen
+import com.example.ui.compare.CompareScreen
 import com.example.ui.chat.InboxScreen
 import com.example.ui.detail.PropertyDetailScreen
 import com.example.ui.explore.ExploreScreen
@@ -104,6 +105,10 @@ sealed class Screen(val route: String) {
     }
     object TourViewer : Screen("tour_viewer/{listingId}") {
         fun createRoute(listingId: String) = "tour_viewer/$listingId"
+    }
+    /** Buyer-only landscape comparison stage. */
+    object Compare : Screen("compare/{listingId}") {
+        fun createRoute(listingId: String) = "compare/$listingId"
     }
     object CreateListing : Screen("create_listing")
     object ChatThread : Screen("chat_thread/{conversationId}") {
@@ -249,6 +254,7 @@ fun DorjaNavHost() {
                     }
                 },
                 onViewHandoverPassport = { id -> navController.navigate(Screen.HandoverPassport.createRoute(id)) },
+                onOpenCompare = { navController.navigate(Screen.Compare.createRoute(listingId)) },
                 onOpenSettingsTab = {
                     settingsTabRequest++
                     navController.popBackStack()
@@ -262,6 +268,17 @@ fun DorjaNavHost() {
         ) { backStackEntry ->
             val listingId = backStackEntry.arguments?.getString("listingId") ?: "l1"
             TourViewerScreen(
+                listingId = listingId,
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(
+            route = Screen.Compare.route,
+            arguments = listOf(navArgument("listingId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val listingId = backStackEntry.arguments?.getString("listingId") ?: "l1"
+            CompareScreen(
                 listingId = listingId,
                 onBack = { navController.popBackStack() }
             )
