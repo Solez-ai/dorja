@@ -209,6 +209,13 @@ fun FloorPlanMakerOverlay(
                     }
                 }
 
+                // Colors resolved in composition — DorjaColors getters are
+                // @Composable and cannot be read inside the Canvas draw lambda.
+                val editorWallColor = DorjaColors.Ink950
+                val editorGridColor = DorjaColors.Sand300
+                val editorAccentColor = DorjaColors.Jol600
+                val editorLabelColor = DorjaColors.Gray700
+
                 // ── Canvas ──
                 Surface(
                     modifier = Modifier
@@ -267,10 +274,10 @@ fun FloorPlanMakerOverlay(
                             walls = walls,
                             rooms = rooms,
                             gridSteps = GRID_STEPS,
-                            wallColor = DorjaColors.Ink950,
-                            gridColor = DorjaColors.Sand300,
-                            accentColor = DorjaColors.Jol600,
-                            labelColor = DorjaColors.Gray700,
+                            wallColor = editorWallColor,
+                            gridColor = editorGridColor,
+                            accentColor = editorAccentColor,
+                            labelColor = editorLabelColor,
                             activeStart = dragStart,
                             activeEnd = dragEnd
                         )
@@ -358,15 +365,19 @@ fun FloorPlanPreview(
     aspectRatio: Float = 4f / 3f
 ) {
     val plan = remember(planJson) { FloorPlanData.fromJson(planJson) ?: FloorPlanData() }
+    // Resolved in composition (see note in FloorPlanMakerOverlay).
+    val wallColor = DorjaColors.Ink950
+    val gridColor = DorjaColors.Sand300
+    val labelColor = DorjaColors.Gray700
     Canvas(modifier = modifier.fillMaxWidth().aspectRatio(aspectRatio)) {
         drawFloorPlan(
             walls = plan.walls,
             rooms = plan.rooms,
             gridSteps = GRID_STEPS,
-            wallColor = DorjaColors.Ink950,
-            gridColor = DorjaColors.Sand300,
+            wallColor = wallColor,
+            gridColor = gridColor,
             accentColor = Color.Transparent,
-            labelColor = DorjaColors.Gray700,
+            labelColor = labelColor,
             activeStart = null,
             activeEnd = null
         )
