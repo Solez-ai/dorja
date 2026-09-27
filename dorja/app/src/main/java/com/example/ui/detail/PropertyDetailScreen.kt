@@ -134,6 +134,8 @@ import com.example.data.model.LegalDocument
 import com.example.data.model.Report
 import com.example.data.model.ReportResponse
 import com.example.data.model.RoomItem
+import com.example.ui.components.DorjaActivityIndicator
+import com.example.ui.components.DorjaAlert
 import com.example.ui.components.DorjaBadge
 import com.example.ui.components.DorjaButton
 import com.example.ui.components.DorjaChip
@@ -917,33 +919,17 @@ fun PropertyDetailScreen(
 
     // ── Delete document confirmation ──
     docPendingDelete?.let { doc ->
-        AlertDialog(
+        DorjaAlert(
             onDismissRequest = { docPendingDelete = null },
-            icon = { Icon(Icons.Default.Delete, contentDescription = null, tint = DorjaColors.Error) },
-            title = { Text("Delete Document", fontWeight = FontWeight.Bold) },
-            text = {
-                Text(
-                    "\"${doc.documentTitle}\" and its stored file will be removed from this listing's record.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = DorjaColors.Gray700
-                )
-            },
-            confirmButton = {
-                DorjaButton(
-                    text = "Delete",
-                    containerColor = DorjaColors.Error,
-                    onClick = {
-                        scope.launch {
-                            repository.deleteLegalDocument(doc.id)
-                            docPendingDelete = null
-                        }
-                    },
-                    modifier = Modifier.widthIn(min = 110.dp)
-                )
-            },
-            dismissButton = {
-                TextButton(onClick = { docPendingDelete = null }) {
-                    Text("Cancel", color = DorjaColors.Gray700)
+            title = "Delete Document",
+            message = "\"${doc.documentTitle}\" and its stored file will be removed from this listing's record.",
+            confirmLabel = "Delete",
+            isDestructive = true,
+            dismissLabel = "Cancel",
+            onConfirm = {
+                scope.launch {
+                    repository.deleteLegalDocument(doc.id)
+                    docPendingDelete = null
                 }
             }
         )
@@ -2803,10 +2789,9 @@ private fun PaperTrailCard(
                 contentAlignment = Alignment.Center
             ) {
                 if (busy) {
-                    CircularProgressIndicator(
+                    DorjaActivityIndicator(
                         modifier = Modifier.size(18.dp),
-                        color = tint,
-                        strokeWidth = 2.dp
+                        color = tint
                     )
                 } else {
                     Icon(imageVector = icon, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))

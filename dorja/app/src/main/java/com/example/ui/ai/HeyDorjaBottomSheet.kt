@@ -86,6 +86,7 @@ import androidx.core.content.ContextCompat
 import com.example.ai.DorjaAiEngine
 import com.example.ai.PropertyAiContext
 import com.example.ai.VoiceAssistantHelper
+import com.example.ui.components.DorjaActivityIndicator
 import com.example.ui.components.DorjaLogo
 import com.example.ui.theme.DorjaColors
 import com.example.ui.theme.LiquidGlassDefaults
@@ -400,9 +401,8 @@ fun HeyDorjaAssistantSheet(
                                 ) {
                                     DorjaLogo(modifier = Modifier.size(22.dp))
                                     Spacer(modifier = Modifier.width(10.dp))
-                                    CircularProgressIndicator(
+                                    DorjaActivityIndicator(
                                         modifier = Modifier.size(16.dp),
-                                        strokeWidth = 2.dp,
                                         color = DorjaColors.Jol600
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))

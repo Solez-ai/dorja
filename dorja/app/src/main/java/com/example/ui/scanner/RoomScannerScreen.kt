@@ -107,6 +107,7 @@ import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
 import com.example.DorjaApp
 import com.example.data.model.RoomItem
+import com.example.ui.components.DorjaActivityIndicator
 import com.example.ui.components.DorjaButton
 import com.example.ui.components.DorjaOutlinedButton
 import com.example.ui.theme.DorjaColors
@@ -944,7 +945,7 @@ private fun DonePhase(
                 ) {
                     Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                         if (stitchedPath == null) {
-                            CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Accent, strokeWidth = 2.dp)
+                            DorjaActivityIndicator(modifier = Modifier.size(20.dp), color = Accent)
                             Spacer(Modifier.width(12.dp))
                         }
                         Text(stitchingStatus!!, color = DorjaColors.Ink950, fontSize = 11.sp, fontFamily = FontFamily.Monospace)

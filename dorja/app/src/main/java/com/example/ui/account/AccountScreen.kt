@@ -82,6 +82,8 @@ import com.example.data.model.User
 import com.example.ui.components.BentoCard
 import com.example.ui.components.BentoMetricTile
 import com.example.ui.components.CountryPicker
+import com.example.ui.components.DorjaActivityIndicator
+import com.example.ui.components.DorjaAlert
 import com.example.ui.components.DorjaAvatar
 import com.example.ui.components.DorjaBadge
 import com.example.ui.components.DorjaButton
@@ -258,117 +260,74 @@ fun AccountScreen(
     }
 
     if (showDeleteContentDialog) {
-        AlertDialog(
+        DorjaAlert(
             onDismissRequest = { showDeleteContentDialog = false },
-            icon = { Icon(Icons.Default.DeleteForever, contentDescription = null, tint = DorjaColors.Error) },
-            title = { Text(L("account_delete_content_title"), fontWeight = FontWeight.Bold) },
-            text = {
-                Text(L("account_delete_content_body"))
-            },
-            confirmButton = {
-                DorjaButton(
-                    text = L("account_delete_everything"),
-                    onClick = {
-                        scope.launch {
-                            isPrivacyWorking = true
-                            repository.deleteAllMyContent()
-                            evidenceSummary = repository.getEvidenceSummary()
-                            isPrivacyWorking = false
-                            showDeleteContentDialog = false
-                            showContentDeletedDone = true
-                        }
-                    },
-                    modifier = Modifier.widthIn(min = 160.dp),
-                    enabled = !isPrivacyWorking,
-                    containerColor = DorjaColors.Error
-                )
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = { showDeleteContentDialog = false },
-                    enabled = !isPrivacyWorking
-                ) {
-                    Text(L("common_cancel"), color = DorjaColors.Gray700)
+            title = L("account_delete_content_title"),
+            message = L("account_delete_content_body"),
+            confirmLabel = L("account_delete_everything"),
+            isDestructive = true,
+            dismissLabel = L("common_cancel"),
+            onConfirm = {
+                scope.launch {
+                    isPrivacyWorking = true
+                    repository.deleteAllMyContent()
+                    evidenceSummary = repository.getEvidenceSummary()
+                    isPrivacyWorking = false
+                    showDeleteContentDialog = false
+                    showContentDeletedDone = true
                 }
             }
         )
     }
 
     if (showEraseAccountDialog) {
-        AlertDialog(
+        DorjaAlert(
             onDismissRequest = { showEraseAccountDialog = false },
-            icon = { Icon(Icons.Default.DeleteForever, contentDescription = null, tint = DorjaColors.Error) },
-            title = { Text(L("account_erase_title"), fontWeight = FontWeight.Bold) },
-            text = {
-                Text(L("account_erase_body"))
-            },
-            confirmButton = {
-                DorjaButton(
-                    text = L("account_erase_everything"),
-                    onClick = {
-                        scope.launch {
-                            isPrivacyWorking = true
-                            repository.eraseAllMyData()
-                            evidenceSummary = repository.getEvidenceSummary()
-                            isPrivacyWorking = false
-                            showEraseAccountDialog = false
-                            showEraseDone = true
-                        }
-                    },
-                    modifier = Modifier.widthIn(min = 160.dp),
-                    enabled = !isPrivacyWorking,
-                    containerColor = DorjaColors.Error
-                )
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = { showEraseAccountDialog = false },
-                    enabled = !isPrivacyWorking
-                ) {
-                    Text(L("common_cancel"), color = DorjaColors.Gray700)
+            title = L("account_erase_title"),
+            message = L("account_erase_body"),
+            confirmLabel = L("account_erase_everything"),
+            isDestructive = true,
+            dismissLabel = L("common_cancel"),
+            onConfirm = {
+                scope.launch {
+                    isPrivacyWorking = true
+                    repository.eraseAllMyData()
+                    evidenceSummary = repository.getEvidenceSummary()
+                    isPrivacyWorking = false
+                    showEraseAccountDialog = false
+                    showEraseDone = true
                 }
             }
         )
     }
 
     if (showReconfirmDone) {
-        AlertDialog(
+        DorjaAlert(
             onDismissRequest = { showReconfirmDone = false },
-            title = { Text(L("account_reconfirm_done_title"), fontWeight = FontWeight.Bold) },
-            text = {
-                Text(Lf("account_reconfirm_done_body", reconfirmedCount))
-            },
-            confirmButton = {
-                TextButton(onClick = { showReconfirmDone = false }) {
-                    Text(L("common_ok"), color = DorjaColors.Jol600)
-                }
-            }
+            title = L("account_reconfirm_done_title"),
+            message = Lf("account_reconfirm_done_body", reconfirmedCount),
+            confirmLabel = L("common_ok"),
+            onConfirm = { showReconfirmDone = false }
         )
     }
 
     if (showContentDeletedDone) {
-        AlertDialog(
+        DorjaAlert(
             onDismissRequest = { showContentDeletedDone = false },
-            title = { Text(L("account_content_deleted_title"), fontWeight = FontWeight.Bold) },
-            text = { Text(L("account_content_deleted_body")) },
-            confirmButton = {
-                TextButton(onClick = { showContentDeletedDone = false }) {
-                    Text(L("common_ok"), color = DorjaColors.Jol600)
-                }
-            }
+            title = L("account_content_deleted_title"),
+            message = L("account_content_deleted_body"),
+            confirmLabel = L("common_ok"),
+            onConfirm = { showContentDeletedDone = false }
         )
     }
 
     if (showEraseDone) {
-        AlertDialog(
+        DorjaAlert(
             onDismissRequest = { showEraseDone = false },
-            title = { Text(L("account_erased_title"), fontWeight = FontWeight.Bold) },
-            text = { Text(L("account_erased_body")) },
-            confirmButton = {
-                TextButton(onClick = { showEraseDone = false }) {
-                    Text(L("common_ok"), color = DorjaColors.Jol600)
-                }
-            }
+            title = L("account_erased_title"),
+            message = L("account_erased_body"),
+            confirmLabel = L("common_ok"),
+            onConfirm = { showEraseDone = false }
         )
     }
 
@@ -380,7 +339,7 @@ fun AccountScreen(
             contentAlignment = Alignment.Center
         ) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                CircularProgressIndicator(color = DorjaColors.BentoBlueIcon)
+                DorjaActivityIndicator(color = DorjaColors.BentoBlueIcon)
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(L("account_loading"), style = MaterialTheme.typography.bodySmall, color = DorjaColors.Gray700)
             }
