@@ -38,6 +38,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.SquareFoot
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material.icons.filled.VerifiedUser
@@ -476,6 +477,7 @@ fun ExploreScreen(
  * Granular multi-parametric filter sheet: price ceiling, bed/bath minimums,
  * minimum area and commercial-vs-residential classification.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ExploreFilterSheet(
     maxPrice: Int?,
