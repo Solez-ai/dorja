@@ -100,6 +100,8 @@ data class Listing(
     val hasScan: Boolean = false,
     /** User-captured verification photos (newline-separated content Uris). */
     val galleryUris: String = "",
+    /** Interactive floor plan sketched in the Floor Plan Maker (serialized JSON). */
+    val floorPlanJson: String? = null,
     // Phase 3 liveability/energy evidence — rendered only when the listing's
     // CountryProfile.liveabilityFields includes the matching field.
     val energyCertificateClass: String? = null,

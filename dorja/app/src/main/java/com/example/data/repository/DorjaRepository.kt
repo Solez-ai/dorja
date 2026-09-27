@@ -404,7 +404,8 @@ class DorjaRepository(private val database: DorjaDatabase, private val appContex
         floodRisk: String? = null,
         buildingCondition: String? = null,
         buildingAgeYears: Int? = null,
-        disasterContext: String? = null
+        disasterContext: String? = null,
+        floorPlanJson: String? = null
     ): String {
         val ownerId = _currentUser.value?.id
             ?: throw IllegalStateException("No signed-in account")
@@ -447,6 +448,7 @@ class DorjaRepository(private val database: DorjaDatabase, private val appContex
             buildingCondition = buildingCondition,
             buildingAgeYears = buildingAgeYears,
             disasterContext = disasterContext,
+            floorPlanJson = floorPlanJson,
             createdAt = System.currentTimeMillis()
         )
         listingDao.insertListing(listing)

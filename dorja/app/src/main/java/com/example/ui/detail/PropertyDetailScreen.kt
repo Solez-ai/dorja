@@ -155,6 +155,7 @@ import com.example.ai.PropertyAiContext
 import com.example.ai.VoiceAssistantHelper
 import com.example.ui.ai.HeyDorjaAssistantSheet
 import com.example.ui.components.DorjaLogo
+import com.example.ui.floorplan.FloorPlanPreview
 import com.example.ui.i18n.L
 import com.example.ui.theme.DorjaColors
 import com.example.ui.theme.LocalDarkTheme
@@ -1536,6 +1537,34 @@ fun PropertyDetailScreen(
                             unit = if (safeListing.balconies == 1) "balcony" else "balconies",
                             label = "Balconies"
                         )
+                    }
+                }
+            }
+
+            // ── FLOOR PLAN — seller-sketched plan rendered read-only ──
+            item {
+                safeListing.floorPlanJson?.let { planJson ->
+                    if (planJson.isNotBlank()) {
+                        Surface(
+                            modifier = Modifier.padding(horizontal = 20.dp),
+                            shape = RoundedCornerShape(18.dp),
+                            color = DorjaColors.White,
+                            border = BorderStroke(1.dp, DorjaColors.BentoCardBorder)
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Text(
+                                    text = L("detail_floorplan_title"),
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = DorjaColors.Ink950
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                FloorPlanPreview(
+                                    planJson = planJson,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+                        }
                     }
                 }
             }

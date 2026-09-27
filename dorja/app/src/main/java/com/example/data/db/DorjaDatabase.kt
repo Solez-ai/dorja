@@ -43,7 +43,7 @@ import androidx.room.TypeConverters
         UserCredential::class,
         ThirdPartyCheck::class
     ],
-    version = 15,
+    version = 16,
     exportSchema = false
 )
 @TypeConverters(Converters::class)

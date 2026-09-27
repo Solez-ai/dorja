@@ -439,6 +439,18 @@ data class DorjaStrings(
             // ── Common ──
             "common_ok" to "OK",
             "common_cancel" to "Cancel",
+            "detail_floorplan_title" to "Floor Plan",
+            // Floor plan maker
+            "floorplan_title" to "Floor Plan Maker",
+            "floorplan_subtitle" to "Sketch walls, label rooms — buyers see this on your listing",
+            "floorplan_tool_wall" to "Draw Wall",
+            "floorplan_tool_room" to "Room Label",
+            "floorplan_tool_erase" to "Erase",
+            "floorplan_undo" to "Undo",
+            "floorplan_clear" to "Clear all",
+            "floorplan_save" to "Save Floor Plan",
+            "floorplan_room_name" to "Room name",
+            "floorplan_room_hint" to "e.g. Master Bedroom",
             "common_save" to "Save",
             "common_delete" to "Delete",
             "common_confirm" to "Confirm",

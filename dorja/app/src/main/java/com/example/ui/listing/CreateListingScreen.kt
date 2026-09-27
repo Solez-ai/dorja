@@ -160,6 +160,7 @@ import com.example.ui.components.DorjaInput
 import com.example.ui.components.DorjaOutlinedButton
 import com.example.ui.components.EvidenceBadge
 import com.example.ui.components.GovernmentSourceCard
+import com.example.ui.floorplan.FloorPlanMakerOverlay
 import com.example.ui.theme.DorjaColors
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -260,6 +261,10 @@ fun CreateListingScreen(
 
     var coverPhotoIndex by remember { mutableIntStateOf(0) }
     var showMultiPhotoSelectorDialog by remember { mutableStateOf(false) }
+
+    // Floor plan maker (full-screen sketch canvas)
+    var floorPlanJson by remember { mutableStateOf<String?>(null) }
+    var showFloorPlanMaker by remember { mutableStateOf(false) }
 
     // Crop state
     var showCropDialog by remember { mutableStateOf(false) }
@@ -1589,6 +1594,13 @@ fun CreateListingScreen(
                             modifier = Modifier.heightIn(min = 36.dp),
                             testTag = "select_multiple_photos_button"
                         )
+                        DorjaOutlinedButton(
+                            text = if (floorPlanJson == null) "Add Floor Plan" else "Edit Floor Plan",
+                            onClick = { showFloorPlanMaker = true },
+                            icon = Icons.Default.SquareFoot,
+                            modifier = Modifier.heightIn(min = 36.dp),
+                            testTag = "add_floor_plan_button"
+                        )
                     }
 
                     Spacer(modifier = Modifier.height(8.dp))
@@ -2538,7 +2550,8 @@ fun CreateListingScreen(
                             floodRisk = floodRiskText.trim().ifBlank { null },
                             buildingCondition = buildingConditionText.trim().ifBlank { null },
                             buildingAgeYears = buildingAgeText.toIntOrNull(),
-                            disasterContext = disasterContextText.trim().ifBlank { null }
+                            disasterContext = disasterContextText.trim().ifBlank { null },
+                            floorPlanJson = floorPlanJson
                         )
                         // Save promises for this listing
                         customPromises.forEach { promise ->
@@ -2570,6 +2583,16 @@ fun CreateListingScreen(
 
             Spacer(modifier = Modifier.height(48.dp))
         }
+    }
+
+    if (showFloorPlanMaker) {
+        FloorPlanMakerOverlay(
+            initialJson = floorPlanJson,
+            onDone = { json ->
+                if (json != null) floorPlanJson = json
+                showFloorPlanMaker = false
+            }
+        )
     }
 }
 
