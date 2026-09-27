@@ -3,6 +3,8 @@ package com.example.ui.explore
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,6 +16,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -35,6 +38,8 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.SquareFoot
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Close
@@ -80,8 +85,12 @@ import com.example.ui.theme.DorjaColors
 import com.example.ui.theme.LocalDarkTheme
 import com.example.ui.util.Formatters
 import com.example.ui.components.DorjaLogo
+import com.example.ui.util.Formatters.formatPriceShort
 
 import kotlinx.coroutines.launch
+
+/** Price ceiling options (BDT) for the granular filter sheet. */
+private val PRICE_CEILINGS = listOf(5_000_000, 20_000_000, 50_000_000, 100_000_000, 500_000_000)
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -103,6 +112,14 @@ fun ExploreScreen(
     var searchQuery by remember { mutableStateOf("") }
     var selectedIntent by remember { mutableStateOf("ALL") }
     var selectedPropertyType by remember { mutableStateOf("ALL") }
+
+    // Granular filter sheet state (price ceiling, bedrooms, baths, sqft, class)
+    var showFilterSheet by remember { mutableStateOf(false) }
+    var maxPrice by remember { mutableStateOf<Int?>(null) }
+    var minBedrooms by remember { mutableStateOf<Int?>(null) }
+    var minBathrooms by remember { mutableStateOf<Int?>(null) }
+    var minSqft by remember { mutableStateOf<Int?>(null) }
+    var propertyClass by remember { mutableStateOf<String?>(null) }
 
     // Trust signal: the feed shows EVERY active listing, but each card marks
     // whether the owner's identity is admin-approved yet. Hiding unverified
@@ -126,8 +143,26 @@ fun ExploreScreen(
         val matchesIntent = selectedIntent == "ALL" || listing.intent.equals(selectedIntent, ignoreCase = true)
         val matchesType = selectedPropertyType == "ALL" || listing.propertyType.equals(selectedPropertyType, ignoreCase = true)
 
-        matchesQuery && matchesIntent && matchesType
+        // Granular filters — null means "no ceiling/floor"
+        val matchesPrice = maxPrice == null || listing.priceAmount <= maxPrice!!
+        val matchesBeds = minBedrooms == null || listing.bedrooms >= minBedrooms!!
+        val matchesBaths = minBathrooms == null || listing.bathrooms >= minBathrooms!!
+        val matchesSqft = minSqft == null || listing.sqft >= minSqft!!
+
+        // Commercial = OFFICE/SHOP/LAND; everything else is residential
+        val listingClass = when (listing.propertyType) {
+            "OFFICE", "SHOP", "LAND" -> "COMMERCIAL"
+            else -> "RESIDENTIAL"
+        }
+        val matchesClass = propertyClass == null || listingClass == propertyClass
+
+        matchesQuery && matchesIntent && matchesType &&
+                matchesPrice && matchesBeds && matchesBaths && matchesSqft && matchesClass
     }
+
+    val activeFilterCount = listOfNotNull(
+        maxPrice, minBedrooms, minBathrooms, minSqft, propertyClass
+    ).size
 
     Column(
         modifier = Modifier
@@ -310,6 +345,18 @@ fun ExploreScreen(
                         }
                     )
                 }
+                item {
+                    DorjaChip(
+                        selected = activeFilterCount > 0,
+                        label = if (activeFilterCount > 0) {
+                            Lf("filter_active_summary_fmt", activeFilterCount)
+                        } else {
+                            L("filter_title")
+                        },
+                        onClick = { showFilterSheet = true },
+                        modifier = Modifier.testTag("filter_advanced")
+                    )
+                }
             }
         }
 
@@ -394,6 +441,230 @@ fun ExploreScreen(
                         ownerVerified = verifiedOwnerIds.contains(listing.ownerId)
                     )
                 }
+            }
+        }
+    }
+
+    if (showFilterSheet) {
+        ExploreFilterSheet(
+            maxPrice = maxPrice,
+            minBedrooms = minBedrooms,
+            minBathrooms = minBathrooms,
+            minSqft = minSqft,
+            propertyClass = propertyClass,
+            onDismiss = { showFilterSheet = false },
+            onReset = {
+                maxPrice = null
+                minBedrooms = null
+                minBathrooms = null
+                minSqft = null
+                propertyClass = null
+            },
+            onApply = { maxP, minBeds, minBaths, minSq, cls ->
+                maxPrice = maxP
+                minBedrooms = minBeds
+                minBathrooms = minBaths
+                minSqft = minSq
+                propertyClass = cls
+                showFilterSheet = false
+            }
+        )
+    }
+}
+
+/**
+ * Granular multi-parametric filter sheet: price ceiling, bed/bath minimums,
+ * minimum area and commercial-vs-residential classification.
+ */
+@Composable
+private fun ExploreFilterSheet(
+    maxPrice: Int?,
+    minBedrooms: Int?,
+    minBathrooms: Int?,
+    minSqft: Int?,
+    propertyClass: String?,
+    onDismiss: () -> Unit,
+    onReset: () -> Unit,
+    onApply: (Int?, Int?, Int?, Int?, String?) -> Unit
+) {
+    var draftPrice by remember { mutableStateOf<Int?>(maxPrice) }
+    var draftBeds by remember { mutableStateOf<Int?>(minBedrooms) }
+    var draftBaths by remember { mutableStateOf<Int?>(minBathrooms) }
+    var draftSqft by remember { mutableStateOf<Int?>(minSqft) }
+    var draftClass by remember { mutableStateOf<String?>(propertyClass) }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = DorjaColors.DrawerSidebar,
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(horizontal = 20.dp, vertical = 12.dp)
+        ) {
+            Text(
+                text = L("filter_title"),
+                style = MaterialTheme.typography.titleLarge,
+                color = DorjaColors.DrawerCream,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = L("filter_subtitle"),
+                style = MaterialTheme.typography.bodySmall,
+                color = DorjaColors.DrawerMuted
+            )
+
+            Spacer(modifier = Modifier.height(18.dp))
+
+            Text(
+                text = L("filter_price_ceiling"),
+                style = MaterialTheme.typography.labelSmall,
+                color = DorjaColors.DrawerMuted
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.horizontalScroll(rememberScrollState())
+            ) {
+                DorjaChip(
+                    selected = draftPrice == null,
+                    label = L("filter_any_price"),
+                    onClick = { draftPrice = null }
+                )
+                PRICE_CEILINGS.forEach { value ->
+                    DorjaChip(
+                        selected = draftPrice == value,
+                        label = formatPriceShort(value, "BDT"),
+                        onClick = { draftPrice = value }
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            Text(
+                text = L("filter_bedrooms_min"),
+                style = MaterialTheme.typography.labelSmall,
+                color = DorjaColors.DrawerMuted
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                DorjaChip(
+                    selected = draftBeds == null,
+                    label = L("common_any"),
+                    onClick = { draftBeds = null }
+                )
+                listOf(1, 2, 3, 4, 5).forEach { n ->
+                    DorjaChip(
+                        selected = draftBeds == n,
+                        label = "$n+",
+                        onClick = { draftBeds = n }
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            Text(
+                text = L("filter_bathrooms_min"),
+                style = MaterialTheme.typography.labelSmall,
+                color = DorjaColors.DrawerMuted
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                DorjaChip(
+                    selected = draftBaths == null,
+                    label = L("common_any"),
+                    onClick = { draftBaths = null }
+                )
+                listOf(1, 2, 3, 4).forEach { n ->
+                    DorjaChip(
+                        selected = draftBaths == n,
+                        label = "$n+",
+                        onClick = { draftBaths = n }
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            Text(
+                text = L("filter_sqft_min"),
+                style = MaterialTheme.typography.labelSmall,
+                color = DorjaColors.DrawerMuted
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.horizontalScroll(rememberScrollState())
+            ) {
+                DorjaChip(
+                    selected = draftSqft == null,
+                    label = L("common_any"),
+                    onClick = { draftSqft = null }
+                )
+                listOf(500, 750, 1000, 1500, 2500).forEach { n ->
+                    DorjaChip(
+                        selected = draftSqft == n,
+                        label = "$n+",
+                        onClick = { draftSqft = n }
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            Text(
+                text = L("filter_class"),
+                style = MaterialTheme.typography.labelSmall,
+                color = DorjaColors.DrawerMuted
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                DorjaChip(
+                    selected = draftClass == null,
+                    label = L("common_any"),
+                    onClick = { draftClass = null }
+                )
+                DorjaChip(
+                    selected = draftClass == "RESIDENTIAL",
+                    label = L("filter_residential"),
+                    onClick = { draftClass = "RESIDENTIAL" }
+                )
+                DorjaChip(
+                    selected = draftClass == "COMMERCIAL",
+                    label = L("filter_commercial"),
+                    onClick = { draftClass = "COMMERCIAL" }
+                )
+            }
+
+            Spacer(modifier = Modifier.height(22.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                DorjaButton(
+                    text = L("filter_reset"),
+                    onClick = {
+                        draftPrice = null
+                        draftBeds = null
+                        draftBaths = null
+                        draftSqft = null
+                        draftClass = null
+                        onReset()
+                    },
+                    modifier = Modifier.weight(1f),
+                    containerColor = DorjaColors.Gray700
+                )
+                DorjaButton(
+                    text = L("filter_apply"),
+                    onClick = { onApply(draftPrice, draftBeds, draftBaths, draftSqft, draftClass) },
+                    modifier = Modifier.weight(1f)
+                )
             }
         }
     }
