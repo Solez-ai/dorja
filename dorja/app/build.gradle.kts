@@ -88,6 +88,11 @@ dependencies {
     implementation("com.google.code.gson:gson:2.10.1")
   // On-device AI: tool-calling assistant (Needle-class local model).
   implementation("com.cactuscompute:cactus:1.4.1-beta")
+  // iOS-style Cupertino widgets (buttons, dialogs, switches, pickers).
+  // schott12521 fork is the maintained lineage of alexzhirkevich/compose-cupertino
+  // and is compiled against Compose Multiplatform 1.7.3 — same 1.7 line as our
+  // BOM 2024.09.00, so it neither bumps nor clashes with androidx Compose.
+  implementation("io.github.schott12521:cupertino:2.1.0")
   // NOTE: OpenCV was removed — its AAR bundles ~100MB of native .so libs for
   // every ABI, which ballooned the APK past 150MB. Stitching is done by the
   // gyro-based equirectangular pipeline in RoomScannerScreen.kt instead.

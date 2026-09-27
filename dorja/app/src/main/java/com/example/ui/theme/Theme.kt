@@ -9,6 +9,9 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
+import com.slapps.cupertino.theme.CupertinoTheme
+import com.slapps.cupertino.theme.darkColorScheme as cupertinoDarkColorScheme
+import com.slapps.cupertino.theme.lightColorScheme as cupertinoLightColorScheme
 
 private val DorjaLightColorScheme = lightColorScheme(
     primary = DorjaLightColors.Jol600,
@@ -83,10 +86,14 @@ fun DorjaTheme(
         LocalDorjaColors provides tokens,
         LocalDarkTheme provides darkTheme
     ) {
-        MaterialTheme(
-            colorScheme = colorScheme,
-            typography = DorjaTypography,
-            content = content
-        )
+        CupertinoTheme(
+            colorScheme = if (darkTheme) cupertinoDarkColorScheme() else cupertinoLightColorScheme()
+        ) {
+            MaterialTheme(
+                colorScheme = colorScheme,
+                typography = DorjaTypography,
+                content = content
+            )
+        }
     }
 }
