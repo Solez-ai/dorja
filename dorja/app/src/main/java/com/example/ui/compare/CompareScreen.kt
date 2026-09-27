@@ -221,6 +221,7 @@ private fun ComparePickStage(
             )
             ComparePickFeedPane(
                 candidates = candidates,
+                verifiedOwnerIds = verifiedOwnerIds,
                 sharedScroll = sharedScroll,
                 onPick = onPick,
                 modifier = Modifier.weight(1f)
@@ -268,6 +269,7 @@ private fun DecayVelocity(velocity: MutableState<Float>) {
 @Composable
 private fun ComparePickFeedPane(
     candidates: List<Listing>,
+    verifiedOwnerIds: Set<String>,
     sharedScroll: Animatable<Float, AnimationVector1D>,
     onPick: (String) -> Unit,
     modifier: Modifier = Modifier
