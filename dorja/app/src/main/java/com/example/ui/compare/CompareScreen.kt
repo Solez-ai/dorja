@@ -178,11 +178,12 @@ private fun ComparePickStage(
     val allListings by repository.getAllListings().collectAsState(initial = emptyList())
     val dark = LocalDarkTheme.current
 
-    // Same trust gate as the explore feed: listings from identity-unverified
-    // owners never appear as comparison candidates.
+    // Every active listing is a comparison candidate — hiding unverified
+    // owners' listings here left the picker empty and made compare feel
+    // broken. Cards mark owner-verification status instead of filtering.
     val verifiedOwnerIds = produceVerifiedOwners(allListings)
-    val candidates = remember(allListings, verifiedOwnerIds, excludeId) {
-        allListings.filter { it.id != excludeId && verifiedOwnerIds.contains(it.ownerId) }
+    val candidates = remember(allListings, excludeId) {
+        allListings.filter { it.id != excludeId && it.status.equals("ACTIVE", ignoreCase = true) }
     }
 
     // One shared scroller anchors the picker stage too, so the hand position
@@ -310,6 +311,7 @@ private fun ComparePickFeedPane(
                     ComparePickCard(
                         listing = listing,
                         ordinal = index,
+                        ownerVerified = verifiedOwnerIds.contains(listing.ownerId),
                         onClick = { onPick(listing.id) }
                     )
                 }
@@ -330,6 +332,7 @@ private fun ComparePickFeedPane(
 private fun ComparePickCard(
     listing: Listing,
     ordinal: Int,
+    ownerVerified: Boolean,
     onClick: () -> Unit
 ) {
     val dark = LocalDarkTheme.current
@@ -374,6 +377,22 @@ private fun ComparePickCard(
                 overflow = TextOverflow.Ellipsis
             )
             Spacer(Modifier.height(3.dp))
+            if (!ownerVerified) {
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = DorjaColors.BentoAmberBg
+                ) {
+                    Text(
+                        text = L("explore_owner_unverified"),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = DorjaColors.BentoAmberText,
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                    )
+                }
+                Spacer(Modifier.height(3.dp))
+            }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     Icons.Default.LocationOn,
