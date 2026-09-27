@@ -27,8 +27,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
+import com.slapps.cupertino.CupertinoSwitch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -227,16 +226,10 @@ fun SettingsScreen(
                                     color = DorjaColors.Gray700
                                 )
                             }
-                            Switch(
+                            CupertinoSwitch(
                                 checked = darkMode,
                                 onCheckedChange = { ThemeSettings.setDarkMode(context, it) },
-                                modifier = Modifier.testTag("settings_dark_mode_switch"),
-                                colors = SwitchDefaults.colors(
-                                    checkedThumbColor = androidx.compose.ui.graphics.Color.White,
-                                    checkedTrackColor = DorjaColors.Jol600,
-                                    uncheckedThumbColor = DorjaColors.Gray500,
-                                    uncheckedTrackColor = DorjaColors.Sand300
-                                )
+                                modifier = Modifier.testTag("settings_dark_mode_switch")
                             )
                         }
                     }
