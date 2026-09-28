@@ -22,6 +22,13 @@ from there verbatim).
 
 ## Restore checklist
 
+### 0. Re-include the AI sources (`dorja/app/build.gradle.kts`)
+
+The `sourceSets` block in `android { }` currently excludes `com/example/ai/**`,
+`com/example/ui/ai/**` and `com/example/ui/assistant/**` from compilation (otherwise
+the kept files can't compile without the cactus dependency). Delete that whole
+`sourceSets { ... }` block — it is marked with an "AI PARKED" comment.
+
 ### 1. Dependency (`dorja/app/build.gradle.kts`)
 
 ```kotlin
