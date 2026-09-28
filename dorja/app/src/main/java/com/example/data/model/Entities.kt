@@ -332,3 +332,41 @@ data class AppealRecord(
     val decidedAt: Long? = null,
     val decisionNote: String = ""
 )
+
+// ═══════════════════════════════════════════════════════════════════
+// DORJA History (atlas §9): event-sourced activity + evidence trail.
+// Every significant action becomes a HistoryEvent; "locking" freezes it
+// into an immutable-style Statement Record with a SHA-256 integrity
+// fingerprint. DORJA presents records; it is not a legal registry.
+// ═══════════════════════════════════════════════════════════════════
+@Entity(tableName = "history_events")
+data class HistoryEvent(
+    @PrimaryKey val id: String,
+    val userId: String,
+    val type: String,            // EVENT_* codes
+    val title: String,
+    val occurredAt: Long,
+    val listingId: String? = null,
+    val listingLabel: String = "",
+    val place: String = "",
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    val detailJson: String = "{}",
+    val relatedEntityId: String? = null,
+    val locked: Boolean = false,
+    val lockedAt: Long? = null,
+    val integrityHash: String = "",
+    val contradictionOfEventId: String? = null,
+    val createdAt: Long = System.currentTimeMillis()
+)
+
+object HistoryEventTypes {
+    const val VIEWING_PASS_ISSUED = "VIEWING_PASS_ISSUED"
+    const val VIEWING_CHECKED_IN = "VIEWING_CHECKED_IN"
+    const val VIEWING_CHECKED_OUT = "VIEWING_CHECKED_OUT"
+    const val DOCUMENT_ADDED = "DOCUMENT_ADDED"
+    const val SELLER_CLAIM = "SELLER_CLAIM"
+    const val LISTING_CREATED = "LISTING_CREATED"
+    const val STATEMENT_LOCKED = "STATEMENT_LOCKED"
+    const val CONTRADICTION_REPORTED = "CONTRADICTION_REPORTED"
+}

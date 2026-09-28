@@ -450,3 +450,21 @@ interface LegalDocumentDao {
     @Query("DELETE FROM legal_documents")
     suspend fun deleteAllLegalDocuments()
 }
+
+@Dao
+interface HistoryEventDao {
+    @Query("SELECT * FROM history_events WHERE userId = :userId ORDER BY occurredAt DESC")
+    fun observeForUser(userId: String): Flow<List<HistoryEvent>>
+
+    @Query("SELECT * FROM history_events WHERE listingId = :listingId ORDER BY occurredAt ASC")
+    fun observeForListing(listingId: String): Flow<List<HistoryEvent>>
+
+    @Query("SELECT * FROM history_events WHERE id = :id LIMIT 1")
+    suspend fun getById(id: String): HistoryEvent?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(event: HistoryEvent)
+
+    @Query("DELETE FROM history_events WHERE userId = :userId")
+    suspend fun deleteAllForUser(userId: String)
+}

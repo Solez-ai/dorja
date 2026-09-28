@@ -29,15 +29,21 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import android.content.Context
 import android.net.Uri
+import com.google.gson.Gson
+import com.example.data.model.HistoryEvent
+import com.example.data.model.HistoryEventTypes
 import java.io.File
+import java.security.MessageDigest
 import java.io.FileOutputStream
 import java.util.UUID
 
 class DorjaRepository(private val database: DorjaDatabase, private val appContext: Context? = null) {
     private val userDao = database.userDao()
+    private val historyEventDao = database.historyEventDao()
     private val listingDao = database.listingDao()
     private val roomDao = database.roomDao()
     private val scanDao = database.scanDao()
@@ -457,6 +463,16 @@ class DorjaRepository(private val database: DorjaDatabase, private val appContex
         // that survives re-posting and carries evidence across borders.
         ensurePropertyPassport(listing.id, listing)
 
+        // DORJA History: the origin event of this property's case-file.
+        recordHistoryEvent(
+            type = HistoryEventTypes.LISTING_CREATED,
+            title = title,
+            listingId = id,
+            listingLabel = title,
+            place = publicArea,
+            detail = mapOf("intent" to intent, "price" to priceAmount.toString())
+        )
+
         if (customRooms.isNotEmpty()) {
             val roomsToInsert = customRooms.mapIndexed { index, room ->
                 room.copy(
@@ -742,6 +758,15 @@ class DorjaRepository(private val database: DorjaDatabase, private val appContex
     // Removed unused sync method – keep async Flow version only
     suspend fun addLegalDocument(doc: LegalDocument) {
         legalDocumentDao.insertLegalDocument(doc)
+        recordHistoryEvent(
+            type = HistoryEventTypes.DOCUMENT_ADDED,
+            title = doc.documentTitle,
+            listingId = doc.listingId,
+            detail = mapOf(
+                "documentType" to doc.documentType,
+                "evidenceLevel" to doc.evidenceLevel
+            )
+        )
     }
 
     /**
@@ -906,6 +931,21 @@ class DorjaRepository(private val database: DorjaDatabase, private val appContex
         )
         viewingDao.insertViewing(viewing)
 
+        // DORJA History: pass issued (issuance → check-in → check-out chain).
+        val listedPlace = listingDao.getListingById(listingId)?.publicArea ?: ""
+        recordHistoryEvent(
+            type = HistoryEventTypes.VIEWING_PASS_ISSUED,
+            title = listedPlace.ifBlank { listingId },
+            listingId = listingId,
+            place = listedPlace,
+            detail = mapOf(
+                "passToken" to passToken,
+                "role" to "BUYER",
+                "scheduledAt" to startsAt.toString()
+            ),
+            relatedEntityId = viewingId
+        )
+
         val conv = getOrCreateConversation(listingId, seekerId, hostId)
         sendMessage(
             conv.id,
@@ -920,6 +960,15 @@ class DorjaRepository(private val database: DorjaDatabase, private val appContex
         val viewing = viewingDao.getViewingById(viewingId)
         if (viewing != null) {
             viewingDao.updateViewing(viewing.copy(status = "CHECKED_IN"))
+            val listedPlace = listingDao.getListingById(viewing.listingId)?.publicArea ?: ""
+            recordHistoryEvent(
+                type = HistoryEventTypes.VIEWING_CHECKED_IN,
+                title = listedPlace.ifBlank { viewing.listingId },
+                listingId = viewing.listingId,
+                place = listedPlace,
+                detail = mapOf("passToken" to viewing.passToken),
+                relatedEntityId = viewingId
+            )
         }
     }
 
@@ -944,6 +993,16 @@ class DorjaRepository(private val database: DorjaDatabase, private val appContex
             evidenceNote = evidenceNote
         )
         promiseDao.insertPromise(promise)
+        recordHistoryEvent(
+            type = HistoryEventTypes.SELLER_CLAIM,
+            title = originalText,
+            listingId = listingId,
+            detail = mapOf(
+                "category" to category,
+                "claim" to title,
+                "status" to "PENDING"
+            )
+        )
     }
 
     // ── Reports / responses / appeals (Phase 5, atlas §2 & §8) ────────────
@@ -1060,6 +1119,131 @@ class DorjaRepository(private val database: DorjaDatabase, private val appContex
                 )
             )
         }
+    }
+
+
+    // ═════════════════════════════════════════════════════════════════
+    // DORJA History (atlas §9). Records what happened, never certifies
+    // legality. Integrity = SHA-256 over the canonical event content.
+    // ═════════════════════════════════════════════════════════════════
+
+    fun observeHistoryForUser(userId: String): Flow<List<HistoryEvent>> =
+        historyEventDao.observeForUser(userId)
+
+    fun observeHistoryForListing(listingId: String): Flow<List<HistoryEvent>> =
+        historyEventDao.observeForListing(listingId)
+
+    private fun historyIntegrityHash(
+        type: String,
+        userId: String,
+        listingId: String?,
+        occurredAt: Long,
+        payload: String
+    ): String {
+        val canonical = "$type|$userId|$listingId|$occurredAt|$payload"
+        val digest = MessageDigest.getInstance("SHA-256")
+            .digest(canonical.toByteArray(Charsets.UTF_8))
+        // Short display fingerprint, atlas style: 8F3A...91C2
+        val hex = digest.joinToString("") { "%02X".format(it) }
+        return hex.take(4) + "..." + hex.takeLast(4)
+    }
+
+    private suspend fun recordHistoryEvent(
+        type: String,
+        title: String,
+        occurredAt: Long = System.currentTimeMillis(),
+        listingId: String? = null,
+        listingLabel: String = "",
+        place: String = "",
+        latitude: Double? = null,
+        longitude: Double? = null,
+        detail: Map<String, String> = emptyMap(),
+        relatedEntityId: String? = null
+    ): HistoryEvent {
+        val userId = _currentUser.value?.id ?: ""
+        if (userId.isBlank()) return HistoryEvent(
+            id = "", userId = "", type = type, title = title, occurredAt = occurredAt
+        )
+        val detailJson = if (detail.isEmpty()) "{}" else Gson().toJson(detail)
+        val event = HistoryEvent(
+            id = "he_" + UUID.randomUUID().toString().take(10),
+            userId = userId,
+            type = type,
+            title = title,
+            occurredAt = occurredAt,
+            listingId = listingId,
+            listingLabel = listingLabel,
+            place = place,
+            latitude = latitude,
+            longitude = longitude,
+            detailJson = detailJson,
+            relatedEntityId = relatedEntityId,
+            integrityHash = historyIntegrityHash(type, userId, listingId, occurredAt, detailJson)
+        )
+        historyEventDao.insert(event)
+        return event
+    }
+
+    /** Statement Record: freezes an event (e.g. a seller claim) with its evidence. */
+    suspend fun lockHistoryEvent(eventId: String): Result<HistoryEvent> {
+        return try {
+            val event = historyEventDao.getById(eventId)
+                ?: return Result.failure(IllegalStateException("Event not found"))
+            if (event.locked) return Result.success(event)
+            val lockedAt = System.currentTimeMillis()
+            val fingerprint = historyIntegrityHash(
+                type = event.type,
+                userId = event.userId,
+                listingId = event.listingId,
+                occurredAt = event.occurredAt,
+                payload = event.detailJson + "|LOCKED|" + lockedAt
+            )
+            val locked = event.copy(
+                locked = true,
+                lockedAt = lockedAt,
+                integrityHash = fingerprint
+            )
+            historyEventDao.insert(locked)
+            Result.success(locked)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /** Contradiction Event: links new evidence against a locked statement. */
+    suspend fun recordContradiction(
+        originalEventId: String,
+        note: String,
+        listingId: String? = null,
+        listingLabel: String = "",
+        place: String = ""
+    ): Result<HistoryEvent> {
+        return try {
+            val original = historyEventDao.getById(originalEventId)
+                ?: return Result.failure(IllegalStateException("Original event not found"))
+            val event = recordHistoryEvent(
+                type = HistoryEventTypes.CONTRADICTION_REPORTED,
+                title = note.ifBlank { "Contradiction of statement" },
+                listingId = original.listingId ?: listingId,
+                listingLabel = original.listingLabel.ifBlank { listingLabel },
+                place = place.ifBlank { original.place },
+                detail = mapOf(
+                    "contradicts" to (original.id),
+                    "originalStatement" to original.title,
+                    "originalHash" to original.integrityHash
+                ),
+                relatedEntityId = original.id
+            )
+            Result.success(event)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
+    /** Builds the Property History case-file lines for one listing. */
+    suspend fun getHistoryEventsForListingSync(listingId: String): List<HistoryEvent> {
+        val userId = _currentUser.value?.id ?: return emptyList()
+        return historyEventDao.observeForListing(listingId).first().filter { it.userId == userId }
     }
 
     suspend fun resetAllData() {

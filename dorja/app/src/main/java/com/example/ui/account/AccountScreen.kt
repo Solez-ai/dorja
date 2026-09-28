@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.DataUsage
 import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.Calculate
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.FactCheck
 import androidx.compose.material.icons.filled.Flag
@@ -107,7 +108,8 @@ import com.example.ui.components.DorjaLogo
 fun AccountScreen(
     onNavigateToSellerSuite: () -> Unit = {},
     onNavigateToRelocation: (origin: String, destination: String) -> Unit = { _, _ -> },
-    onNavigateToCalculator: () -> Unit = {}
+    onNavigateToCalculator: () -> Unit = {},
+    onNavigateToHistory: () -> Unit = {}
 ) {
     val repository = DorjaApp.instance.repository
     val scope = rememberCoroutineScope()
@@ -892,6 +894,51 @@ fun AccountScreen(
                             style = MaterialTheme.typography.labelSmall,
                             color = DorjaColors.Gray500
                         )
+                    }
+                }
+            }
+
+            // DORJA History — chronological activity + evidence record
+            item {
+                BentoCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = onNavigateToHistory
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(DorjaColors.BentoPurpleBg),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.History,
+                                contentDescription = null,
+                                tint = DorjaColors.BentoPurpleIcon,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = L("history_title"),
+                                style = MaterialTheme.typography.titleSmall,
+                                color = DorjaColors.Ink950,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = L("history_entry_subtitle"),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = DorjaColors.Gray700,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        ForwardChevron(tint = DorjaColors.Gray500)
                     }
                 }
             }

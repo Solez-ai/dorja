@@ -6,6 +6,7 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import com.example.data.model.AppealRecord
 import com.example.data.model.Conversation
+import com.example.data.model.HistoryEvent
 import com.example.data.model.IdentityVerification
 import com.example.data.model.LegalDocument
 import com.example.data.model.Listing
@@ -41,9 +42,10 @@ import androidx.room.TypeConverters
         AppealRecord::class,
         IdentityVerification::class,
         UserCredential::class,
-        ThirdPartyCheck::class
+        ThirdPartyCheck::class,
+        HistoryEvent::class
     ],
-    version = 16,
+    version = 17,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -65,6 +67,7 @@ abstract class DorjaDatabase : RoomDatabase() {
     abstract fun identityVerificationDao(): IdentityVerificationDao
     abstract fun userCredentialDao(): UserCredentialDao
     abstract fun thirdPartyCheckDao(): ThirdPartyCheckDao
+    abstract fun historyEventDao(): HistoryEventDao
 
     companion object {
         @Volatile

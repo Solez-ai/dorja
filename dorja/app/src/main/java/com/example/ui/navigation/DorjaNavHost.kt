@@ -84,6 +84,7 @@ import com.example.ui.seller.HostListingsScreen
 import com.example.ui.settings.SettingsScreen
 import com.example.ui.splash.SplashScreen
 import com.example.ui.calculator.FinancialCalculatorScreen
+import com.example.ui.history.HistoryScreen
 import com.example.ui.components.DorjaLogo
 import com.example.ui.i18n.L
 import com.example.ui.theme.DorjaColors
@@ -113,6 +114,7 @@ sealed class Screen(val route: String) {
     }
     object CreateListing : Screen("create_listing")
     object FinancialCalculator : Screen("financial_calculator")
+    object History : Screen("history")
     object ChatThread : Screen("chat_thread/{conversationId}") {
         fun createRoute(conversationId: String) = "chat_thread/$conversationId"
     }
@@ -230,6 +232,9 @@ fun DorjaNavHost() {
                 onNavigateToCalculator = {
                     navController.navigate(Screen.FinancialCalculator.route)
                 },
+                onNavigateToHistory = {
+                    navController.navigate(Screen.History.route)
+                },
                 onNavigateToRelocation = { origin, dest ->
                     navController.navigate(Screen.RelocationMode.createRoute(origin, dest))
                 },
@@ -272,6 +277,10 @@ fun DorjaNavHost() {
 
         composable(Screen.FinancialCalculator.route) {
             FinancialCalculatorScreen(onBack = { navController.popBackStack() })
+        }
+
+        composable(Screen.History.route) {
+            HistoryScreen(onBack = { navController.popBackStack() })
         }
 
         composable(
@@ -385,6 +394,7 @@ fun MainContainer(
     onNavigateToPass: (String) -> Unit,
     onNavigateToHandover: (String) -> Unit,
     onNavigateToCalculator: () -> Unit = {},
+    onNavigateToHistory: () -> Unit = {},
     onNavigateToRelocation: (String, String) -> Unit = { _, _ -> },
     /** Sign out; the flag opens the auth screen directly in sign-up mode. */
     onLogout: (startInSignUp: Boolean) -> Unit = {},
