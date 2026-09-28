@@ -65,9 +65,11 @@ android {
   sourceSets {
     getByName("main") {
       java {
-        exclude("com/example/ai/**")
-        exclude("com/example/ui/ai/**")
-        exclude("com/example/ui/assistant/**")
+        filter.excludes = setOf(
+          "com/example/ai/**",
+          "com/example/ui/ai/**",
+          "com/example/ui/assistant/**"
+        )
       }
     }
   }
