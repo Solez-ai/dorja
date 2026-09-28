@@ -83,6 +83,7 @@ import com.example.ui.relocation.RelocationModeScreen
 import com.example.ui.seller.HostListingsScreen
 import com.example.ui.settings.SettingsScreen
 import com.example.ui.splash.SplashScreen
+import com.example.ui.calculator.FinancialCalculatorScreen
 import com.example.ui.components.DorjaLogo
 import com.example.ui.i18n.L
 import com.example.ui.theme.DorjaColors
@@ -111,6 +112,7 @@ sealed class Screen(val route: String) {
         fun createRoute(listingId: String) = "compare/$listingId"
     }
     object CreateListing : Screen("create_listing")
+    object FinancialCalculator : Screen("financial_calculator")
     object ChatThread : Screen("chat_thread/{conversationId}") {
         fun createRoute(conversationId: String) = "chat_thread/$conversationId"
     }
@@ -225,6 +227,9 @@ fun DorjaNavHost() {
                 onNavigateToHandover = { listingId ->
                     navController.navigate(Screen.HandoverPassport.createRoute(listingId))
                 },
+                onNavigateToCalculator = {
+                    navController.navigate(Screen.FinancialCalculator.route)
+                },
                 onNavigateToRelocation = { origin, dest ->
                     navController.navigate(Screen.RelocationMode.createRoute(origin, dest))
                 },
@@ -263,6 +268,10 @@ fun DorjaNavHost() {
                     navController.popBackStack()
                 }
             )
+        }
+
+        composable(Screen.FinancialCalculator.route) {
+            FinancialCalculatorScreen(onBack = { navController.popBackStack() })
         }
 
         composable(
@@ -375,6 +384,7 @@ fun MainContainer(
     onNavigateToChatThread: (String) -> Unit,
     onNavigateToPass: (String) -> Unit,
     onNavigateToHandover: (String) -> Unit,
+    onNavigateToCalculator: () -> Unit = {},
     onNavigateToRelocation: (String, String) -> Unit = { _, _ -> },
     /** Sign out; the flag opens the auth screen directly in sign-up mode. */
     onLogout: (startInSignUp: Boolean) -> Unit = {},
@@ -569,7 +579,8 @@ fun MainContainer(
                             HostTab.INBOX -> InboxScreen(onOpenConversation = onNavigateToChatThread)
                             HostTab.ACCOUNT -> AccountScreen(
                                 onNavigateToSellerSuite = onNavigateToCreateListing,
-                                onNavigateToRelocation = onNavigateToRelocation
+                                onNavigateToRelocation = onNavigateToRelocation,
+                                onNavigateToCalculator = onNavigateToCalculator
                             )
                             HostTab.SETTINGS -> SettingsScreen(onLoggedOut = onLogout)
                         }
@@ -582,7 +593,8 @@ fun MainContainer(
                             BuyerTab.INBOX -> InboxScreen(onOpenConversation = onNavigateToChatThread)
                             BuyerTab.ACCOUNT -> AccountScreen(
                                 onNavigateToSellerSuite = onNavigateToCreateListing,
-                                onNavigateToRelocation = onNavigateToRelocation
+                                onNavigateToRelocation = onNavigateToRelocation,
+                                onNavigateToCalculator = onNavigateToCalculator
                             )
                             BuyerTab.SETTINGS -> SettingsScreen(onLoggedOut = onLogout)
                         }

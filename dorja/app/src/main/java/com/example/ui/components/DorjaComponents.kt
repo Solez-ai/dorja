@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalCupertinoApi::class)
+
 package com.example.ui.components
 
 import androidx.compose.animation.animateColorAsState
@@ -48,6 +50,9 @@ import com.example.ui.theme.LiquidGlassDefaults
 import com.example.ui.theme.liquidGlass
 import com.example.ui.theme.pressScale
 import com.example.ui.util.Formatters
+import com.slapps.cupertino.CupertinoButton
+import com.slapps.cupertino.CupertinoButtonDefaults
+import com.slapps.cupertino.ExperimentalCupertinoApi
 
 @Composable
 fun BentoCard(
@@ -210,42 +215,34 @@ fun DorjaButton(
     testTag: String? = null
 ) {
     val finalModifier = if (testTag != null) modifier.testTag(testTag) else modifier
-    Button(
+    // iOS: real CupertinoButton (filled, .borderedProminent style) with native
+    // press-dim physics and iOS disabled states.
+    CupertinoButton(
         onClick = onClick,
+        modifier = finalModifier.heightIn(min = 44.dp),
         enabled = enabled,
-        modifier = finalModifier
-            .heightIn(min = 44.dp)
-            .pressScale(),
-        shape = RoundedCornerShape(12.dp),
-        colors = ButtonDefaults.buttonColors(
-            containerColor = containerColor,
+        colors = CupertinoButtonDefaults.filledButtonColors(
             contentColor = contentColor,
-            disabledContainerColor = containerColor.copy(alpha = 0.4f),
-            disabledContentColor = contentColor.copy(alpha = 0.6f)
-        )
+            containerColor = containerColor
+        ),
+        shape = RoundedCornerShape(12.dp)
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center
-        ) {
-            if (icon != null) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-            }
-            Text(
-                text = text,
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.SemiBold,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                lineHeight = 16.sp,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+        if (icon != null) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp)
             )
         }
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            lineHeight = 16.sp,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+        )
     }
 }
 
@@ -312,40 +309,32 @@ fun DorjaOutlinedButton(
     testTag: String? = null
 ) {
     val finalModifier = if (testTag != null) modifier.testTag(testTag) else modifier
-    OutlinedButton(
+    // iOS: CupertinoButton in the plain/bordered style — transparent fill,
+    // tinted label, native press alpha.
+    CupertinoButton(
         onClick = onClick,
+        modifier = finalModifier.heightIn(min = 44.dp),
         enabled = enabled,
-        modifier = finalModifier
-            .heightIn(min = 44.dp)
-            .pressScale(),
-        shape = RoundedCornerShape(12.dp),
+        colors = CupertinoButtonDefaults.plainButtonColors(contentColor = contentColor),
         border = BorderStroke(1.dp, if (enabled) borderColor else borderColor.copy(alpha = 0.4f)),
-        colors = ButtonDefaults.outlinedButtonColors(
-            contentColor = contentColor
-        )
+        shape = RoundedCornerShape(12.dp)
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Center
-        ) {
-            if (icon != null) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-            }
-            Text(
-                text = text,
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.Medium,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                lineHeight = 16.sp,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+        if (icon != null) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp)
             )
         }
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.Medium,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            lineHeight = 16.sp,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center
+        )
     }
 }
 

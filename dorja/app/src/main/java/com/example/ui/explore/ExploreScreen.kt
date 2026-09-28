@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalCupertinoApi::class)
+
 package com.example.ui.explore
 
 import androidx.compose.foundation.BorderStroke
@@ -78,6 +80,8 @@ import com.example.ui.components.BentoMetricTile
 import com.example.ui.components.DorjaBadge
 import com.example.ui.components.DorjaButton
 import com.example.ui.components.DorjaChip
+import com.slapps.cupertino.CupertinoSearchTextField
+import com.slapps.cupertino.ExperimentalCupertinoApi
 import com.example.ui.components.DorjaOutlinedButton
 import com.example.ui.i18n.L
 import com.example.ui.i18n.Lf
@@ -247,40 +251,16 @@ fun ExploreScreen(
                 .background(DorjaColors.CanvasBg)
                 .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 8.dp)
         ) {
-            // Search Box Bento Input
-            OutlinedTextField(
+            // iOS search field: CupertinoSearchTextField with native magnifier
+            // icon, clear (x) button and iOS fill/border styling.
+            CupertinoSearchTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
-                placeholder = { Text(L("explore_search_city")) },
-                leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Default.Search,
-                        contentDescription = L("common_search"),
-                        tint = DorjaColors.BentoBlueIcon
-                    )
-                },
-                trailingIcon = {
-                    if (searchQuery.isNotBlank()) {
-                        IconButton(onClick = { searchQuery = "" }) {
-                            Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = L("explore_clear_search"),
-                                tint = DorjaColors.Gray500
-                            )
-                        }
-                    }
-                },
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag("explore_search_field"),
-                singleLine = true,
-                shape = RoundedCornerShape(14.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = DorjaColors.White,
-                    unfocusedContainerColor = DorjaColors.White,
-                    focusedBorderColor = DorjaColors.BentoBlueIcon,
-                    unfocusedBorderColor = DorjaColors.BentoCardBorder
-                )
+                cancelButton = null,
+                placeholder = { Text(L("explore_search_city"), color = DorjaColors.Gray500) }
             )
 
             Spacer(modifier = Modifier.height(10.dp))

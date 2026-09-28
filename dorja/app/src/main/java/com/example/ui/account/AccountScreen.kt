@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DataUsage
 import androidx.compose.material.icons.filled.DeleteForever
+import androidx.compose.material.icons.filled.Calculate
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.FactCheck
@@ -71,6 +72,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.DorjaApp
@@ -104,7 +106,8 @@ import com.example.ui.components.DorjaLogo
 @Composable
 fun AccountScreen(
     onNavigateToSellerSuite: () -> Unit = {},
-    onNavigateToRelocation: (origin: String, destination: String) -> Unit = { _, _ -> }
+    onNavigateToRelocation: (origin: String, destination: String) -> Unit = { _, _ -> },
+    onNavigateToCalculator: () -> Unit = {}
 ) {
     val repository = DorjaApp.instance.repository
     val scope = rememberCoroutineScope()
@@ -889,6 +892,51 @@ fun AccountScreen(
                             style = MaterialTheme.typography.labelSmall,
                             color = DorjaColors.Gray500
                         )
+                    }
+                }
+            }
+
+            // Built-in country-aware financial calculator
+            item {
+                BentoCard(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = onNavigateToCalculator
+                ) {
+                    Row(
+                        modifier = Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(DorjaColors.BentoGreenBg),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Calculate,
+                                contentDescription = null,
+                                tint = DorjaColors.BentoGreenIcon,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = L("calc_title"),
+                                style = MaterialTheme.typography.titleSmall,
+                                color = DorjaColors.Ink950,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = L("calc_estimates_note"),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = DorjaColors.Gray700,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        ForwardChevron(tint = DorjaColors.Gray500)
                     }
                 }
             }

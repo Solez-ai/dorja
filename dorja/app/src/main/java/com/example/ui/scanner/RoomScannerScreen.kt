@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalCupertinoApi::class)
+
 package com.example.ui.scanner
 
 import android.Manifest
@@ -127,6 +129,8 @@ import kotlin.math.cos
 import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlin.math.tan
+import com.slapps.cupertino.CupertinoSlider
+import com.slapps.cupertino.ExperimentalCupertinoApi
 
 private enum class Phase { SELECT, PREVIEW, CAPTURING, DONE }
 
@@ -1038,7 +1042,7 @@ private fun TuningSlider(
 ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(label, color = DorjaColors.Gray600, fontSize = 11.sp, modifier = Modifier.width(84.dp))
-        Slider(
+        CupertinoSlider(
             value = value,
             onValueChange = onChange,
             valueRange = min..max,
