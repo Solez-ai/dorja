@@ -130,7 +130,7 @@ fun CountrySettingsSheet(
                         displayName = profile.displayName,
                         iso2 = profile.iso2,
                         subtitle = "${profile.currencyCode} (${profile.currencySymbol})  •  ${identity.shortName}  •  $languageName" +
-                            if (signature != null) "\n★ ${signature.title}" else "",
+                            if (signature != null) "\n" + signature.title else "",
                         isSelected = isSelected,
                         onClick = { onCountrySelected(profile.iso2) }
                     )

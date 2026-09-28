@@ -7,23 +7,42 @@ import android.content.Intent
 import android.graphics.Paint
 import android.graphics.Typeface
 import android.graphics.pdf.PdfDocument
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Flag
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Login
+import androidx.compose.material.icons.filled.Logout
+import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
@@ -39,12 +58,17 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
 import com.example.DorjaApp
 import com.example.data.model.HistoryEvent
@@ -64,8 +88,7 @@ import java.util.Date
 import java.util.Locale
 
 // ────────────────────────────────────────────────────────────────────
-// Timeline grouping: newest first, grouped by day under year headers —
-// the "2026 / 28 NOV" rhythm.
+// Timeline grouping: newest first, grouped by day under year headers.
 // ────────────────────────────────────────────────────────────────────
 private data class DayGroup(
     val dayHeader: String,
@@ -111,6 +134,18 @@ private fun groupEvents(events: List<HistoryEvent>): List<DayGroup> {
     return groups
 }
 
+private fun typeIcon(type: String): ImageVector = when (type) {
+    HistoryEventTypes.VIEWING_PASS_ISSUED -> Icons.Default.Login
+    HistoryEventTypes.VIEWING_CHECKED_IN -> Icons.Default.Login
+    HistoryEventTypes.VIEWING_CHECKED_OUT -> Icons.Default.Logout
+    HistoryEventTypes.DOCUMENT_ADDED -> Icons.Default.Description
+    HistoryEventTypes.SELLER_CLAIM -> Icons.Default.RecordVoiceOver
+    HistoryEventTypes.LISTING_CREATED -> Icons.Default.Home
+    HistoryEventTypes.STATEMENT_LOCKED -> Icons.Default.Lock
+    HistoryEventTypes.CONTRADICTION_REPORTED -> Icons.Default.Flag
+    else -> Icons.Default.CheckCircle
+}
+
 @Composable
 fun HistoryScreen(onBack: () -> Unit) {
     val context = LocalContext.current
@@ -146,6 +181,7 @@ fun HistoryScreen(onBack: () -> Unit) {
     val sNotRegistry = L("history_not_registry")
     val sUnknown = L("history_unknown_place")
     val sRecordedBy = L("history_recorded_by_you")
+    val sFullRecord = L("history_open_full_record")
 
     Column(
         modifier = Modifier
@@ -228,39 +264,54 @@ fun HistoryScreen(onBack: () -> Unit) {
             val groups = remember(events) { groupEvents(events) }
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(
-                    start = 16.dp, end = 16.dp, top = 4.dp, bottom = 32.dp
-                ),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 32.dp),
+                verticalArrangement = Arrangement.spacedBy(0.dp)
             ) {
                 item {
                     Text(
                         text = sIntro,
                         style = MaterialTheme.typography.bodySmall,
-                        color = DorjaColors.Gray700
+                        color = DorjaColors.Gray700,
+                        modifier = Modifier.padding(bottom = 14.dp)
                     )
                 }
                 groups.forEach { group ->
                     item(key = "header_" + group.dayHeader + "_" + group.events.first().id) {
-                        Column {
-                            Text(
-                                text = group.year,
-                                style = MaterialTheme.typography.titleLarge,
-                                color = DorjaColors.Ink950,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = group.dayHeader,
-                                style = MaterialTheme.typography.labelMedium,
-                                color = DorjaColors.Gray500,
-                                fontFamily = DorjaFontFamily,
-                                fontWeight = FontWeight.Bold
-                            )
+                        // Day marker sits ON the timeline spine.
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(IntrinsicSize.Min)
+                                .padding(top = 14.dp)
+                        ) {
+                            TimelineSpine(isFirst = true, nodeContent = {
+                                Box(
+                                    modifier = Modifier
+                                        .size(12.dp)
+                                        .clip(CircleShape)
+                                        .background(DorjaColors.Jol600)
+                                )
+                            }) {
+                                Text(
+                                    text = group.year + "  ·  " + group.dayHeader,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = DorjaColors.Gray600,
+                                    fontFamily = DorjaFontFamily,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
                         }
                     }
-                    group.events.forEach { event ->
+                    group.events.forEachIndexed { index, event ->
                         item(key = event.id) {
-                            HistoryEventCard(event = event, onClick = { selected = event })
+                            TimelineEventItem(
+                                event = event,
+                                isLast = index == group.events.lastIndex,
+                                lockedLabel = sLocked,
+                                fullRecordLabel = sFullRecord,
+                                unknownPlace = sUnknown,
+                                onOpenRecord = { selected = event }
+                            )
                         }
                     }
                 }
@@ -268,7 +319,8 @@ fun HistoryScreen(onBack: () -> Unit) {
                     Text(
                         text = sNotRegistry,
                         style = MaterialTheme.typography.labelSmall,
-                        color = DorjaColors.Gray500
+                        color = DorjaColors.Gray500,
+                        modifier = Modifier.padding(top = 18.dp)
                     )
                 }
             }
@@ -444,17 +496,128 @@ fun HistoryScreen(onBack: () -> Unit) {
     }
 }
 
+// ────────────────────────────────────────────────────────────────────
+// Timeline primitives
+// ────────────────────────────────────────────────────────────────────
+
+/**
+ * One row on the vertical spine: a continuous 2dp line with a node slot in
+ * the middle. [content] renders to the right of the spine. The line runs
+ * the full height of the row so consecutive items connect seamlessly.
+ */
 @Composable
-private fun HistoryEventCard(event: HistoryEvent, onClick: () -> Unit) {
-    Surface(
+private fun TimelineSpine(
+    isFirst: Boolean,
+    isLast: Boolean = false,
+    lineColor: Color = DorjaColors.BentoCardBorder,
+    nodeContent: @Composable () -> Unit,
+    content: @Composable () -> Unit
+) {
+    Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(12.dp),
-        color = DorjaColors.White,
-        border = BorderStroke(0.5.dp, DorjaColors.BentoCardBorder)
+            .height(IntrinsicSize.Min)
     ) {
-        Column(modifier = Modifier.padding(14.dp)) {
+        // Spine column: top segment / node / bottom segment
+        Column(
+            modifier = Modifier
+                .width(36.dp)
+                .fillMaxHeight(),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Box(
+                modifier = Modifier
+                    .width(2.dp)
+                    .weight(1f)
+                    .background(if (isFirst) Color.Transparent else lineColor)
+            )
+            Box(contentAlignment = Alignment.Center) { nodeContent() }
+            Box(
+                modifier = Modifier
+                    .width(2.dp)
+                    .weight(1f)
+                    .background(if (isLast) Color.Transparent else lineColor)
+            )
+        }
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .padding(vertical = 6.dp)
+        ) {
+            content()
+        }
+    }
+}
+
+/**
+ * Expandable timeline event: type-colored node with icon on the spine,
+ * time + title card to the right. Tapping expands the captured-details
+ * preview in place; "Full record" opens the Evidence Record sheet.
+ */
+@Composable
+private fun TimelineEventItem(
+    event: HistoryEvent,
+    isLast: Boolean,
+    lockedLabel: String,
+    fullRecordLabel: String,
+    unknownPlace: String,
+    onOpenRecord: () -> Unit
+) {
+    val haptics = LocalHapticFeedback.current
+    var expanded by remember(event.id) { mutableStateOf(false) }
+    val isContradiction = event.type == HistoryEventTypes.CONTRADICTION_REPORTED
+
+    val nodeBg = when {
+        event.locked -> DorjaColors.BentoGreenBg
+        isContradiction -> DorjaColors.BentoAmberBg
+        else -> DorjaColors.Jol100
+    }
+    val nodeTint = when {
+        event.locked -> DorjaColors.BentoGreenIcon
+        isContradiction -> DorjaColors.BentoAmberIcon
+        else -> DorjaColors.Jol600
+    }
+
+    TimelineSpine(
+        isFirst = false,
+        isLast = isLast,
+        nodeContent = {
+            Box(
+                modifier = Modifier
+                    .size(34.dp)
+                    .clip(CircleShape)
+                    .background(nodeBg)
+                    .then(
+                        if (event.locked) {
+                            Modifier.border(
+                                BorderStroke(2.dp, DorjaColors.BentoGreenIcon),
+                                CircleShape
+                            )
+                        } else Modifier
+                    ),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = typeIcon(event.type),
+                    contentDescription = typeLabel(event.type),
+                    tint = nodeTint,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+        }
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .animateContentSize()
+                .clip(RoundedCornerShape(12.dp))
+                .background(DorjaColors.White)
+                .clickable {
+                    haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    expanded = !expanded
+                }
+                .padding(12.dp)
+        ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = timeFormat.format(Date(event.occurredAt)),
@@ -466,28 +629,26 @@ private fun HistoryEventCard(event: HistoryEvent, onClick: () -> Unit) {
                 Spacer(modifier = Modifier.width(8.dp))
                 DorjaBadge(
                     text = typeLabel(event.type),
-                    backgroundColor = if (event.type == HistoryEventTypes.CONTRADICTION_REPORTED)
-                        DorjaColors.BentoAmberBg else DorjaColors.Jol100,
-                    contentColor = if (event.type == HistoryEventTypes.CONTRADICTION_REPORTED)
-                        DorjaColors.BentoAmberText else DorjaColors.Jol700
+                    backgroundColor = if (isContradiction) DorjaColors.BentoAmberBg
+                    else DorjaColors.Jol100,
+                    contentColor = if (isContradiction) DorjaColors.BentoAmberText
+                    else DorjaColors.Jol700
                 )
                 Spacer(modifier = Modifier.weight(1f))
-                if (event.locked) {
-                    Text(
-                        text = event.integrityHash,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = DorjaColors.BentoGreenText,
-                        fontFamily = DorjaFontFamily
-                    )
-                }
+                Icon(
+                    imageVector = if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = null,
+                    tint = DorjaColors.Gray500,
+                    modifier = Modifier.size(16.dp)
+                )
             }
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(5.dp))
             Text(
                 text = event.title,
                 style = MaterialTheme.typography.titleSmall,
                 color = DorjaColors.Ink950,
                 fontWeight = FontWeight.Bold,
-                maxLines = 2,
+                maxLines = if (expanded) Int.MAX_VALUE else 2,
                 overflow = TextOverflow.Ellipsis
             )
             if (event.place.isNotBlank()) {
@@ -499,6 +660,49 @@ private fun HistoryEventCard(event: HistoryEvent, onClick: () -> Unit) {
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
+            }
+
+            // Expanded inline preview — the quick facts without opening the sheet
+            if (expanded) {
+                Spacer(modifier = Modifier.height(8.dp))
+                val summary = parseDetailSummary(event.detailJson)
+                if (summary.isNotBlank()) {
+                    Text(
+                        text = summary,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = DorjaColors.Gray700,
+                        fontFamily = DorjaFontFamily
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (event.locked) {
+                        Icon(
+                            Icons.Default.Lock,
+                            contentDescription = null,
+                            tint = DorjaColors.BentoGreenIcon,
+                            modifier = Modifier.size(12.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = lockedLabel + "  " + event.integrityHash,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = DorjaColors.BentoGreenText,
+                            fontFamily = DorjaFontFamily
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                    }
+                    Text(
+                        text = fullRecordLabel,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = DorjaColors.Jol600,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable(onClick = onOpenRecord)
+                            .padding(4.dp)
+                    )
+                }
             }
         }
     }
@@ -624,8 +828,8 @@ private object HistoryPdfGenerator {
             for (event in sorted) {
                 if (y > pageHeight - 90f) newPage()
                 val dateLine = fullFormat.format(Date(event.occurredAt)) +
-                        "  ·  " + typeLabel(event.type) +
-                        (if (event.locked) "  ·  LOCKED " + event.integrityHash else "")
+                        "  -  " + typeLabel(event.type) +
+                        (if (event.locked) "  -  LOCKED " + event.integrityHash else "")
                 canvas.drawText(dateLine, margin, y, subPaint)
                 y += 14f
                 canvas.drawText(event.title, margin, y, bodyPaint)

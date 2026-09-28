@@ -497,6 +497,7 @@ data class DorjaStrings(
             "history_not_registry" to "DORJA-generated record. Not a government registry or legal certification.",
             "history_unknown_place" to "Not recorded",
             "history_recorded_by_you" to "You (this device)",
+            "history_open_full_record" to "Full record",
             // Direct-to-agent lead forms
             "lead_call" to "Call",
             "lead_email" to "Email",

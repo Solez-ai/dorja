@@ -1284,7 +1284,8 @@ fun CreateListingScreen(
                     }
 
                     DorjaOutlinedButton(
-                        text = if (locationLoading) "Getting Location..." else if (lastFetchedLocation.isNotBlank()) "📍 $lastFetchedLocation" else "Use My Current Location",
+                        text = if (locationLoading) "Getting Location..." else if (lastFetchedLocation.isNotBlank()) lastFetchedLocation else "Use My Current Location",
+                        icon = if (lastFetchedLocation.isNotBlank() || !locationLoading) Icons.Default.LocationOn else null,
                         onClick = {
                             if (hasLocationPermission) {
                                 locationLoading = true
