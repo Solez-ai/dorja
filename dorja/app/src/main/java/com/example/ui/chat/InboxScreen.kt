@@ -51,6 +51,7 @@ import com.example.ui.components.DorjaLogo
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 
 @Composable
@@ -158,13 +159,25 @@ fun InboxScreen(
                     // Resolve other party from DB
                     val otherId = if (userId == conv.hostUserId) conv.seekerUserId else conv.hostUserId
                     var otherName by remember(conv.id) { mutableStateOf("") }
-                    var otherRole by remember(conv.id) { mutableStateOf("") }
+                    var listingTitle by remember(conv.id) { mutableStateOf("") }
                     LaunchedEffect(conv.id) {
                         withContext(Dispatchers.IO) {
                             val otherUser = DorjaApp.instance.repository.getUserById(otherId)
+                            val listing = DorjaApp.instance.repository.getListingById(conv.listingId)
                             withContext(Dispatchers.Main) {
                                 otherName = otherUser?.displayName?.ifBlank { otherUser.username } ?: otherId
-                                otherRole = otherUser?.role ?: ""
+                                listingTitle = listing?.title ?: ""
+                            }
+                        }
+                    }
+                    // Unread: the newest message came from the other party.
+                    var isUnread by remember(conv.id) { mutableStateOf(false) }
+                    LaunchedEffect(conv.id) {
+                        withContext(Dispatchers.IO) {
+                            val msgs = DorjaApp.instance.repository
+                                .getMessagesByConversation(conv.id).first()
+                            withContext(Dispatchers.Main) {
+                                isUnread = msgs.isNotEmpty() && msgs.last().senderUserId != userId
                             }
                         }
                     }
@@ -179,7 +192,18 @@ fun InboxScreen(
                             modifier = Modifier.padding(14.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            DorjaAvatar(name = otherName.ifBlank { otherId }, size = 44.dp)
+                            Box {
+                                DorjaAvatar(name = otherName.ifBlank { otherId }, size = 44.dp)
+                                if (isUnread) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(10.dp)
+                                            .align(Alignment.TopEnd)
+                                            .clip(CircleShape)
+                                            .background(DorjaColors.Jol600)
+                                    )
+                                }
+                            }
                             Spacer(modifier = Modifier.width(12.dp))
                             Column(modifier = Modifier.weight(1f)) {
                                 Row(
@@ -191,34 +215,33 @@ fun InboxScreen(
                                         text = otherName.ifBlank { otherId },
                                         style = MaterialTheme.typography.titleSmall,
                                         color = DorjaColors.Ink950,
-                                        fontWeight = FontWeight.Bold
+                                        fontWeight = if (isUnread) FontWeight.Bold else FontWeight.SemiBold,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.weight(1f, fill = false)
                                     )
+                                    Spacer(modifier = Modifier.width(8.dp))
                                     Text(
                                         text = Formatters.formatTimeOnly(conv.lastMessageAt ?: conv.createdAt),
                                         style = MaterialTheme.typography.labelSmall,
-                                        color = DorjaColors.Gray500
+                                        color = if (isUnread) DorjaColors.Jol600 else DorjaColors.Gray500,
+                                        fontWeight = if (isUnread) FontWeight.Bold else FontWeight.Medium
                                     )
                                 }
                                 Spacer(modifier = Modifier.height(2.dp))
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    DorjaBadge(
-                                        text = otherRole.ifBlank { "USER" },
-                                        backgroundColor = DorjaColors.Sand100,
-                                        textColor = DorjaColors.Ink950
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
-                                        text = "Listing #${conv.listingId}",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = DorjaColors.Gray500,
-                                        fontFamily = DorjaFontFamily
-                                    )
-                                }
-                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = if (listingTitle.isNotBlank()) "Re: $listingTitle" else "Listing #${conv.listingId}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = DorjaColors.Gray500,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Spacer(modifier = Modifier.height(3.dp))
                                 Text(
                                     text = conv.lastMessageText,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = DorjaColors.Gray700,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = if (isUnread) DorjaColors.Ink950 else DorjaColors.Gray700,
+                                    fontWeight = if (isUnread) FontWeight.SemiBold else FontWeight.Normal,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )

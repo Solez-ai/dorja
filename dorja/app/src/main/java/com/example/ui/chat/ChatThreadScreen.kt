@@ -10,12 +10,15 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -26,8 +29,6 @@ import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -41,6 +42,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -50,12 +53,16 @@ import com.example.DorjaApp
 import com.example.data.model.Message
 import com.example.ui.components.DorjaAvatar
 import com.example.ui.components.DorjaBadge
-import com.example.ui.theme.DorjaFontFamily
 import com.example.ui.theme.DorjaColors
+import com.example.ui.theme.DorjaFontFamily
 import com.example.ui.util.Formatters
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+
+private val dayKeyFormat = SimpleDateFormat("yyyyMMdd", Locale.getDefault())
+private val dayHeaderFormat = SimpleDateFormat("d MMM yyyy", Locale.getDefault())
 
 @Composable
 fun ChatThreadScreen(
@@ -67,19 +74,20 @@ fun ChatThreadScreen(
     val currentUser by repository.currentUser.collectAsState()
     val userId = currentUser?.id ?: ""
 
-    val messages by repository.getMessagesByConversation(conversationId).collectAsState(initial = emptyList())
+    val messages by repository.getMessagesByConversation(conversationId)
+        .collectAsState(initial = emptyList())
     var inputText by remember { mutableStateOf("") }
 
     var otherPartyName by remember { mutableStateOf("") }
     var otherPartyPhone by remember { mutableStateOf("") }
     var otherPartyId by remember { mutableStateOf("") }
     LaunchedEffect(conversationId) {
-        withContext(Dispatchers.IO) {
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             val conv = DorjaApp.instance.repository.getConversationById(conversationId)
             if (conv != null) {
                 otherPartyId = if (userId == conv.hostUserId) conv.seekerUserId else conv.hostUserId
                 val otherUser = DorjaApp.instance.repository.getUserById(otherPartyId)
-                withContext(Dispatchers.Main) {
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
                     otherPartyName = otherUser?.displayName?.ifBlank { otherUser.username } ?: otherPartyId
                     otherPartyPhone = otherUser?.phone ?: ""
                 }
@@ -87,23 +95,33 @@ fun ChatThreadScreen(
         }
     }
 
+    // iOS chat behavior: newest message visible when opening the thread.
+    val listState = rememberLazyListState()
+    LaunchedEffect(messages.size) {
+        if (messages.isNotEmpty()) {
+            listState.animateScrollToItem(messages.size - 1)
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(DorjaColors.Paper50)
+            .background(DorjaColors.CanvasBg)
             .testTag("chat_thread_screen")
     ) {
-        // Top Bar
+        // ── Top bar: iOS plain, hairline separator, centered identity ──
         Surface(
             modifier = Modifier.fillMaxWidth(),
             color = DorjaColors.White,
-            shadowElevation = 2.dp,
-            border = androidx.compose.foundation.BorderStroke(1.dp, DorjaColors.Sand300)
+            border = androidx.compose.foundation.BorderStroke(
+                width = 0.5.dp,
+                color = DorjaColors.BentoCardBorder
+            )
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 44.dp, start = 16.dp, end = 16.dp, bottom = 12.dp),
+                    .padding(top = 44.dp, start = 8.dp, end = 16.dp, bottom = 10.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(
@@ -111,99 +129,124 @@ fun ChatThreadScreen(
                     modifier = Modifier
                         .size(40.dp)
                         .clip(CircleShape)
-                        .background(DorjaColors.Paper50)
                         .testTag("chat_back_button")
                 ) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "Back",
-                        tint = DorjaColors.Ink950
+                        tint = DorjaColors.Jol600
                     )
                 }
-                Spacer(modifier = Modifier.width(12.dp))
-                DorjaAvatar(name = otherPartyName, size = 38.dp)
-                Spacer(modifier = Modifier.width(10.dp))
-                Column(modifier = Modifier.weight(1f)) {
+                Spacer(modifier = Modifier.width(6.dp))
+                Column(
+                    modifier = Modifier.weight(1f),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    DorjaAvatar(name = otherPartyName, size = 40.dp)
+                    Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = otherPartyName,
-                        style = MaterialTheme.typography.titleMedium,
+                        style = MaterialTheme.typography.titleSmall,
                         color = DorjaColors.Ink950,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1
                     )
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
                             imageVector = Icons.Default.Lock,
                             contentDescription = null,
-                            tint = DorjaColors.Jol600,
-                            modifier = Modifier.size(12.dp)
+                            tint = DorjaColors.Gray500,
+                            modifier = Modifier.size(10.dp)
                         )
-                        Spacer(modifier = Modifier.width(4.dp))
+                        Spacer(modifier = Modifier.width(3.dp))
                         Text(
-                            text = "$otherPartyPhone (Encrypted)",
+                            text = "SAFE CHANNEL",
                             style = MaterialTheme.typography.labelSmall,
                             color = DorjaColors.Gray500,
-                            fontFamily = DorjaFontFamily,
-                            fontSize = 11.sp
+                            fontSize = 9.sp,
+                            fontFamily = DorjaFontFamily
                         )
                     }
                 }
                 DorjaBadge(
-                    text = "SAFE CHANNEL",
+                    text = otherPartyPhone,
                     backgroundColor = DorjaColors.Teal100,
                     textColor = DorjaColors.Teal900
                 )
             }
         }
 
-        // Messages List
+        // ── Messages: day dividers + aligned bubbles, auto-scrolled ──
         LazyColumn(
+            state = listState,
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth(),
-            contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            items(messages, key = { it.id }) { msg ->
+            var lastDayKey = ""
+            messages.forEach { msg ->
+                val dayKey = dayKeyFormat.format(Date(msg.createdAt))
+                if (dayKey != lastDayKey) {
+                    lastDayKey = dayKey
+                    item(key = "day_$dayKey") {
+                        DayDivider(label = dayHeaderFormat.format(Date(msg.createdAt)))
+                    }
+                }
                 if (msg.kind == "SYSTEM") {
-                    SystemMessageBubble(message = msg)
+                    item(key = msg.id) {
+                        SystemMessageBubble(message = msg)
+                    }
                 } else {
                     val isMe = msg.senderUserId == userId
-                    UserMessageBubble(message = msg, isMe = isMe)
+                    item(key = msg.id) {
+                        MessageBubble(message = msg, isMe = isMe)
+                    }
                 }
             }
         }
 
-        // Bottom Input Row
+        // ── Composer: frosted pill field + filled circular send button ──
         Surface(
             modifier = Modifier.fillMaxWidth(),
             color = DorjaColors.White,
-            border = androidx.compose.foundation.BorderStroke(1.dp, DorjaColors.Sand300)
+            border = androidx.compose.foundation.BorderStroke(
+                width = 0.5.dp,
+                color = DorjaColors.BentoCardBorder
+            )
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(12.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .navigationBarsPadding()
+                    .imePadding()
+                    .padding(horizontal = 10.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.Bottom
             ) {
                 OutlinedTextField(
                     value = inputText,
                     onValueChange = { inputText = it },
-                    placeholder = { Text("Type an encrypted message...", color = DorjaColors.Gray500) },
+                    placeholder = {
+                        Text("Message", color = DorjaColors.Gray500)
+                    },
                     modifier = Modifier
                         .weight(1f)
                         .testTag("chat_message_input"),
-                    shape = RoundedCornerShape(24.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
+                    shape = RoundedCornerShape(20.dp),
+                    maxLines = 4,
+                    colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
                         focusedContainerColor = DorjaColors.Paper50,
                         unfocusedContainerColor = DorjaColors.Paper50,
-                        focusedBorderColor = DorjaColors.Jol600,
-                        unfocusedBorderColor = DorjaColors.Sand300
+                        focusedBorderColor = DorjaColors.Jol600.copy(alpha = 0.5f),
+                        unfocusedBorderColor = Color.Transparent
                     )
                 )
                 Spacer(modifier = Modifier.width(8.dp))
+                val canSend = inputText.isNotBlank()
                 IconButton(
                     onClick = {
-                        if (inputText.isNotBlank()) {
+                        if (canSend) {
                             val textToSend = inputText
                             inputText = ""
                             scope.launch {
@@ -215,17 +258,21 @@ fun ChatThreadScreen(
                             }
                         }
                     },
+                    enabled = canSend,
                     modifier = Modifier
-                        .size(46.dp)
+                        .size(42.dp)
                         .clip(CircleShape)
-                        .background(DorjaColors.Jol600)
+                        .background(
+                            if (canSend) DorjaColors.Jol600
+                            else DorjaColors.Gray300
+                        )
                         .testTag("chat_send_button")
                 ) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.Send,
                         contentDescription = "Send",
-                        tint = DorjaColors.White,
-                        modifier = Modifier.size(20.dp)
+                        tint = if (canSend) DorjaColors.White else DorjaColors.Gray500,
+                        modifier = Modifier.size(18.dp)
                     )
                 }
             }
@@ -233,36 +280,76 @@ fun ChatThreadScreen(
     }
 }
 
+/** Centered date chip — "Today"-style separator between activity days. */
 @Composable
-private fun UserMessageBubble(message: Message, isMe: Boolean) {
+private fun DayDivider(label: String) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = DorjaColors.Gray500,
+            fontFamily = DorjaFontFamily,
+            modifier = Modifier
+                .clip(RoundedCornerShape(50))
+                .background(DorjaColors.Sand100)
+                .padding(horizontal = 10.dp, vertical = 3.dp)
+        )
+    }
+}
+
+/**
+ * iMessage-style bubble: filled accent for my messages, neutral card for
+ * theirs, asymmetric corner radius, inline timestamp, read marker.
+ */
+@Composable
+private fun MessageBubble(message: Message, isMe: Boolean) {
     Column(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = if (isMe) Alignment.End else Alignment.Start
     ) {
         Surface(
             shape = RoundedCornerShape(
-                topStart = 14.dp,
-                topEnd = 14.dp,
-                bottomStart = if (isMe) 14.dp else 2.dp,
-                bottomEnd = if (isMe) 2.dp else 14.dp
+                topStart = 18.dp,
+                topEnd = 18.dp,
+                bottomStart = if (isMe) 18.dp else 4.dp,
+                bottomEnd = if (isMe) 4.dp else 18.dp
             ),
             color = if (isMe) DorjaColors.Jol600 else DorjaColors.White,
-            border = if (isMe) null else androidx.compose.foundation.BorderStroke(1.dp, DorjaColors.Sand300),
-            modifier = Modifier.widthIn(max = 280.dp)
+            border = if (isMe) null
+            else androidx.compose.foundation.BorderStroke(0.5.dp, DorjaColors.BentoCardBorder),
+            shadowElevation = if (isMe) 0.dp else 1.dp,
+            modifier = Modifier.widthIn(max = 290.dp)
         ) {
-            Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
-                Text(
-                    text = message.body,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = if (isMe) DorjaColors.White else DorjaColors.Ink950
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = Formatters.formatTimeOnly(message.createdAt),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = if (isMe) DorjaColors.Teal100 else DorjaColors.Gray500,
-                    fontSize = 10.sp,
-                    modifier = Modifier.align(Alignment.End)
+            Text(
+                text = message.body,
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (isMe) DorjaColors.White else DorjaColors.Ink950,
+                modifier = Modifier.padding(horizontal = 13.dp, vertical = 9.dp)
+            )
+        }
+        Spacer(modifier = Modifier.height(2.dp))
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(horizontal = 4.dp)
+        ) {
+            Text(
+                text = Formatters.formatTimeOnly(message.createdAt),
+                style = MaterialTheme.typography.labelSmall,
+                color = DorjaColors.Gray500,
+                fontSize = 9.sp
+            )
+            if (isMe) {
+                Spacer(modifier = Modifier.width(3.dp))
+                Icon(
+                    imageVector = Icons.Default.Shield,
+                    contentDescription = null,
+                    tint = DorjaColors.BentoGreenIcon,
+                    modifier = Modifier.size(9.dp)
                 )
             }
         }
@@ -274,13 +361,12 @@ private fun SystemMessageBubble(message: Message) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp),
+            .padding(vertical = 6.dp),
         contentAlignment = Alignment.Center
     ) {
         Surface(
             shape = RoundedCornerShape(12.dp),
             color = DorjaColors.Ink950,
-            border = androidx.compose.foundation.BorderStroke(1.dp, DorjaColors.Jol600),
             modifier = Modifier.widthIn(max = 320.dp)
         ) {
             Row(
@@ -291,7 +377,7 @@ private fun SystemMessageBubble(message: Message) {
                     imageVector = Icons.Default.Shield,
                     contentDescription = null,
                     tint = DorjaColors.Jol600,
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.size(16.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(

@@ -456,6 +456,15 @@ object DorjaTranslationsPriority {
         "lead_email" to "ইমেইল",
         "lead_email_subject" to "জিজ্ঞাসা: %1\$s",
         "lead_email_body" to "হ্যালো, আমি DORJA-তে আপনার “%1\$s” লিস্টিং দেখে আগ্রহী। এটি কি এখনো available?",
+        "explore_match_count" to "%1\$dটি প্রপার্টি মেলে",
+        "filter_verified_only" to "যাচাইকৃত মালিক",
+        "filter_photos_only" to "ছবি আছে",
+        "filter_min_price" to "সর্বনিম্ন মূল্য",
+        "sort_newest" to "নতুন",
+        "sort_price_low" to "দাম ↑",
+        "sort_price_high" to "দাম ↓",
+        "sort_largest" to "বড়",
+        "sort_beds" to "বেড",
     )
 
     val HINDI: Map<String, String> = mapOf(
@@ -906,6 +915,15 @@ object DorjaTranslationsPriority {
         "lead_email" to "ईमेल",
         "lead_email_subject" to "पूछताछ: %1\$s",
         "lead_email_body" to "नमस्ते, मुझे DORJA पर आपकी लिस्टिंग “%1\$s” पसंद आई। क्या यह अभी भी उपलब्ध है?",
+        "explore_match_count" to "%1\$d प्रॉपर्टीज मेल खाती हैं",
+        "filter_verified_only" to "सत्यापित मालिक",
+        "filter_photos_only" to "फ़ोटो वाली",
+        "filter_min_price" to "न्यूनतम मूल्य",
+        "sort_newest" to "नवीनतम",
+        "sort_price_low" to "कीमत ↑",
+        "sort_price_high" to "कीमत ↓",
+        "sort_largest" to "सबसे बड़ी",
+        "sort_beds" to "बेड",
     )
 
     val URDU: Map<String, String> = mapOf(
@@ -1356,6 +1374,15 @@ object DorjaTranslationsPriority {
         "lead_email" to "ای میل",
         "lead_email_subject" to "پوچھ گچھ: %1\$s",
         "lead_email_body" to "ہیلو، میں نے DORJA پر آپ کی لسٹنگ “%1\$s” دیکھی اور دلچسپی رکھتا ہوں۔ کیا یہ ابھی دستیاب ہے؟",
+        "explore_match_count" to "%1\$d پراپرٹیز میچ ہوتی ہیں",
+        "filter_verified_only" to "تصدیق شدہ مالکان",
+        "filter_photos_only" to "تصاویر والی",
+        "filter_min_price" to "کم از کم قیمت",
+        "sort_newest" to "نئی",
+        "sort_price_low" to "قیمت ↑",
+        "sort_price_high" to "قیمت ↓",
+        "sort_largest" to "سب سے بڑی",
+        "sort_beds" to "بیڈ",
     )
 
     val ITALIAN: Map<String, String> = mapOf(
@@ -1806,5 +1833,14 @@ object DorjaTranslationsPriority {
         "lead_email" to "Email",
         "lead_email_subject" to "Richiesta: %1\$s",
         "lead_email_body" to "Salve, ho visto il tuo annuncio “%1\$s” su DORJA e sono interessato. È ancora disponibile?",
+        "explore_match_count" to "%1\$d immobili corrispondono",
+        "filter_verified_only" to "Proprietari verificati",
+        "filter_photos_only" to "Con foto",
+        "filter_min_price" to "Prezzo minimo",
+        "sort_newest" to "Più recenti",
+        "sort_price_low" to "Prezzo ↑",
+        "sort_price_high" to "Prezzo ↓",
+        "sort_largest" to "Più grandi",
+        "sort_beds" to "Camere",
     )
 }

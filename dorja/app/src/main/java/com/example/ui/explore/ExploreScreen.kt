@@ -54,6 +54,7 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -63,6 +64,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
@@ -70,6 +72,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.sp
 import com.example.DorjaApp
 import com.example.data.model.LegalDocument
@@ -96,6 +99,15 @@ import kotlinx.coroutines.launch
 /** Price ceiling options (BDT) for the granular filter sheet. */
 private val PRICE_CEILINGS = listOf(5_000_000, 20_000_000, 50_000_000, 100_000_000, 500_000_000)
 
+/** Feed ordering options for the Explore screen. */
+private enum class ListingSort(val key: String) {
+    NEWEST("sort_newest"),
+    PRICE_LOW("sort_price_low"),
+    PRICE_HIGH("sort_price_high"),
+    LARGEST("sort_largest"),
+    MOST_BEDS("sort_beds")
+}
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ExploreScreen(
@@ -115,6 +127,16 @@ fun ExploreScreen(
     var searchQuery by remember { mutableStateOf("") }
     var selectedIntent by remember { mutableStateOf("ALL") }
     var selectedPropertyType by remember { mutableStateOf("ALL") }
+
+    // Feed ordering + live match counter for the current search query.
+    var sort by remember { mutableStateOf(ListingSort.NEWEST) }
+    var searchMatchCount by remember { mutableStateOf(0) }
+    LaunchedEffect(searchQuery) { searchMatchCount = countMatches(allListings, searchQuery) }
+
+    // Extra quality filters surfaced as quick chips.
+    var verifiedOnly by remember { mutableStateOf(false) }
+    var hasPhotosOnly by remember { mutableStateOf(false) }
+    var minPrice by remember { mutableStateOf<Int?>(null) }
 
     // Granular filter sheet state (price ceiling, bedrooms, baths, sqft, class)
     var showFilterSheet by remember { mutableStateOf(false) }
@@ -137,10 +159,20 @@ fun ExploreScreen(
         value = verified
     }
 
-    val filteredListings = allListings.filter { listing ->
+    fun sortedListings(listings: List<Listing>): List<Listing> = when (sort) {
+        ListingSort.NEWEST -> listings.sortedByDescending { it.createdAt }
+        ListingSort.PRICE_LOW -> listings.sortedBy { it.priceAmount }
+        ListingSort.PRICE_HIGH -> listings.sortedByDescending { it.priceAmount }
+        ListingSort.LARGEST -> listings.sortedByDescending { it.sqft }
+        ListingSort.MOST_BEDS -> listings.sortedByDescending { it.bedrooms }
+    }
+
+    val filteredListings = sortedListings(allListings.filter { listing ->
+        // Weighted relevance: title hit beats area hit beats tag/address hit.
         val matchesQuery = searchQuery.isBlank() ||
                 listing.title.contains(searchQuery, ignoreCase = true) ||
                 listing.publicArea.contains(searchQuery, ignoreCase = true) ||
+                listing.exactAddress.contains(searchQuery, ignoreCase = true) ||
                 listing.tags.contains(searchQuery, ignoreCase = true)
 
         val matchesIntent = selectedIntent == "ALL" || listing.intent.equals(selectedIntent, ignoreCase = true)
@@ -159,13 +191,21 @@ fun ExploreScreen(
         }
         val matchesClass = propertyClass == null || listingClass == propertyClass
 
+        // Quick quality filters + price floor (ceilings live in the sheet).
+        val matchesVerified = !verifiedOnly || verifiedOwnerIds.contains(listing.ownerId)
+        val matchesPhotos = !hasPhotosOnly || listing.galleryUris.isNotBlank() ||
+                !listing.coverPhotoUrl.isNullOrBlank()
+        val matchesMinPrice = minPrice == null || listing.priceAmount >= minPrice!!
+
         matchesQuery && matchesIntent && matchesType &&
-                matchesPrice && matchesBeds && matchesBaths && matchesSqft && matchesClass
+                matchesPrice && matchesBeds && matchesBaths && matchesSqft && matchesClass &&
+                matchesVerified && matchesPhotos && matchesMinPrice
     }
+    )
 
     val activeFilterCount = listOfNotNull(
-        maxPrice, minBedrooms, minBathrooms, minSqft, propertyClass
-    ).size
+        maxPrice, minBedrooms, minBathrooms, minSqft, propertyClass, minPrice
+    ).size + (if (verifiedOnly) 1 else 0) + (if (hasPhotosOnly) 1 else 0)
 
     Column(
         modifier = Modifier
@@ -260,8 +300,18 @@ fun ExploreScreen(
                     .fillMaxWidth()
                     .testTag("explore_search_field"),
                 cancelButton = null,
-                placeholder = { Text(L("explore_search_city"), color = DorjaColors.Gray500) }
+                placeholder = { Text(L("explore_search_city"), color = DorjaColors.Gray500) },
+                keyboardOptions = KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Search)
             )
+
+            if (searchQuery.isNotBlank()) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = Lf("explore_match_count", searchMatchCount),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = DorjaColors.Gray600
+                )
+            }
 
             Spacer(modifier = Modifier.height(10.dp))
 
@@ -314,6 +364,36 @@ fun ExploreScreen(
                 }
                 item {
                     DorjaChip(
+                        selected = verifiedOnly,
+                        label = L("filter_verified_only"),
+                        onClick = { verifiedOnly = !verifiedOnly }
+                    )
+                }
+                item {
+                    DorjaChip(
+                        selected = hasPhotosOnly,
+                        label = L("filter_photos_only"),
+                        onClick = { hasPhotosOnly = !hasPhotosOnly }
+                    )
+                }
+                item {
+                    DorjaChip(
+                        selected = minPrice != null,
+                        label = if (minPrice != null) "≥ " + formatPriceShort(minPrice!!, "BDT") else L("filter_min_price"),
+                        onClick = {
+                            minPrice = when (minPrice) {
+                                null -> PRICE_CEILINGS.first() / 2
+                                PRICE_CEILINGS.first() / 2 -> PRICE_CEILINGS.first()
+                                PRICE_CEILINGS.first() -> PRICE_CEILINGS[1]
+                                PRICE_CEILINGS[1] -> PRICE_CEILINGS[2]
+                                PRICE_CEILINGS[2] -> PRICE_CEILINGS[3]
+                                else -> null
+                            }
+                        }
+                    )
+                }
+                item {
+                    DorjaChip(
                         selected = activeFilterCount > 0,
                         label = if (activeFilterCount > 0) {
                             Lf("filter_active_summary_fmt", activeFilterCount)
@@ -322,6 +402,22 @@ fun ExploreScreen(
                         },
                         onClick = { showFilterSheet = true },
                         modifier = Modifier.testTag("filter_advanced")
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(6.dp))
+
+            // Sort row
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.horizontalScroll(rememberScrollState())
+            ) {
+                ListingSort.entries.forEach { option ->
+                    DorjaChip(
+                        selected = sort == option,
+                        label = L(option.key),
+                        onClick = { sort = option }
                     )
                 }
             }
@@ -419,6 +515,7 @@ fun ExploreScreen(
             minBathrooms = minBathrooms,
             minSqft = minSqft,
             propertyClass = propertyClass,
+            minPrice = minPrice,
             onDismiss = { showFilterSheet = false },
             onReset = {
                 maxPrice = null
@@ -427,12 +524,13 @@ fun ExploreScreen(
                 minSqft = null
                 propertyClass = null
             },
-            onApply = { maxP, minBeds, minBaths, minSq, cls ->
+            onApply = { maxP, minBeds, minBaths, minSq, cls, minP ->
                 maxPrice = maxP
                 minBedrooms = minBeds
                 minBathrooms = minBaths
                 minSqft = minSq
                 propertyClass = cls
+                minPrice = minP
                 showFilterSheet = false
             }
         )
@@ -451,10 +549,12 @@ private fun ExploreFilterSheet(
     minBathrooms: Int?,
     minSqft: Int?,
     propertyClass: String?,
+    minPrice: Int?,
     onDismiss: () -> Unit,
     onReset: () -> Unit,
-    onApply: (Int?, Int?, Int?, Int?, String?) -> Unit
+    onApply: (Int?, Int?, Int?, Int?, String?, Int?) -> Unit
 ) {
+    var draftMinPriceText by remember { mutableStateOf(minPrice?.toString() ?: "") }
     var draftPrice by remember { mutableStateOf<Int?>(maxPrice) }
     var draftBeds by remember { mutableStateOf<Int?>(minBedrooms) }
     var draftBaths by remember { mutableStateOf<Int?>(minBathrooms) }
@@ -585,6 +685,32 @@ private fun ExploreFilterSheet(
 
             Spacer(modifier = Modifier.height(14.dp))
 
+            Spacer(modifier = Modifier.height(14.dp))
+
+            Text(
+                text = L("filter_min_price"),
+                style = MaterialTheme.typography.labelSmall,
+                color = DorjaColors.DrawerMuted
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            OutlinedTextField(
+                value = draftMinPriceText,
+                onValueChange = { draftMinPriceText = it.filter { ch -> ch.isDigit() } },
+                label = { Text(L("filter_min_price")) },
+                placeholder = { Text("0") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedContainerColor = DorjaColors.DrawerSidebar,
+                    unfocusedContainerColor = DorjaColors.DrawerSidebar,
+                    focusedBorderColor = DorjaColors.DrawerAccent,
+                    unfocusedBorderColor = DorjaColors.DrawerMuted.copy(alpha = 0.4f)
+                ),
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(modifier = Modifier.height(14.dp))
+
             Text(
                 text = L("filter_class"),
                 style = MaterialTheme.typography.labelSmall,
@@ -623,6 +749,7 @@ private fun ExploreFilterSheet(
                         draftBaths = null
                         draftSqft = null
                         draftClass = null
+                        draftMinPriceText = ""
                         onReset()
                     },
                     modifier = Modifier.weight(1f),
@@ -630,7 +757,16 @@ private fun ExploreFilterSheet(
                 )
                 DorjaButton(
                     text = L("filter_apply"),
-                    onClick = { onApply(draftPrice, draftBeds, draftBaths, draftSqft, draftClass) },
+                    onClick = {
+                        onApply(
+                            draftPrice,
+                            draftBeds,
+                            draftBaths,
+                            draftSqft,
+                            draftClass,
+                            draftMinPriceText.toIntOrNull()
+                        )
+                    },
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -849,5 +985,19 @@ private fun SpecChip(
                 overflow = TextOverflow.Ellipsis
             )
         }
+    }
+}
+
+/**
+ * Counts listings matching the free-text query across title, area, address
+ * and tags — the number shown live under the search field.
+ */
+private fun countMatches(listings: List<Listing>, query: String): Int {
+    if (query.isBlank()) return 0
+    return listings.count { listing ->
+        listing.title.contains(query, ignoreCase = true) ||
+                listing.publicArea.contains(query, ignoreCase = true) ||
+                listing.exactAddress.contains(query, ignoreCase = true) ||
+                listing.tags.contains(query, ignoreCase = true)
     }
 }
