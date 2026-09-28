@@ -60,6 +60,7 @@ import androidx.compose.material.icons.filled.Balcony
 import androidx.compose.material.icons.filled.Bathtub
 import androidx.compose.material.icons.filled.Bed
 import androidx.compose.material.icons.filled.Flag
+import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Email
@@ -174,6 +175,8 @@ fun PropertyDetailScreen(
     onOpenScanner: (String) -> Unit = {},
     onChatWithSeller: (String, String, String) -> Unit,
     onViewHandoverPassport: (String) -> Unit,
+    /** Opens the full DORJA History timeline for the signed-in user. */
+    onOpenHistory: () -> Unit = {},
     /** Invoked when the AI sheet's "Go to Settings" asks for the Settings tab. */
     onOpenSettingsTab: () -> Unit = {},
     /** Buyer-only: opens the landscape split-screen comparison stage. */
@@ -190,6 +193,10 @@ fun PropertyDetailScreen(
     val endorsements by repository.observeEndorsementsForListing(listingId).collectAsState(initial = emptyList())
     val legalDocs by repository.getLegalDocumentsByListing(listingId).collectAsState(initial = emptyList())
     val promises by repository.getPromisesByListing(listingId).collectAsState(initial = emptyList())
+
+    // Property Journey: this listing's case-file events from DORJA History.
+    val journeyEvents by repository.observeHistoryForListing(listingId)
+        .collectAsState(initial = emptyList())
     val listingReports by repository.observeReportsForListing(listingId).collectAsState(initial = emptyList<Report>())
     val reportResponsesById = listingReports.associate { report ->
         report.id to repository.observeResponsesForReport(report.id).collectAsState(initial = emptyList<ReportResponse>()).value
@@ -1517,6 +1524,16 @@ fun PropertyDetailScreen(
                             }
                         }
                     }
+                }
+            }
+
+            // ── PROPERTY JOURNEY — this listing's case-file (DORJA History) ──
+            if (journeyEvents.isNotEmpty()) {
+                item {
+                    PropertyJourneyCard(
+                        events = journeyEvents,
+                        onViewAll = onOpenHistory
+                    )
                 }
             }
 
@@ -2870,6 +2887,114 @@ private fun LeadPill(
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.Bold,
                 color = content
+            )
+        }
+    }
+}
+
+/**
+ * Property Journey case-file (atlas §9): the chronological History events
+ * recorded for THIS listing — claims, documents, viewings, contradictions —
+ * with a link into the full DORJA History timeline.
+ */
+@Composable
+private fun PropertyJourneyCard(
+    events: List<com.example.data.model.HistoryEvent>,
+    onViewAll: () -> Unit
+) {
+    val sTitle = L("journey_title")
+    val sSubtitle = L("journey_subtitle")
+    val sViewAll = L("journey_view_all")
+    val sLocked = L("history_locked")
+    val fmt = remember { java.text.SimpleDateFormat("d MMM", java.util.Locale.getDefault()) }
+
+    Surface(
+        modifier = Modifier
+            .padding(horizontal = 20.dp)
+            .fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        color = DorjaColors.White,
+        border = BorderStroke(1.dp, DorjaColors.BentoCardBorder)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = sTitle,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = DorjaColors.Ink950
+                    )
+                    Text(
+                        text = sSubtitle,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = DorjaColors.Gray500
+                    )
+                }
+                Text(
+                    text = sViewAll,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = DorjaColors.Jol600,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable(onClick = onViewAll)
+                        .padding(4.dp)
+                )
+            }
+            Spacer(modifier = Modifier.height(10.dp))
+            events.sortedByDescending { it.occurredAt }.take(5).forEach { event ->
+                JourneyRow(event = event, lockedLabel = sLocked, fmt = fmt)
+                Spacer(modifier = Modifier.height(6.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun JourneyRow(
+    event: com.example.data.model.HistoryEvent,
+    lockedLabel: String,
+    fmt: java.text.SimpleDateFormat
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(30.dp)
+                .clip(CircleShape)
+                .background(DorjaColors.Jol100),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = when (event.type) {
+                    com.example.data.model.HistoryEventTypes.DOCUMENT_ADDED -> Icons.Default.Description
+                    com.example.data.model.HistoryEventTypes.SELLER_CLAIM -> Icons.Default.RecordVoiceOver
+                    com.example.data.model.HistoryEventTypes.CONTRADICTION_REPORTED -> Icons.Default.Flag
+                    else -> Icons.Default.Home
+                },
+                contentDescription = null,
+                tint = DorjaColors.Jol600,
+                modifier = Modifier.size(15.dp)
+            )
+        }
+        Spacer(modifier = Modifier.width(10.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = event.title,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = DorjaColors.Ink950,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = fmt.format(java.util.Date(event.occurredAt)) +
+                        (if (event.locked) "  ·  " + lockedLabel else ""),
+                style = MaterialTheme.typography.labelSmall,
+                color = if (event.locked) DorjaColors.BentoGreenText else DorjaColors.Gray500
             )
         }
     }

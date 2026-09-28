@@ -268,6 +268,7 @@ fun DorjaNavHost() {
                 },
                 onViewHandoverPassport = { id -> navController.navigate(Screen.HandoverPassport.createRoute(id)) },
                 onOpenCompare = { navController.navigate(Screen.Compare.createRoute(listingId)) },
+                onOpenHistory = { navController.navigate(Screen.History.route) },
                 onOpenSettingsTab = {
                     settingsTabRequest++
                     navController.popBackStack()
