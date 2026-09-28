@@ -86,8 +86,8 @@ dependencies {
   // implementation(libs.androidx.camera.core)
   // implementation(libs.androidx.camera.lifecycle)
     implementation("com.google.code.gson:gson:2.10.1")
-  // On-device AI: tool-calling assistant (Needle-class local model).
-  implementation("com.cactuscompute:cactus:1.4.1-beta")
+  // AI REMOVED FOR NOW — restore by uncommenting (see AI_FEATURES_RESTORE.md at repo root).
+  // implementation("com.cactuscompute:cactus:1.4.1-beta")
   // iOS-style Cupertino widgets (buttons, dialogs, switches, pickers).
   // schott12521 fork is the maintained lineage of alexzhirkevich/compose-cupertino
   // and is compiled against Compose Multiplatform 1.7.3 — same 1.7 line as our

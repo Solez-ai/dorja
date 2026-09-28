@@ -63,6 +63,7 @@ import com.example.ui.components.DorjaLogo
 import com.example.ui.components.DorjaOutlinedButton
 import com.example.ui.i18n.L
 import com.example.ui.i18n.Lf
+import com.example.ui.theme.DorjaFontFamily
 import com.example.ui.theme.DorjaColors
 import com.example.ui.util.Formatters
 import kotlinx.coroutines.launch
@@ -312,7 +313,7 @@ fun AdminScreen() {
                     text = L("admin_queue"),
                     style = MaterialTheme.typography.labelSmall,
                     color = DorjaColors.Gray500,
-                    fontFamily = FontFamily.Monospace,
+                    fontFamily = DorjaFontFamily,
                     fontWeight = FontWeight.Bold
                 )
             }
@@ -370,7 +371,7 @@ fun AdminScreen() {
                         text = L("admin_history"),
                         style = MaterialTheme.typography.labelSmall,
                         color = DorjaColors.Gray500,
-                        fontFamily = FontFamily.Monospace,
+                        fontFamily = DorjaFontFamily,
                         fontWeight = FontWeight.Bold
                     )
                 }
@@ -393,7 +394,7 @@ fun AdminScreen() {
                     text = L("admin_check_log"),
                     style = MaterialTheme.typography.labelSmall,
                     color = DorjaColors.Gray500,
-                    fontFamily = FontFamily.Monospace,
+                    fontFamily = DorjaFontFamily,
                     fontWeight = FontWeight.Bold
                 )
             }
@@ -448,7 +449,7 @@ fun AdminScreen() {
                     text = L("admin_awaiting_accounts"),
                     style = MaterialTheme.typography.labelSmall,
                     color = DorjaColors.Gray500,
-                    fontFamily = FontFamily.Monospace,
+                    fontFamily = DorjaFontFamily,
                     fontWeight = FontWeight.Bold
                 )
             }
@@ -504,7 +505,7 @@ fun AdminScreen() {
                     text = L("admin_agent_register"),
                     style = MaterialTheme.typography.labelSmall,
                     color = DorjaColors.Gray500,
-                    fontFamily = FontFamily.Monospace,
+                    fontFamily = DorjaFontFamily,
                     fontWeight = FontWeight.Bold
                 )
             }

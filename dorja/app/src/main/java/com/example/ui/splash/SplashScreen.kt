@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.graphics.Color
 import com.example.ui.components.DorjaLogo
+import com.example.ui.theme.DorjaFontFamily
 import com.example.ui.theme.DorjaLightColors
 import kotlinx.coroutines.delay
 
@@ -82,7 +83,7 @@ fun SplashScreen(
                 text = "PROPERTY TRUST PLATFORM",
                 style = MaterialTheme.typography.labelMedium,
                 color = DorjaLightColors.Sand300,
-                fontFamily = FontFamily.Monospace,
+                fontFamily = DorjaFontFamily,
                 letterSpacing = 2.sp
             )
         }

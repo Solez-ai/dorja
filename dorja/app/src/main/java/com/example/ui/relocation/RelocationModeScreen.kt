@@ -41,6 +41,7 @@ import com.example.data.country.LiveabilityField
 import com.example.ui.components.BentoCard
 import com.example.ui.components.CountryPicker
 import com.example.ui.components.DorjaBadge
+import com.example.ui.theme.DorjaFontFamily
 import com.example.ui.theme.DorjaColors
 
 /**
@@ -109,7 +110,7 @@ fun RelocationModeScreen(
                         text = "MOVING FROM",
                         style = MaterialTheme.typography.labelSmall,
                         color = DorjaColors.Gray500,
-                        fontFamily = FontFamily.Monospace,
+                        fontFamily = DorjaFontFamily,
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(modifier = Modifier.height(6.dp))
@@ -123,7 +124,7 @@ fun RelocationModeScreen(
                             text = "MOVING TO",
                             style = MaterialTheme.typography.labelSmall,
                             color = DorjaColors.Gray500,
-                            fontFamily = FontFamily.Monospace,
+                            fontFamily = DorjaFontFamily,
                             fontWeight = FontWeight.Bold
                         )
                     }
@@ -149,7 +150,7 @@ fun RelocationModeScreen(
                             text = "DESTINATION MARKET STATUS",
                             style = MaterialTheme.typography.labelSmall,
                             color = DorjaColors.Gray500,
-                            fontFamily = FontFamily.Monospace,
+                            fontFamily = DorjaFontFamily,
                             fontWeight = FontWeight.Bold
                         )
                         Spacer(modifier = Modifier.height(8.dp))
@@ -177,7 +178,7 @@ fun RelocationModeScreen(
                             text = "WHAT TO ASK FOR IN ${to.displayName.uppercase()}",
                             style = MaterialTheme.typography.labelSmall,
                             color = DorjaColors.Gray500,
-                            fontFamily = FontFamily.Monospace,
+                            fontFamily = DorjaFontFamily,
                             fontWeight = FontWeight.Bold
                         )
                         Spacer(modifier = Modifier.height(8.dp))
@@ -212,7 +213,7 @@ fun RelocationModeScreen(
                                 text = "OFFICIAL RECORDS",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = DorjaColors.Gray500,
-                                fontFamily = FontFamily.Monospace,
+                                fontFamily = DorjaFontFamily,
                                 fontWeight = FontWeight.Bold
                             )
                             Spacer(modifier = Modifier.height(8.dp))
@@ -248,7 +249,7 @@ fun RelocationModeScreen(
                             text = "LANGUAGE & UNITS",
                             style = MaterialTheme.typography.labelSmall,
                             color = DorjaColors.Gray500,
-                            fontFamily = FontFamily.Monospace,
+                            fontFamily = DorjaFontFamily,
                             fontWeight = FontWeight.Bold
                         )
                         Spacer(modifier = Modifier.height(8.dp))
@@ -288,7 +289,7 @@ fun RelocationModeScreen(
                                 text = "WHO YOU MAY NEED",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = DorjaColors.Gray500,
-                                fontFamily = FontFamily.Monospace,
+                                fontFamily = DorjaFontFamily,
                                 fontWeight = FontWeight.Bold
                             )
                             Spacer(modifier = Modifier.height(8.dp))

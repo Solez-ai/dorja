@@ -144,19 +144,12 @@ import com.example.ui.components.EvidenceBadge
 import com.example.ui.components.SafeAddressShield
 import com.example.data.model.ReportReason
 import com.example.ui.negotiation.ConflictCard
-import android.Manifest
-import android.content.pm.PackageManager
-import androidx.core.content.ContextCompat
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.material.icons.filled.Mic
-import com.example.ai.PropertyAiContext
-import com.example.ai.VoiceAssistantHelper
-import com.example.ui.ai.HeyDorjaAssistantSheet
-import com.example.ui.components.DorjaLogo
 import com.example.ui.floorplan.FloorPlanPreview
 import com.example.ui.i18n.L
+import com.example.ui.theme.DorjaFontFamily
 import com.example.ui.theme.DorjaColors
 import com.example.ui.theme.LocalDarkTheme
 import com.example.ui.util.Formatters
@@ -203,59 +196,8 @@ fun PropertyDetailScreen(
     }
     val currentUser by repository.currentUser.collectAsState()
 
-    var showHeyDorjaSheet by remember { mutableStateOf(false) }
-
-    val propertyAiContext = remember(listing, rooms, passport, legalDocs, promises, endorsements) {
-        listing?.let {
-            PropertyAiContext.from(
-                listing = it,
-                rooms = rooms,
-                passport = passport,
-                documents = legalDocs,
-                promises = promises,
-                endorsements = endorsements
-            )
-        }
-    }
-
-    // "Hey Dorja" Hotword and Voice Trigger
-    val voiceHelper = remember { VoiceAssistantHelper(context) }
-    var hasAudioPermission by remember {
-        mutableStateOf(
-            ContextCompat.checkSelfPermission(
-                context,
-                Manifest.permission.RECORD_AUDIO
-            ) == PackageManager.PERMISSION_GRANTED
-        )
-    }
-
-    val audioPermissionLauncher = rememberLauncherForActivityResult(
-    contract = ActivityResultContracts.RequestPermission()
-) { granted ->
-        hasAudioPermission = granted
-        if (granted) {
-            voiceHelper.startListening(onResult = { recognized ->
-                val lower = recognized.lowercase()
-                if (matchesWakeWord(lower)) {
-                    showHeyDorjaSheet = true
-                }
-            })
-        }
-    }
-
-    DisposableEffect(hasAudioPermission) {
-        if (hasAudioPermission && voiceHelper.isAvailable()) {
-            voiceHelper.startListening(onResult = { recognized ->
-                val lower = recognized.lowercase()
-                if (matchesWakeWord(lower)) {
-                    showHeyDorjaSheet = true
-                }
-            })
-        }
-        onDispose {
-            voiceHelper.stopListening()
-        }
-    }
+    // AI REMOVED FOR NOW — "Hey Dorja" voice hotword + assistant sheet were here.
+    // Restore guide: AI_FEATURES_RESTORE.md at repo root.
 
     var showVisitRequestDialog by remember { mutableStateOf(false) }
     var visitScheduledSuccess by remember { mutableStateOf(false) }
@@ -965,7 +907,7 @@ fun PropertyDetailScreen(
                         text = "Target Tour URL: $tourUrl",
                         style = MaterialTheme.typography.bodySmall,
                         color = DorjaColors.Gray700,
-                        fontFamily = FontFamily.Monospace
+                        fontFamily = DorjaFontFamily
                     )
                 }
             },
@@ -1027,7 +969,7 @@ fun PropertyDetailScreen(
                         text = "Category: ${room.roomType.replace("_", " ")}",
                         style = MaterialTheme.typography.labelMedium,
                         color = DorjaColors.Gray500,
-                        fontFamily = FontFamily.Monospace
+                        fontFamily = DorjaFontFamily
                     )
                     if (room.dimensions.isNotBlank()) {
                         Spacer(modifier = Modifier.height(4.dp))
@@ -1111,7 +1053,7 @@ fun PropertyDetailScreen(
                                 text = "PROPOSED INSPECTION WINDOW",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = DorjaColors.Gray500,
-                                fontFamily = FontFamily.Monospace
+                                fontFamily = DorjaFontFamily
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
@@ -1721,7 +1663,7 @@ fun PropertyDetailScreen(
                                                 text = label.uppercase(),
                                                 style = MaterialTheme.typography.labelSmall,
                                                 color = DorjaColors.Gray500,
-                                                fontFamily = FontFamily.Monospace,
+                                                fontFamily = DorjaFontFamily,
                                                 fontSize = 9.sp
                                             )
                                             Spacer(modifier = Modifier.height(3.dp))
@@ -1916,7 +1858,7 @@ fun PropertyDetailScreen(
                             text = "PROFESSIONAL HANDOFF",
                             style = MaterialTheme.typography.labelSmall,
                             color = DorjaColors.Gray500,
-                            fontFamily = FontFamily.Monospace,
+                            fontFamily = DorjaFontFamily,
                             fontWeight = FontWeight.Bold
                         )
                     }
@@ -2223,12 +2165,6 @@ fun PropertyDetailScreen(
                         CompareButton(onClick = onOpenCompare)
                         Spacer(modifier = Modifier.width(2.dp))
                     }
-                    HeyDorjaPill(onClick = {
-                        if (!hasAudioPermission) {
-                            audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-                        }
-                        showHeyDorjaSheet = true
-                    })
                 } else {
                     Surface(
                         shape = RoundedCornerShape(22.dp),
@@ -2288,36 +2224,14 @@ fun PropertyDetailScreen(
                         CompareButton(onClick = onOpenCompare)
                         Spacer(modifier = Modifier.width(2.dp))
                     }
-                    HeyDorjaPill(onClick = {
-                        if (!hasAudioPermission) {
-                            audioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-                        }
-                        showHeyDorjaSheet = true
-                    })
                 }
             }
         }
     }
 
-    if (showHeyDorjaSheet) {
-        HeyDorjaAssistantSheet(
-            propertyContext = propertyAiContext,
-            onDismiss = { showHeyDorjaSheet = false },
-            onNavigateToSettings = onOpenSettingsTab
-        )
-    }
+    // AI REMOVED FOR NOW — assistant sheet invocation was here (AI_FEATURES_RESTORE.md).
 }
 
-/**
- * Wake-word matcher for the "Hey Dorja" voice trigger.
- *
- * Speech recognizers transliterate the brand name inconsistently depending on
- * the speaker's accent and the recognizer locale ("dorja", "doria", "dhaka"…),
- * and some users just say "Dorja" without "Hey" (or vice versa). This accepts:
- *  - the standalone word "hey"
- *  - "dorja" or any close phonetic rendering (j/g/y soft-g variants)
- *  - any combination of the two, in any order
- */
 /** Mime type guess for opening a stored document with an external viewer. */
 private fun docMimeType(fileName: String): String = when {
     fileName.endsWith(".pdf", ignoreCase = true) -> "application/pdf"
@@ -2342,14 +2256,6 @@ private fun queryDocDisplayName(context: android.content.Context, uri: Uri): Str
     } catch (_: Exception) {
         null
     }
-}
-
-private fun matchesWakeWord(lower: String): Boolean {
-    if (lower.contains("hey")) return true
-    // d + o + (r | l) + soft consonant + final vowel — covers dorja/doria/dorga/dolja…
-    // without false-positives on everyday words like "dog".
-    if (Regex("\\bd[o0]r?[ljgyzi][ae]\\b") in lower) return true
-    return false
 }
 
 /**
@@ -2746,7 +2652,7 @@ private fun RoomStoryCard(
                         text = room.dimensions,
                         style = MaterialTheme.typography.labelSmall,
                         color = DorjaColors.Gray500,
-                        fontFamily = FontFamily.Monospace
+                        fontFamily = DorjaFontFamily
                     )
                 }
                 if (!isOwner && room.has3DScan) {
@@ -2878,41 +2784,6 @@ private fun CompareButton(onClick: () -> Unit) {
                 contentDescription = L("compare_title"),
                 tint = DorjaColors.BentoBlueIcon,
                 modifier = Modifier.size(19.dp)
-            )
-        }
-    }
-}
-
-/**
- * The compact "Hey Dorja" pill that lives inside the floating action bar.
- */
-@Composable
-private fun HeyDorjaPill(onClick: () -> Unit) {
-    // Fully opaque in both modes — the pill must never read as disabled.
-    Surface(
-        shape = CircleShape,
-        color = DorjaColors.BentoGreenBg,
-        border = BorderStroke(1.dp, DorjaColors.BentoGreenIcon.copy(alpha = 0.55f)),
-        onClick = onClick
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            DorjaLogo(modifier = Modifier.size(18.dp))
-            Spacer(modifier = Modifier.width(6.dp))
-            Text(
-                text = "Dorja",
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Bold,
-                color = DorjaColors.BentoGreenText
-            )
-            Spacer(modifier = Modifier.width(4.dp))
-            Icon(
-                imageVector = Icons.Default.Mic,
-                contentDescription = null,
-                tint = DorjaColors.BentoGreenIcon,
-                modifier = Modifier.size(14.dp)
             )
         }
     }

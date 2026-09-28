@@ -51,6 +51,7 @@ import com.example.data.model.Viewing
 import com.example.ui.components.DorjaBadge
 import com.example.ui.components.DorjaButton
 import com.example.ui.components.DorjaCard
+import com.example.ui.theme.DorjaFontFamily
 import com.example.ui.theme.DorjaColors
 import com.example.ui.theme.LocalDarkTheme
 import com.example.ui.util.Formatters
@@ -207,7 +208,7 @@ fun ViewingPassScreen(
                             text = pass.passToken,
                             style = MaterialTheme.typography.titleLarge,
                             color = DorjaColors.Ink950,
-                            fontFamily = FontFamily.Monospace,
+                            fontFamily = DorjaFontFamily,
                             fontWeight = FontWeight.Bold,
                             letterSpacing = 2.sp
                         )

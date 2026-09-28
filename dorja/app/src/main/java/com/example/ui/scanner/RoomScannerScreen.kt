@@ -110,6 +110,7 @@ import com.example.data.model.RoomItem
 import com.example.ui.components.DorjaActivityIndicator
 import com.example.ui.components.DorjaButton
 import com.example.ui.components.DorjaOutlinedButton
+import com.example.ui.theme.DorjaFontFamily
 import com.example.ui.theme.DorjaColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -533,7 +534,7 @@ private fun SelectRoom(
                             }
                             if (room.has3DScan) {
                                 Badge(containerColor = Accent.copy(alpha = 0.2f)) {
-                                    Text("SCANNED", color = Accent, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
+                                    Text("SCANNED", color = Accent, fontSize = 9.sp, fontFamily = DorjaFontFamily)
                                 }
                             }
                         }
@@ -573,7 +574,7 @@ private fun PreviewPhase(
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = Color.White)
             }
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("DORJA 360° PANORAMA", color = Accent, fontSize = 11.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+                Text("DORJA 360° PANORAMA", color = Accent, fontSize = 11.sp, fontFamily = DorjaFontFamily, fontWeight = FontWeight.Bold)
                 Text(roomName, color = Color.White, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleSmall)
             }
             Spacer(Modifier.size(38.dp))
@@ -583,7 +584,7 @@ private fun PreviewPhase(
         Box(Modifier.align(Alignment.Center).padding(24.dp), contentAlignment = Alignment.Center) {
             Surface(shape = RoundedCornerShape(16.dp), color = Color.Black.copy(alpha = 0.75f), border = androidx.compose.foundation.BorderStroke(1.dp, Accent.copy(alpha = 0.4f))) {
                 Column(Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("HOW TO CAPTURE A PANORAMA", color = Accent, fontSize = 11.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+                    Text("HOW TO CAPTURE A PANORAMA", color = Accent, fontSize = 11.sp, fontFamily = DorjaFontFamily, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(10.dp))
                     Text("1. Stand in middle of room (pivot like a tripod)", color = Color.White, fontSize = 12.sp)
                     Spacer(Modifier.height(4.dp))
@@ -598,7 +599,7 @@ private fun PreviewPhase(
             // Lens zoom picker — chosen BEFORE the scan starts so every frame
             // shares the same field of view. Options reflect what the bound
             // camera actually supports (min zoom ratio of the device).
-            Text("LENS ZOOM — PICK BEFORE SCANNING", color = Accent, fontSize = 10.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+            Text("LENS ZOOM — PICK BEFORE SCANNING", color = Accent, fontSize = 10.sp, fontFamily = DorjaFontFamily, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(6.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 zoomChoices(minZoomRatio).forEach { z ->
@@ -620,7 +621,7 @@ private fun PreviewPhase(
                 }
             }
             Spacer(Modifier.height(12.dp))
-            Text("PRESS TO START SCAN", color = Color.White, fontSize = 11.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+            Text("PRESS TO START SCAN", color = Color.White, fontSize = 11.sp, fontFamily = DorjaFontFamily, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(8.dp))
             Box(Modifier.size(68.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.15f)).border(3.dp, Color.White, CircleShape).clickable { onStart() }, contentAlignment = Alignment.Center) {
                 Box(Modifier.size(54.dp).clip(CircleShape).background(Green))
@@ -695,7 +696,7 @@ private fun CapturingPhase(
                     "SHOT ${currentTargetIdx + 1}/${scanTargets.size} • RING ${target.ringIndex} • TURN ${"%.0f".format(normalizedDelta)}°",
                     color = if (isLocked) Green else Accent,
                     fontWeight = FontWeight.Bold,
-                    fontFamily = FontFamily.Monospace,
+                    fontFamily = DorjaFontFamily,
                     fontSize = 11.sp
                 )
             }
@@ -745,7 +746,7 @@ private fun CapturingPhase(
                 guidanceText,
                 color = if (isLocked) Green else TargetYellow,
                 fontSize = 11.sp,
-                fontFamily = FontFamily.Monospace,
+                fontFamily = DorjaFontFamily,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
             )
@@ -930,7 +931,7 @@ private fun DonePhase(
                             containerColor = DorjaColors.InverseBg.copy(alpha = 0.78f),
                             modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)
                         ) {
-                            Text("LIVE 360° CANVAS PREVIEW", color = DorjaColors.InverseFg, fontSize = 9.sp, fontFamily = FontFamily.Monospace)
+                            Text("LIVE 360° CANVAS PREVIEW", color = DorjaColors.InverseFg, fontSize = 9.sp, fontFamily = DorjaFontFamily)
                         }
                     }
                 }
@@ -948,7 +949,7 @@ private fun DonePhase(
                             DorjaActivityIndicator(modifier = Modifier.size(20.dp), color = Accent)
                             Spacer(Modifier.width(12.dp))
                         }
-                        Text(stitchingStatus!!, color = DorjaColors.Ink950, fontSize = 11.sp, fontFamily = FontFamily.Monospace)
+                        Text(stitchingStatus!!, color = DorjaColors.Ink950, fontSize = 11.sp, fontFamily = DorjaFontFamily)
                     }
                 }
             }
@@ -964,7 +965,7 @@ private fun DonePhase(
                     modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
                 ) {
                     Column(Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
-                        Text("TUNE LIGHTING — CHANGES APPLY LIVE", color = DorjaColors.Jol600, fontSize = 10.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+                        Text("TUNE LIGHTING — CHANGES APPLY LIVE", color = DorjaColors.Jol600, fontSize = 10.sp, fontFamily = DorjaFontFamily, fontWeight = FontWeight.Bold)
                         Spacer(Modifier.height(4.dp))
                         TuningSlider("Brightness", brightness, 0.5f, 1.6f) { brightness = it }
                         TuningSlider("Contrast", contrast, 0.6f, 1.5f) { contrast = it }
@@ -1047,7 +1048,7 @@ private fun TuningSlider(
             "${((value - 1f) * 100).roundToInt().let { if (it >= 0) "+$it%" else "$it%" }}",
             color = DorjaColors.Ink950,
             fontSize = 11.sp,
-            fontFamily = FontFamily.Monospace,
+            fontFamily = DorjaFontFamily,
             modifier = Modifier.width(52.dp)
         )
     }
@@ -1253,7 +1254,7 @@ private fun VerticalRingRail(
             verticalArrangement = Arrangement.spacedBy(8.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text("RING", color = Accent, fontSize = 8.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold)
+            Text("RING", color = Accent, fontSize = 8.sp, fontFamily = DorjaFontFamily, fontWeight = FontWeight.Bold)
 
             for (ring in rings) {
                 val targetsInRing = scanTargets.filter { it.ringIndex == ring }
@@ -1435,7 +1436,7 @@ private fun GyroChip(on: Boolean, toggle: () -> Unit) {
         Row(Modifier.padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(8.dp).clip(CircleShape).background(if (on) Accent else Color.Gray))
             Spacer(Modifier.width(6.dp))
-            Text("GYRO ${if (on) "ON" else "OFF"}", color = if (on) Accent else Color.Gray, fontSize = 10.sp, fontFamily = FontFamily.Monospace)
+            Text("GYRO ${if (on) "ON" else "OFF"}", color = if (on) Accent else Color.Gray, fontSize = 10.sp, fontFamily = DorjaFontFamily)
         }
     }
 }

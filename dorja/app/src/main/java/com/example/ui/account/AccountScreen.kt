@@ -92,6 +92,7 @@ import com.example.ui.components.DorjaOutlinedButton
 import com.example.ui.components.ForwardChevron
 import com.example.ui.i18n.L
 import com.example.ui.i18n.Lf
+import com.example.ui.theme.DorjaFontFamily
 import com.example.ui.theme.DorjaColors
 import com.example.ui.theme.LocalDarkTheme
 import kotlinx.coroutines.launch
@@ -708,7 +709,7 @@ fun AccountScreen(
                             text = L("account_devices_accounts"),
                             style = MaterialTheme.typography.labelSmall,
                             color = DorjaColors.Gray500,
-                            fontFamily = FontFamily.Monospace,
+                            fontFamily = DorjaFontFamily,
                             fontWeight = FontWeight.Bold
                         )
                         Spacer(modifier = Modifier.height(10.dp))
@@ -790,7 +791,7 @@ fun AccountScreen(
                             text = L("account_security"),
                             style = MaterialTheme.typography.labelSmall,
                             color = DorjaColors.Gray500,
-                            fontFamily = FontFamily.Monospace,
+                            fontFamily = DorjaFontFamily,
                             fontWeight = FontWeight.Bold
                         )
                         Spacer(modifier = Modifier.height(10.dp))
@@ -818,7 +819,7 @@ fun AccountScreen(
                             text = L("account_evidence_health"),
                             style = MaterialTheme.typography.labelSmall,
                             color = DorjaColors.Gray500,
-                            fontFamily = FontFamily.Monospace,
+                            fontFamily = DorjaFontFamily,
                             fontWeight = FontWeight.Bold
                         )
                         Spacer(modifier = Modifier.height(10.dp))
@@ -946,7 +947,7 @@ fun AccountScreen(
                             text = L("account_reports"),
                             style = MaterialTheme.typography.labelSmall,
                             color = DorjaColors.Gray500,
-                            fontFamily = FontFamily.Monospace,
+                            fontFamily = DorjaFontFamily,
                             fontWeight = FontWeight.Bold
                         )
                         Spacer(modifier = Modifier.height(6.dp))
@@ -1022,7 +1023,7 @@ fun AccountScreen(
                             text = L("account_privacy_data"),
                             style = MaterialTheme.typography.labelSmall,
                             color = DorjaColors.Gray500,
-                            fontFamily = FontFamily.Monospace,
+                            fontFamily = DorjaFontFamily,
                             fontWeight = FontWeight.Bold
                         )
                         Spacer(modifier = Modifier.height(6.dp))

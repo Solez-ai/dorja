@@ -59,6 +59,7 @@ import com.example.ui.components.DorjaButton
 import com.example.ui.components.DorjaOutlinedButton
 import com.example.ui.components.PulseDot
 import com.example.ui.i18n.L
+import com.example.ui.theme.DorjaFontFamily
 import com.example.ui.theme.DorjaColors
 import com.example.ui.util.Formatters
 import com.example.ui.components.DorjaLogo
@@ -245,7 +246,7 @@ fun VisitsScreen(
                             text = L("visits_past_passes"),
                             style = MaterialTheme.typography.labelSmall,
                             color = DorjaColors.Gray500,
-                            fontFamily = FontFamily.Monospace,
+                            fontFamily = DorjaFontFamily,
                             fontWeight = FontWeight.Bold
                         )
                     }
@@ -326,7 +327,7 @@ private fun ActiveViewingBentoCard(
                         text = if (viewing.status == "CHECKED_IN") "VISITOR CHECKED IN" else "CONFIRMED INSPECTION SLOT",
                         style = MaterialTheme.typography.labelSmall,
                         color = DorjaColors.Success,
-                        fontFamily = FontFamily.Monospace,
+                        fontFamily = DorjaFontFamily,
                         fontWeight = FontWeight.Bold
                     )
                 }

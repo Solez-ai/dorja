@@ -70,7 +70,6 @@ import androidx.navigation.navArgument
 import com.example.DorjaApp
 import com.example.ui.account.AccountScreen
 import com.example.ui.admin.AdminScreen
-import com.example.ui.assistant.AssistantScreen
 import com.example.ui.auth.AuthScreen
 import com.example.ui.chat.ChatThreadScreen
 import com.example.ui.compare.CompareScreen
@@ -223,9 +222,6 @@ fun DorjaNavHost() {
                 onNavigateToPass = { viewingId ->
                     navController.navigate(Screen.ViewingPass.createRoute(viewingId))
                 },
-                onNavigateToAssistant = {
-                    navController.navigate(Screen.Assistant.route)
-                },
                 onNavigateToHandover = { listingId ->
                     navController.navigate(Screen.HandoverPassport.createRoute(listingId))
                 },
@@ -278,10 +274,6 @@ fun DorjaNavHost() {
                 listingId = listingId,
                 onBack = { navController.popBackStack() }
             )
-        }
-
-        composable(Screen.Assistant.route) {
-            AssistantScreen(onBack = { navController.popBackStack() })
         }
 
         composable(
@@ -383,11 +375,10 @@ fun MainContainer(
     onNavigateToChatThread: (String) -> Unit,
     onNavigateToPass: (String) -> Unit,
     onNavigateToHandover: (String) -> Unit,
-    onNavigateToAssistant: () -> Unit = {},
     onNavigateToRelocation: (String, String) -> Unit = { _, _ -> },
     /** Sign out; the flag opens the auth screen directly in sign-up mode. */
     onLogout: (startInSignUp: Boolean) -> Unit = {},
-    /** Incremented by outside screens (e.g. AI sheet) to request the Settings tab. */
+    /** Incremented by outside screens to request the Settings tab. */
     settingsTabRequest: Int = 0
 ) {
     val repository = DorjaApp.instance.repository
@@ -585,8 +576,7 @@ fun MainContainer(
                     } else {
                         when (currentBuyerTab) {
                             BuyerTab.EXPLORE -> ExploreScreen(
-                                onSelectListing = onNavigateToDetail,
-                                onOpenAssistant = onNavigateToAssistant
+                                onSelectListing = onNavigateToDetail
                             )
                             BuyerTab.VISITS -> VisitsScreen(onOpenPass = onNavigateToPass)
                             BuyerTab.INBOX -> InboxScreen(onOpenConversation = onNavigateToChatThread)

@@ -75,6 +75,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.example.DorjaApp
 import com.example.ui.components.DorjaButton
+import com.example.ui.theme.DorjaFontFamily
 import com.example.ui.theme.DorjaColors
 import org.json.JSONObject
 import java.io.File
@@ -400,7 +401,7 @@ fun PanoramaViewerScreen(
                                         selectedRoom.displayName.uppercase(),
                                         color = Color.White,
                                         fontSize = 11.sp,
-                                        fontFamily = FontFamily.Monospace,
+                                        fontFamily = DorjaFontFamily,
                                         fontWeight = FontWeight.Bold
                                     )
                                 }
@@ -492,7 +493,7 @@ private fun GlassChip(
                 label,
                 color = if (active) Accent else Color.White,
                 fontSize = 9.sp,
-                fontFamily = FontFamily.Monospace,
+                fontFamily = DorjaFontFamily,
                 fontWeight = FontWeight.Bold
             )
         }

@@ -42,7 +42,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material.icons.filled.VerifiedUser
-import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ViewInAr
 import androidx.compose.material3.Icon
@@ -97,7 +96,6 @@ private val PRICE_CEILINGS = listOf(5_000_000, 20_000_000, 50_000_000, 100_000_0
 @Composable
 fun ExploreScreen(
     onSelectListing: (String) -> Unit,
-    onOpenAssistant: () -> Unit = {}
 ) {
     val repository = DorjaApp.instance.repository
     val scope = rememberCoroutineScope()
@@ -262,25 +260,13 @@ fun ExploreScreen(
                     )
                 },
                 trailingIcon = {
-                    Row {
-                        IconButton(
-                            onClick = onOpenAssistant,
-                            modifier = Modifier.testTag("explore_open_assistant")
-                        ) {
+                    if (searchQuery.isNotBlank()) {
+                        IconButton(onClick = { searchQuery = "" }) {
                             Icon(
-                                imageVector = Icons.Default.AutoAwesome,
-                                contentDescription = L("assistant_title"),
-                                tint = DorjaColors.Jol600
+                                imageVector = Icons.Default.Close,
+                                contentDescription = L("explore_clear_search"),
+                                tint = DorjaColors.Gray500
                             )
-                        }
-                        if (searchQuery.isNotBlank()) {
-                            IconButton(onClick = { searchQuery = "" }) {
-                                Icon(
-                                    imageVector = Icons.Default.Close,
-                                    contentDescription = L("explore_clear_search"),
-                                    tint = DorjaColors.Gray500
-                                )
-                            }
                         }
                     }
                 },

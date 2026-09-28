@@ -67,6 +67,7 @@ import com.example.ui.components.DorjaOutlinedButton
 import com.example.data.country.CountryRegistry
 import com.example.ui.i18n.L
 import com.example.ui.i18n.Lf
+import com.example.ui.theme.DorjaFontFamily
 import com.example.ui.theme.DorjaColors
 import com.example.ui.util.Formatters
 import com.example.ui.components.DorjaLogo
@@ -385,7 +386,7 @@ private fun HostListingCard(
                         text = "${listing.bedrooms} Beds • ${listing.bathrooms} Baths • ${listing.sqft} sqft",
                         style = MaterialTheme.typography.bodySmall,
                         color = DorjaColors.Gray500,
-                        fontFamily = FontFamily.Monospace,
+                        fontFamily = DorjaFontFamily,
                         fontSize = 11.sp
                     )
                 }

@@ -59,6 +59,7 @@ import com.example.ui.components.ForwardChevron
 import com.example.ui.i18n.DorjaLocales
 import com.example.ui.i18n.L
 import com.example.ui.i18n.LocaleSettings
+import com.example.ui.theme.DorjaFontFamily
 import com.example.ui.theme.DorjaColors
 import com.example.ui.theme.ThemeSettings
 import kotlinx.coroutines.launch
@@ -198,7 +199,7 @@ fun SettingsScreen(
                             text = L("settings_appearance"),
                             style = MaterialTheme.typography.labelSmall,
                             color = DorjaColors.Gray500,
-                            fontFamily = FontFamily.Monospace,
+                            fontFamily = DorjaFontFamily,
                             fontWeight = FontWeight.Bold
                         )
                         Spacer(modifier = Modifier.height(12.dp))
@@ -246,7 +247,7 @@ fun SettingsScreen(
                             text = L("settings_country_section"),
                             style = MaterialTheme.typography.labelSmall,
                             color = DorjaColors.Gray500,
-                            fontFamily = FontFamily.Monospace,
+                            fontFamily = DorjaFontFamily,
                             fontWeight = FontWeight.Bold
                         )
                         Spacer(modifier = Modifier.height(12.dp))
@@ -292,7 +293,7 @@ fun SettingsScreen(
                             text = L("account_db_management"),
                             style = MaterialTheme.typography.labelSmall,
                             color = DorjaColors.Gray500,
-                            fontFamily = FontFamily.Monospace,
+                            fontFamily = DorjaFontFamily,
                             fontWeight = FontWeight.Bold
                         )
                         Spacer(modifier = Modifier.height(10.dp))
@@ -314,7 +315,7 @@ fun SettingsScreen(
                             text = L("settings_accounts_section"),
                             style = MaterialTheme.typography.labelSmall,
                             color = DorjaColors.Gray500,
-                            fontFamily = FontFamily.Monospace,
+                            fontFamily = DorjaFontFamily,
                             fontWeight = FontWeight.Bold
                         )
                         Spacer(modifier = Modifier.height(10.dp))

@@ -37,6 +37,7 @@ import com.example.data.model.Report
 import com.example.data.model.ReportReason
 import com.example.data.model.ReportResponse
 import com.example.ui.components.DorjaBadge
+import com.example.ui.theme.DorjaFontFamily
 import com.example.ui.theme.DorjaColors
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -304,7 +305,7 @@ private fun ClaimColumn(
             text = title,
             style = MaterialTheme.typography.labelSmall,
             color = DorjaColors.Gray500,
-            fontFamily = FontFamily.Monospace,
+            fontFamily = DorjaFontFamily,
             fontSize = 9.sp,
             fontWeight = FontWeight.Bold
         )

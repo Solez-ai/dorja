@@ -44,6 +44,7 @@ import com.example.ui.components.DorjaBadge
 import com.example.ui.components.DorjaCard
 import com.example.ui.components.ForwardChevron
 import com.example.ui.i18n.L
+import com.example.ui.theme.DorjaFontFamily
 import com.example.ui.theme.DorjaColors
 import com.example.ui.util.Formatters
 import com.example.ui.components.DorjaLogo
@@ -111,7 +112,7 @@ fun InboxScreen(
                         text = L("inbox_secured"),
                         style = MaterialTheme.typography.labelSmall,
                         color = DorjaColors.Jol600,
-                        fontFamily = FontFamily.Monospace,
+                        fontFamily = DorjaFontFamily,
                         fontWeight = FontWeight.Bold,
                         fontSize = 10.sp
                     )
@@ -210,7 +211,7 @@ fun InboxScreen(
                                         text = "Listing #${conv.listingId}",
                                         style = MaterialTheme.typography.labelSmall,
                                         color = DorjaColors.Gray500,
-                                        fontFamily = FontFamily.Monospace
+                                        fontFamily = DorjaFontFamily
                                     )
                                 }
                                 Spacer(modifier = Modifier.height(4.dp))

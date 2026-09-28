@@ -50,6 +50,7 @@ import com.example.DorjaApp
 import com.example.data.model.Message
 import com.example.ui.components.DorjaAvatar
 import com.example.ui.components.DorjaBadge
+import com.example.ui.theme.DorjaFontFamily
 import com.example.ui.theme.DorjaColors
 import com.example.ui.util.Formatters
 import kotlinx.coroutines.launch
@@ -141,7 +142,7 @@ fun ChatThreadScreen(
                             text = "$otherPartyPhone (Encrypted)",
                             style = MaterialTheme.typography.labelSmall,
                             color = DorjaColors.Gray500,
-                            fontFamily = FontFamily.Monospace,
+                            fontFamily = DorjaFontFamily,
                             fontSize = 11.sp
                         )
                     }

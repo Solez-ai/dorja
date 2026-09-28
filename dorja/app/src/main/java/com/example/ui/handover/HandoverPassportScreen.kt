@@ -60,6 +60,7 @@ import com.example.ui.components.DorjaBadge
 import com.example.ui.components.DorjaButton
 import com.example.ui.components.DorjaCard
 import com.example.ui.components.DorjaInput
+import com.example.ui.theme.DorjaFontFamily
 import com.example.ui.theme.DorjaColors
 import kotlinx.coroutines.launch
 
@@ -213,7 +214,7 @@ fun HandoverPassportScreen(
                                 text = "LEGAL DOSSIER RECORD",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = DorjaColors.Sand300,
-                                fontFamily = FontFamily.Monospace
+                                fontFamily = DorjaFontFamily
                             )
                             DorjaBadge(
                                 text = "AUDITED",
@@ -293,7 +294,7 @@ fun HandoverPassportScreen(
                         text = "RECORDED PROMISES (${promises.size})",
                         style = MaterialTheme.typography.labelSmall,
                         color = DorjaColors.Gray500,
-                        fontFamily = FontFamily.Monospace
+                        fontFamily = DorjaFontFamily
                     )
                     TextButton(onClick = { showAddPromiseDialog = true }) {
                         Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp), tint = DorjaColors.Jol600)
@@ -388,7 +389,7 @@ private fun PromiseCard(promise: Promise) {
                             text = "Evidence: ${promise.evidenceNote}",
                             style = MaterialTheme.typography.labelSmall,
                             color = DorjaColors.Gray700,
-                            fontFamily = FontFamily.Monospace,
+                            fontFamily = DorjaFontFamily,
                             fontSize = 11.sp
                         )
                     }

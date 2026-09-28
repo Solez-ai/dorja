@@ -88,6 +88,7 @@ import com.example.ai.PropertyAiContext
 import com.example.ai.VoiceAssistantHelper
 import com.example.ui.components.DorjaActivityIndicator
 import com.example.ui.components.DorjaLogo
+import com.example.ui.theme.DorjaFontFamily
 import com.example.ui.theme.DorjaColors
 import com.example.ui.theme.LiquidGlassDefaults
 import com.example.ui.theme.LocalDarkTheme
@@ -410,7 +411,7 @@ fun HeyDorjaAssistantSheet(
                                         text = "Quick answer…",
                                         style = MaterialTheme.typography.labelSmall,
                                         color = DorjaColors.Gray600,
-                                        fontFamily = FontFamily.Monospace
+                                        fontFamily = DorjaFontFamily
                                     )
                                 }
                             } else if (aiAnswer != null) {

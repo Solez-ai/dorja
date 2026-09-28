@@ -53,7 +53,7 @@ import com.example.ui.util.Formatters
 fun BentoCard(
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
-    shape: Shape = RoundedCornerShape(20.dp),
+    shape: Shape = RoundedCornerShape(12.dp),
     backgroundColor: Color = DorjaColors.White,
     borderColor: Color = DorjaColors.BentoCardBorder,
     borderWidth: Dp = 0.5.dp,
@@ -85,7 +85,7 @@ fun BentoCard(
 fun DorjaCard(
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
-    shape: Shape = RoundedCornerShape(20.dp),
+    shape: Shape = RoundedCornerShape(12.dp),
     backgroundColor: Color = DorjaColors.White,
     borderColor: Color = DorjaColors.BentoCardBorder,
     borderWidth: Dp = 0.5.dp,
@@ -123,7 +123,7 @@ fun BentoMetricTile(
 
     Surface(
         modifier = modifier.then(clickableModifier),
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(12.dp),
         color = DorjaColors.Paper50,
         border = BorderStroke(0.5.dp, DorjaColors.BentoCardBorder)
     ) {
@@ -192,7 +192,7 @@ fun BentoHeroCard(
     BentoCard(
         modifier = modifier,
         onClick = onClick,
-        shape = RoundedCornerShape(24.dp),
+        shape = RoundedCornerShape(16.dp),
         backgroundColor = backgroundColor,
         content = content
     )
@@ -214,9 +214,9 @@ fun DorjaButton(
         onClick = onClick,
         enabled = enabled,
         modifier = finalModifier
-            .heightIn(min = 50.dp)
+            .heightIn(min = 44.dp)
             .pressScale(),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(12.dp),
         colors = ButtonDefaults.buttonColors(
             containerColor = containerColor,
             contentColor = contentColor,
@@ -238,11 +238,11 @@ fun DorjaButton(
             }
             Text(
                 text = text,
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.SemiBold,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
-                lineHeight = 18.sp,
+                lineHeight = 16.sp,
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center
             )
         }
@@ -262,12 +262,12 @@ fun StainedLiquidGlassButton(
     val finalModifier = if (testTag != null) modifier.testTag(testTag) else modifier
     Box(
         modifier = finalModifier
-            .heightIn(min = 52.dp)
+            .heightIn(min = 44.dp)
             .liquidGlass(
                 blurRadius = LiquidGlassDefaults.BlurMedium,
                 glassColor = stainedColor.copy(alpha = 0.85f),
                 specularColor = Color(0x60FFFFFF),
-                shape = RoundedCornerShape(26.dp)
+                shape = RoundedCornerShape(22.dp)
             )
             .pressScale(onClick = { if (enabled) onClick() }),
         contentAlignment = Alignment.Center
@@ -288,12 +288,12 @@ fun StainedLiquidGlassButton(
             }
             Text(
                 text = text,
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.labelLarge,
                 color = Color.White,
                 fontWeight = FontWeight.Bold,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
-                lineHeight = 18.sp,
+                lineHeight = 16.sp,
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center
             )
         }
@@ -316,9 +316,9 @@ fun DorjaOutlinedButton(
         onClick = onClick,
         enabled = enabled,
         modifier = finalModifier
-            .heightIn(min = 48.dp)
+            .heightIn(min = 44.dp)
             .pressScale(),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(12.dp),
         border = BorderStroke(1.dp, if (enabled) borderColor else borderColor.copy(alpha = 0.4f)),
         colors = ButtonDefaults.outlinedButtonColors(
             contentColor = contentColor
@@ -338,11 +338,11 @@ fun DorjaOutlinedButton(
             }
             Text(
                 text = text,
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.Medium,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
-                lineHeight = 18.sp,
+                lineHeight = 16.sp,
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center
             )
         }
@@ -405,7 +405,7 @@ fun DorjaChip(
 
     Surface(
         modifier = modifier.pressScale(onClick = onClick),
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(16.dp),
         color = animatedBg,
         border = BorderStroke(
             0.5.dp,
@@ -574,7 +574,7 @@ fun DorjaInput(
         maxLines = maxLines,
         keyboardOptions = keyboardOptions,
         modifier = baseModifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(10.dp),
         colors = OutlinedTextFieldDefaults.colors(
             focusedContainerColor = DorjaColors.White,
             unfocusedContainerColor = DorjaColors.White,
@@ -684,7 +684,7 @@ fun ListingCard(
     BentoCard(
         modifier = modifier.fillMaxWidth(),
         onClick = { onSelect(listing.id) },
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(12.dp),
         backgroundColor = DorjaColors.White
     ) {
         Column {
@@ -693,7 +693,7 @@ fun ListingCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(180.dp)
-                    .clip(RoundedCornerShape(16.dp))
+                    .clip(RoundedCornerShape(9.dp))
                     .background(DorjaColors.Sand300)
             ) {
                 if (listing.photos.isNotEmpty()) {

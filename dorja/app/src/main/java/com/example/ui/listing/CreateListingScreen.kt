@@ -161,6 +161,7 @@ import com.example.ui.components.DorjaOutlinedButton
 import com.example.ui.components.EvidenceBadge
 import com.example.ui.components.GovernmentSourceCard
 import com.example.ui.floorplan.FloorPlanMakerOverlay
+import com.example.ui.theme.DorjaFontFamily
 import com.example.ui.theme.DorjaColors
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -497,7 +498,7 @@ fun CreateListingScreen(
             text = {
                 Column(
                     modifier = Modifier.verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Text(
                         text = "Add photos and assign them directly to designated rooms:",
@@ -511,7 +512,7 @@ fun CreateListingScreen(
                             text = "ASSIGN TO ROOM (optional)",
                             style = MaterialTheme.typography.labelSmall,
                             color = DorjaColors.Gray500,
-                            fontFamily = FontFamily.Monospace,
+                            fontFamily = DorjaFontFamily,
                             fontWeight = FontWeight.Bold
                         )
 
@@ -551,8 +552,6 @@ fun CreateListingScreen(
                             unfocusedBorderColor = DorjaColors.BentoCardBorder
                         )
                     )
-
-                    Spacer(modifier = Modifier.height(4.dp))
 
                     // Pick buttons — auto-crop to 4:5 silently (no dialog)
                     val ctx = LocalContext.current
@@ -1086,7 +1085,7 @@ fun CreateListingScreen(
                         text = "PROPERTY INTENT",
                         style = MaterialTheme.typography.labelSmall,
                         color = DorjaColors.Gray500,
-                        fontFamily = FontFamily.Monospace,
+                        fontFamily = DorjaFontFamily,
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(modifier = Modifier.height(6.dp))
@@ -1129,7 +1128,7 @@ fun CreateListingScreen(
                             text = "${activeProfile.displayName.uppercase()} EMIRATE / STATE",
                             style = MaterialTheme.typography.labelSmall,
                             color = DorjaColors.Gray500,
-                            fontFamily = FontFamily.Monospace,
+                            fontFamily = DorjaFontFamily,
                             fontWeight = FontWeight.Bold
                         )
                         Spacer(modifier = Modifier.height(6.dp))
@@ -1164,7 +1163,7 @@ fun CreateListingScreen(
                         text = "PROPERTY TYPE",
                         style = MaterialTheme.typography.labelSmall,
                         color = DorjaColors.Gray500,
-                        fontFamily = FontFamily.Monospace,
+                        fontFamily = DorjaFontFamily,
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(modifier = Modifier.height(6.dp))
@@ -1336,7 +1335,7 @@ fun CreateListingScreen(
                         text = "PROPERTY SPECIFICATIONS",
                         style = MaterialTheme.typography.labelSmall,
                         color = DorjaColors.Gray500,
-                        fontFamily = FontFamily.Monospace,
+                        fontFamily = DorjaFontFamily,
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(modifier = Modifier.height(8.dp))
@@ -1594,6 +1593,7 @@ fun CreateListingScreen(
                             modifier = Modifier.heightIn(min = 36.dp),
                             testTag = "select_multiple_photos_button"
                         )
+                        Spacer(modifier = Modifier.width(8.dp))
                         DorjaOutlinedButton(
                             text = if (floorPlanJson == null) "Add Floor Plan" else "Edit Floor Plan",
                             onClick = { showFloorPlanMaker = true },
@@ -1679,7 +1679,7 @@ fun CreateListingScreen(
                                                         color = DorjaColors.White,
                                                         fontSize = 8.sp,
                                                         fontWeight = FontWeight.Bold,
-                                                        fontFamily = FontFamily.Monospace,
+                                                        fontFamily = DorjaFontFamily,
                                                         modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
                                                     )
                                                 }
@@ -1696,7 +1696,7 @@ fun CreateListingScreen(
                                                     color = DorjaColors.White,
                                                     fontSize = 7.sp,
                                                     fontWeight = FontWeight.Bold,
-                                                    fontFamily = FontFamily.Monospace,
+                                                    fontFamily = DorjaFontFamily,
                                                     modifier = Modifier.padding(horizontal = 3.dp, vertical = 1.5.dp)
                                                 )
                                             }
@@ -1710,7 +1710,7 @@ fun CreateListingScreen(
                                                 text = "Photo ${index + 1}",
                                                 style = MaterialTheme.typography.labelSmall,
                                                 color = DorjaColors.Gray500,
-                                                fontFamily = FontFamily.Monospace
+                                                fontFamily = DorjaFontFamily
                                             )
 
                                             Spacer(modifier = Modifier.height(2.dp))
@@ -2101,7 +2101,7 @@ fun CreateListingScreen(
                         text = "AMENITIES & FEATURES (${selectedTags.size})",
                         style = MaterialTheme.typography.labelSmall,
                         color = DorjaColors.Gray500,
-                        fontFamily = FontFamily.Monospace,
+                        fontFamily = DorjaFontFamily,
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(modifier = Modifier.height(8.dp))
@@ -2135,7 +2135,7 @@ fun CreateListingScreen(
                         text = "PROPERTY DESCRIPTION",
                         style = MaterialTheme.typography.labelSmall,
                         color = DorjaColors.Gray500,
-                        fontFamily = FontFamily.Monospace,
+                        fontFamily = DorjaFontFamily,
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(modifier = Modifier.height(8.dp))
@@ -2170,7 +2170,7 @@ fun CreateListingScreen(
                             text = "LIVEABILITY & ENERGY (${activeProfile.displayName.uppercase()})",
                             style = MaterialTheme.typography.labelSmall,
                             color = DorjaColors.Gray500,
-                            fontFamily = FontFamily.Monospace,
+                            fontFamily = DorjaFontFamily,
                             fontWeight = FontWeight.Bold
                         )
                         Spacer(modifier = Modifier.height(8.dp))
@@ -2443,7 +2443,7 @@ fun CreateListingScreen(
                                                 text = promise.category.replace("_", " "),
                                                 style = MaterialTheme.typography.labelSmall,
                                                 color = DorjaColors.Gray500,
-                                                fontFamily = FontFamily.Monospace,
+                                                fontFamily = DorjaFontFamily,
                                                 fontSize = 10.sp
                                             )
                                         }
@@ -2618,7 +2618,7 @@ private fun CounterBox(
                 text = label.uppercase(),
                 style = MaterialTheme.typography.labelSmall,
                 color = DorjaColors.Gray500,
-                fontFamily = FontFamily.Monospace,
+                fontFamily = DorjaFontFamily,
                 fontSize = 10.sp
             )
             Spacer(modifier = Modifier.height(4.dp))
