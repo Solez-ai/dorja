@@ -8,6 +8,7 @@ import androidx.room.Query
 import androidx.room.Update
 import com.example.data.model.AppealRecord
 import com.example.data.model.Conversation
+import com.example.data.model.HistoryEvent
 import com.example.data.model.IdentityVerification
 import com.example.data.model.Listing
 import com.example.data.model.Message
