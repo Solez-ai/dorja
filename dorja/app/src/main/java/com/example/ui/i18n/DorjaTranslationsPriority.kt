@@ -484,6 +484,10 @@ object DorjaTranslationsPriority {
         "compare_unknown_none" to "সব জানা আছে",
         "compare_checklist_title" to "ভিজিট চেকলিস্ট তৈরি করুন",
         "compare_checklist_empty" to "যাচাই করার মতো কিছু বাকি নেই — সবই নথিভুক্ত।",
+        "compare_row_rooms_doc" to "নথিভুক্ত রুম",
+        "compare_row_price_sqft" to "প্রতি ফুট² মূল্য",
+        "compare_row_sqft_bed" to "বেডরুম প্রতি জায়গা",
+        "compare_row_evidence" to "প্রমাণের পূর্ণতা",
     )
 
     val HINDI: Map<String, String> = mapOf(
@@ -962,6 +966,10 @@ object DorjaTranslationsPriority {
         "compare_unknown_none" to "पूरी जानकारी है",
         "compare_checklist_title" to "विज़िट चेकलिस्ट बनाएं",
         "compare_checklist_empty" to "जांचने के लिए कुछ नहीं बचा — सब दर्ज है।",
+        "compare_row_rooms_doc" to "दर्ज कमरे",
+        "compare_row_price_sqft" to "प्रति फुट² कीमत",
+        "compare_row_sqft_bed" to "बेडरूम प्रति जगह",
+        "compare_row_evidence" to "साक्ष्य पूर्णता",
     )
 
     val URDU: Map<String, String> = mapOf(
@@ -1440,6 +1448,10 @@ object DorjaTranslationsPriority {
         "compare_unknown_none" to "مکمل معلومات موجود",
         "compare_checklist_title" to "وزٹ چیک لسٹ بنائیں",
         "compare_checklist_empty" to "جانچنے کو کچھ باقی نہیں — سب ریکارڈ ہے۔",
+        "compare_row_rooms_doc" to "ریکارڈ شدہ کمرے",
+        "compare_row_price_sqft" to "فی فٹ² قیمت",
+        "compare_row_sqft_bed" to "بیڈ روم فی جگہ",
+        "compare_row_evidence" to "ثبوت کی مکملیت",
     )
 
     val ITALIAN: Map<String, String> = mapOf(
@@ -1918,5 +1930,9 @@ object DorjaTranslationsPriority {
         "compare_unknown_none" to "Tutto specificato",
         "compare_checklist_title" to "Crea checklist di visita",
         "compare_checklist_empty" to "Nulla da verificare — tutto è documentato.",
+        "compare_row_rooms_doc" to "Stanze documentate",
+        "compare_row_price_sqft" to "Prezzo per ft²",
+        "compare_row_sqft_bed" to "Spazio per camera",
+        "compare_row_evidence" to "Completezza delle prove",
     )
 }

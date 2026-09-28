@@ -82,8 +82,102 @@ private data class BoardRow(val labelKey: String, val left: CellValue, val right
 private val ROW_LABELS = listOf(
     "compare_row_price", "compare_row_beds", "compare_row_baths", "compare_row_sqft",
     "compare_row_area", "compare_row_type", "compare_row_intent", "compare_row_docs",
-    "compare_row_rooms"
+    "compare_row_rooms", "compare_row_rooms_doc", "compare_row_price_sqft",
+    "compare_row_sqft_bed", "compare_row_evidence"
 )
+
+private val boardIntFormat = java.text.DecimalFormat("#,##0")
+
+/**
+ * Derived metrics — computed from raw facts so the board can compare what
+ * neither listing states directly. Unknown inputs produce honest "?" cells
+ * that flow into the viewing checklist.
+ */
+
+/** Price per square foot — lower is better; unknown when area is missing. */
+private fun derivedPricePerSqftRow(l: Listing, r: Listing): BoardRow {
+    val lRatio = if (l.sqft > 0) l.priceAmount.toDouble() / l.sqft else null
+    val rRatio = if (r.sqft > 0) r.priceAmount.toDouble() / r.sqft else null
+    val leftCell = when {
+        lRatio == null -> CellValue("?", CellState.UNKNOWN)
+        rRatio == null -> CellValue(fmtRatio(lRatio), CellState.NEUTRAL)
+        lRatio <= rRatio -> CellValue(fmtRatio(lRatio), CellState.GOOD)
+        else -> CellValue(fmtRatio(lRatio), CellState.BAD)
+    }
+    val rightCell = when {
+        rRatio == null -> CellValue("?", CellState.UNKNOWN)
+        lRatio == null -> CellValue(fmtRatio(rRatio), CellState.NEUTRAL)
+        rRatio <= lRatio -> CellValue(fmtRatio(rRatio), CellState.GOOD)
+        else -> CellValue(fmtRatio(rRatio), CellState.BAD)
+    }
+    return boardRow("compare_row_price_sqft", leftCell, rightCell)
+}
+
+private fun fmtRatio(v: Double): String = boardIntFormat.format(v) + " / ft²"
+
+/** Floor area per bedroom — higher is better; unknown without bedrooms. */
+private fun derivedSpacePerBedRow(l: Listing, r: Listing): BoardRow {
+    val lVal = if (l.bedrooms > 0) l.sqft / l.bedrooms else null
+    val rVal = if (r.bedrooms > 0) r.sqft / r.bedrooms else null
+    val leftCell = when {
+        lVal == null -> CellValue("?", CellState.UNKNOWN)
+        rVal == null -> CellValue(boardIntFormat.format(lVal) + " ft² / bed", CellState.NEUTRAL)
+        lVal >= rVal -> CellValue(boardIntFormat.format(lVal) + " ft² / bed", CellState.GOOD)
+        else -> CellValue(boardIntFormat.format(lVal) + " ft² / bed", CellState.BAD)
+    }
+    val rightCell = when {
+        rVal == null -> CellValue("?", CellState.UNKNOWN)
+        lVal == null -> CellValue(boardIntFormat.format(rVal) + " ft² / bed", CellState.NEUTRAL)
+        rVal >= lVal -> CellValue(boardIntFormat.format(rVal) + " ft² / bed", CellState.GOOD)
+        else -> CellValue(boardIntFormat.format(rVal) + " ft² / bed", CellState.BAD)
+    }
+    return boardRow("compare_row_sqft_bed", leftCell, rightCell)
+}
+
+/** Evidence completeness: how many of the 6 core facts this listing states. */
+private fun evidenceScore(l: Listing): Int {
+    var score = 0
+    if (l.floodRisk?.isNotBlank() == true) score++
+    if (l.powerBackup?.isNotBlank() == true) score++
+    if (l.waterSupply?.isNotBlank() == true) score++
+    if (l.buildingAgeYears != null) score++
+    if (l.galleryUris.isNotBlank() || !l.coverPhotoUrl.isNullOrBlank()) score++
+    if (!l.virtualTourUrl.isNullOrBlank() || l.hasScan) score++
+    return score
+}
+
+private fun derivedEvidenceRow(l: Listing, r: Listing): BoardRow {
+    val ls = evidenceScore(l)
+    val rs = evidenceScore(r)
+    val leftCell = when {
+        ls > rs -> CellValue("$ls/6 facts", CellState.GOOD)
+        ls < rs -> CellValue("$ls/6 facts", CellState.BAD)
+        else -> CellValue("$ls/6 facts", CellState.NEUTRAL)
+    }
+    val rightCell = when {
+        rs > ls -> CellValue("$rs/6 facts", CellState.GOOD)
+        rs < ls -> CellValue("$rs/6 facts", CellState.BAD)
+        else -> CellValue("$rs/6 facts", CellState.NEUTRAL)
+    }
+    return boardRow("compare_row_evidence", leftCell, rightCell)
+}
+
+/** Rooms documented on the case-file — higher is better. */
+private fun derivedRoomsDocRow(leftRooms: List<RoomItem>, rightRooms: List<RoomItem>): BoardRow {
+    val l = leftRooms.size
+    val r = rightRooms.size
+    val leftCell = when {
+        l > r -> CellValue("$l rooms", CellState.GOOD)
+        l < r -> CellValue("$l rooms", CellState.BAD)
+        else -> CellValue("$l rooms", CellState.NEUTRAL)
+    }
+    val rightCell = when {
+        r > l -> CellValue("$r rooms", CellState.GOOD)
+        r < l -> CellValue("$r rooms", CellState.BAD)
+        else -> CellValue("$r rooms", CellState.NEUTRAL)
+    }
+    return boardRow("compare_row_rooms_doc", leftCell, rightCell)
+}
 
 /** Listing facts DORJA does not track — surfaced honestly, never faked. */
 private val UNKNOWN_DATA_KEYS = listOf(
@@ -170,7 +264,11 @@ private fun buildBoard(
                 leftRooms.count { it.has3DScan }.toString() + " 3D scans",
                 rightRooms.count { it.has3DScan }.toString() + " 3D scans"
             )
-        )
+        ),
+        derivedRoomsDocRow(leftRooms, rightRooms),
+        derivedPricePerSqftRow(left, right),
+        derivedSpacePerBedRow(left, right),
+        derivedEvidenceRow(left, right)
     )
 }
 
