@@ -61,6 +61,8 @@ import androidx.compose.material.icons.filled.Bathtub
 import androidx.compose.material.icons.filled.Bed
 import androidx.compose.material.icons.filled.Flag
 import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Call
+import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.CompareArrows
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.CheckCircle
@@ -122,6 +124,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.DorjaApp
+import com.example.data.model.User
 import com.example.R
 import com.example.data.country.CountryRegistry
 import com.example.data.country.LiveabilityField
@@ -268,6 +271,12 @@ fun PropertyDetailScreen(
     }
 
     val safeListing = listing!!
+
+    // ── Direct-to-agent lead context: the listing owner (call / email / chat).
+    val listingOwner = remember(safeListing.ownerId) { mutableStateOf<User?>(null) }
+    LaunchedEffect(safeListing.ownerId) {
+        listingOwner.value = repository.getUserById(safeListing.ownerId)
+    }
     val isOwner = currentUser?.id == safeListing.ownerId && currentUser?.role == "SELLER"
 
     // Assemble high-quality photo list for buyer view
@@ -2130,6 +2139,44 @@ fun PropertyDetailScreen(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                    // ── Direct-to-agent leads: click-to-call / email inquiry ──
+                    val owner = listingOwner.value
+                    if (owner != null) {
+                        LeadPill(
+                            icon = Icons.Default.Call,
+                            label = L("lead_call"),
+                            container = DorjaColors.BentoGreenBg,
+                            content = DorjaColors.BentoGreenText
+                        ) {
+                            val intent = Intent(Intent.ACTION_DIAL, Uri.parse("tel:" + owner.phone))
+                            try {
+                                context.startActivity(intent)
+                            } catch (_: Exception) {
+                            }
+                        }
+                        val leadSubject = L("lead_email_subject")
+                        val leadBodyTemplate = L("lead_email_body")
+                        LeadPill(
+                            icon = Icons.Default.Email,
+                            label = L("lead_email"),
+                            container = DorjaColors.BentoBlueBg,
+                            content = DorjaColors.BentoBlueText
+                        ) {
+                            val intent = Intent(Intent.ACTION_SENDTO).apply {
+                                data = Uri.parse("mailto:")
+                                putExtra(Intent.EXTRA_EMAIL, arrayOf(owner.email))
+                                putExtra(Intent.EXTRA_SUBJECT, leadSubject)
+                                putExtra(
+                                    Intent.EXTRA_TEXT,
+                                    leadBodyTemplate.format(safeListing.title)
+                                )
+                            }
+                            try {
+                                context.startActivity(intent)
+                            } catch (_: Exception) {
+                            }
+                        }
+                    }
                 if (isOwner) {
                     Surface(
                         shape = RoundedCornerShape(22.dp),
@@ -2784,6 +2831,45 @@ private fun CompareButton(onClick: () -> Unit) {
                 contentDescription = L("compare_title"),
                 tint = DorjaColors.BentoBlueIcon,
                 modifier = Modifier.size(19.dp)
+            )
+        }
+    }
+}
+
+/**
+ * Compact direct-to-agent lead pill (click-to-call / email) that lives in the
+ * floating action bar next to Chat and Book Visit. Fully opaque in both modes
+ * so it never reads as disabled.
+ */
+@Composable
+private fun LeadPill(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    container: Color,
+    content: Color,
+    onClick: () -> Unit
+) {
+    Surface(
+        shape = CircleShape,
+        color = container,
+        onClick = onClick
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+                tint = content,
+                modifier = Modifier.size(16.dp)
+            )
+            Spacer(modifier = Modifier.width(5.dp))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                color = content
             )
         }
     }

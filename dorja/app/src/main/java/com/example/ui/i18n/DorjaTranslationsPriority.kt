@@ -452,6 +452,10 @@ object DorjaTranslationsPriority {
         "history_not_registry" to "DORJA-নির্মিত রেকর্ড। এটি সরকারি রেজিস্ট্রি বা আইনি সনদ নয়।",
         "history_unknown_place" to "রেকর্ড করা হয়নি",
         "history_recorded_by_you" to "আপনি (এই ডিভাইস)",
+        "lead_call" to "কল",
+        "lead_email" to "ইমেইল",
+        "lead_email_subject" to "জিজ্ঞাসা: %1\$s",
+        "lead_email_body" to "হ্যালো, আমি DORJA-তে আপনার “%1\$s” লিস্টিং দেখে আগ্রহী। এটি কি এখনো available?",
     )
 
     val HINDI: Map<String, String> = mapOf(
@@ -898,6 +902,10 @@ object DorjaTranslationsPriority {
         "history_not_registry" to "DORJA-निर्मित रिकॉर्ड। यह सरकारी रजिस्टर या कानूनी प्रमाणन नहीं है।",
         "history_unknown_place" to "दर्ज नहीं",
         "history_recorded_by_you" to "आप (यह डिवाइस)",
+        "lead_call" to "कॉल",
+        "lead_email" to "ईमेल",
+        "lead_email_subject" to "पूछताछ: %1\$s",
+        "lead_email_body" to "नमस्ते, मुझे DORJA पर आपकी लिस्टिंग “%1\$s” पसंद आई। क्या यह अभी भी उपलब्ध है?",
     )
 
     val URDU: Map<String, String> = mapOf(
@@ -1344,6 +1352,10 @@ object DorjaTranslationsPriority {
         "history_not_registry" to "DORJA سے تیار کردہ ریکارڈ۔ یہ سرکاری رجسٹری یا قانونی تصدیق نہیں۔",
         "history_unknown_place" to "ریکارڈ نہیں ہوا",
         "history_recorded_by_you" to "آپ (یہ ڈیوائس)",
+        "lead_call" to "کال",
+        "lead_email" to "ای میل",
+        "lead_email_subject" to "پوچھ گچھ: %1\$s",
+        "lead_email_body" to "ہیلو، میں نے DORJA پر آپ کی لسٹنگ “%1\$s” دیکھی اور دلچسپی رکھتا ہوں۔ کیا یہ ابھی دستیاب ہے؟",
     )
 
     val ITALIAN: Map<String, String> = mapOf(
@@ -1790,5 +1802,9 @@ object DorjaTranslationsPriority {
         "history_not_registry" to "Record generato da DORJA. Non è un registro governativo né una certificazione legale.",
         "history_unknown_place" to "Non registrato",
         "history_recorded_by_you" to "Tu (questo dispositivo)",
+        "lead_call" to "Chiama",
+        "lead_email" to "Email",
+        "lead_email_subject" to "Richiesta: %1\$s",
+        "lead_email_body" to "Salve, ho visto il tuo annuncio “%1\$s” su DORJA e sono interessato. È ancora disponibile?",
     )
 }

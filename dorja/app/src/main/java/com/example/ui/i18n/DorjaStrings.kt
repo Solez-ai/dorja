@@ -497,6 +497,11 @@ data class DorjaStrings(
             "history_not_registry" to "DORJA-generated record. Not a government registry or legal certification.",
             "history_unknown_place" to "Not recorded",
             "history_recorded_by_you" to "You (this device)",
+            // Direct-to-agent lead forms
+            "lead_call" to "Call",
+            "lead_email" to "Email",
+            "lead_email_subject" to "Inquiry: %1\$s",
+            "lead_email_body" to "Hello, I found your listing “%1\$s” on DORJA and I'm interested. Is it still available?",
             "common_save" to "Save",
             "common_delete" to "Delete",
             "common_confirm" to "Confirm",
