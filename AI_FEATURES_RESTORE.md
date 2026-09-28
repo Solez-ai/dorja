@@ -15,19 +15,28 @@ from there verbatim).
 
 | Path | Contents |
 |---|---|
-| `dorja/app/src/main/java/com/example/ai/` | `DorjaAiEngine.kt` (rule-based engine), `DorjaAssistant.kt` (Cactus on-device model, 4 tools), `PropertyAiContext.kt`, `VoiceAssistantHelper.kt` (speech recognizer) |
-| `dorja/app/src/main/java/com/example/ui/ai/` | `HeyDorjaBottomSheet.kt` — the "Hey Dorja" property-context sheet |
-| `dorja/app/src/main/java/com/example/ui/assistant/` | `AssistantScreen.kt` — full-screen assistant (route `Screen.Assistant` still exists in `DorjaNavHost.kt`) |
+| `dorja/app/src/parkedAI/ai/` | `DorjaAiEngine.kt` (rule-based engine), `DorjaAssistant.kt` (Cactus on-device model, 4 tools), `PropertyAiContext.kt`, `VoiceAssistantHelper.kt` (speech recognizer) |
+| `dorja/app/src/parkedAI/ui_ai/` | `HeyDorjaBottomSheet.kt` — the "Hey Dorja" property-context sheet |
+| `dorja/app/src/parkedAI/ui_assistant/` | `AssistantScreen.kt` — full-screen assistant |
 | `dorja/ai-finetune/` | Needle Phase 2 fine-tuning kit (tools.json, data, README) |
 
 ## Restore checklist
 
-### 0. Re-include the AI sources (`dorja/app/build.gradle.kts`)
+### 0. Move the AI sources back into the source tree
 
-The `sourceSets` block in `android { }` currently excludes `com/example/ai/**`,
-`com/example/ui/ai/**` and `com/example/ui/assistant/**` from compilation (otherwise
-the kept files can't compile without the cactus dependency). Delete that whole
-`sourceSets { ... }` block — it is marked with an "AI PARKED" comment.
+The AI code was moved out of compilation into `dorja/app/src/parkedAI/` (from
+`dorja/`):
+
+```bash
+cd dorja/app/src
+git mv parkedAI/ai main/java/com/example/ai
+git mv parkedAI/ui_ai main/java/com/example/ui/ai
+git mv parkedAI/ui_assistant main/java/com/example/ui/assistant
+```
+
+Folder names map back to their original packages, so no code edits are needed.
+Then delete the "AI sources are parked" NOTE comment in `android { }` in
+`dorja/app/build.gradle.kts` if you want the tidiness.
 
 ### 1. Dependency (`dorja/app/build.gradle.kts`)
 

@@ -58,21 +58,8 @@ android {
     compose = true
     buildConfig = true
   }
-
-  // AI PARKED: exclude the kept-but-dormant AI sources from compilation while the
-  // cactus dependency is commented out. Files remain in the repo — to restore AI,
-  // delete this sourceSets block and follow AI_FEATURES_RESTORE.md.
-  sourceSets {
-    getByName("main") {
-      java {
-        filter.excludes = setOf(
-          "com/example/ai/**",
-          "com/example/ui/ai/**",
-          "com/example/ui/assistant/**"
-        )
-      }
-    }
-  }
+  // NOTE: the AI sources are parked outside the source tree at app/src/parkedAI/
+  // (they import cactus, which is commented out). Restore guide: AI_FEATURES_RESTORE.md.
   testOptions { unitTests { isIncludeAndroidResources = true } }
   dependenciesInfo {
     includeInApk = false
