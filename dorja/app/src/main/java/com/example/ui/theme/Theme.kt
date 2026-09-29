@@ -40,11 +40,13 @@ private val DorjaLightColorScheme = lightColorScheme(
 
 private val DorjaDarkColorScheme = darkColorScheme(
     primary = DorjaDarkColors.Jol600,
-    onPrimary = DorjaDarkColors.Ink950,
+    // Jol600-dark is a saturated blue, so onPrimary must stay light. Ink950
+    // inverts to near-white and produced light-on-light invisible labels.
+    onPrimary = DorjaDarkColors.InverseFg,
     primaryContainer = DorjaDarkColors.Jol100,
     onPrimaryContainer = DorjaDarkColors.Jol700,
     secondary = DorjaDarkColors.Sand300,
-    onSecondary = DorjaDarkColors.Ink950,
+    onSecondary = DorjaDarkColors.CanvasBg,
     secondaryContainer = DorjaDarkColors.Sand100,
     onSecondaryContainer = DorjaDarkColors.Ink950,
     tertiary = DorjaDarkColors.Teal100,

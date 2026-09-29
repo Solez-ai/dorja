@@ -46,6 +46,7 @@ import com.example.data.model.Listing
 import com.example.ui.i18n.DorjaLocales
 import com.example.ui.i18n.LocaleSettings
 import com.example.ui.theme.DorjaColors
+import com.example.ui.theme.LocalDarkTheme
 import com.example.ui.theme.LiquidGlassDefaults
 import com.example.ui.theme.liquidGlass
 import com.example.ui.theme.pressScale
@@ -214,6 +215,19 @@ fun DorjaButton(
     contentColor: Color = Color.White,
     testTag: String? = null
 ) {
+    // Dark mode: a disabled filled button must not melt into the pitch-black
+    // canvas (InverseBg = #080A0E) — give it an elevated dark fill and muted
+    // label so its shape stays visible.
+    val disabledContainer = if (LocalDarkTheme.current) {
+        DorjaColors.White.copy(alpha = 0.35f)
+    } else {
+        DorjaColors.Sand300
+    }
+    val disabledContent = if (LocalDarkTheme.current) {
+        DorjaColors.Gray500
+    } else {
+        DorjaColors.Gray600
+    }
     val finalModifier = if (testTag != null) modifier.testTag(testTag) else modifier
     // iOS: real CupertinoButton (filled, .borderedProminent style) with native
     // press-dim physics and iOS disabled states.
@@ -223,7 +237,9 @@ fun DorjaButton(
         enabled = enabled,
         colors = CupertinoButtonDefaults.filledButtonColors(
             contentColor = contentColor,
-            containerColor = containerColor
+            containerColor = containerColor,
+            disabledContentColor = disabledContent,
+            disabledContainerColor = disabledContainer
         ),
         shape = RoundedCornerShape(12.dp)
     ) {
@@ -383,12 +399,14 @@ fun DorjaChip(
     modifier: Modifier = Modifier,
     icon: ImageVector? = null
 ) {
+    // Unselected chip fill uses the elevated dark token in dark mode; the
+    // selected pair keeps white content on the saturated Jol600 blue.
     val animatedBg by animateColorAsState(
         targetValue = if (selected) DorjaColors.Jol600 else DorjaColors.White,
         label = "chipBg"
     )
     val animatedFg by animateColorAsState(
-        targetValue = if (selected) androidx.compose.ui.graphics.Color.White else DorjaColors.Ink950,
+        targetValue = if (selected) Color.White else DorjaColors.Ink950,
         label = "chipFg"
     )
 
@@ -432,7 +450,7 @@ fun DorjaAvatar(
     modifier: Modifier = Modifier,
     size: Dp = 40.dp,
     backgroundColor: Color = DorjaColors.Jol600,
-    textColor: Color = Color.White
+    textColor: Color = DorjaColors.InverseFg
 ) {
     val initials = name.trim().split(" ")
         .take(2)

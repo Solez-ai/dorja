@@ -285,6 +285,9 @@ private fun ActiveViewingBentoCard(
                 DorjaButton(
                     text = L("visits_cancel_cta"),
                     containerColor = DorjaColors.Error,
+                    // Error token inverts to light salmon in dark mode; keep
+                    // an explicit dark label so the text stays legible.
+                    contentColor = DorjaColors.InverseFg,
                     onClick = {
                         showCancelConfirm = false
                         onCancel()

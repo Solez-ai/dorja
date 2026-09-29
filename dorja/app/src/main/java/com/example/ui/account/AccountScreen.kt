@@ -483,6 +483,9 @@ fun AccountScreen(
                 DorjaButton(
                     text = L("account_delete_confirm"),
                     containerColor = DorjaColors.Error,
+                    // Error token inverts to light salmon in dark mode; keep
+                    // an explicit dark label so the text stays legible.
+                    contentColor = DorjaColors.InverseFg,
                     onClick = {
                         scope.launch {
                             repository.deleteAccount(target.id)

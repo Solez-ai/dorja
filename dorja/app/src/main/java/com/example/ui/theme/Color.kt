@@ -102,7 +102,10 @@ val DorjaLightColors = DorjaColorTokens(
 val DorjaDarkColors = DorjaColorTokens(
     CanvasBg = Color(0xFF0F1419),
     Ink950 = Color(0xFFF2F4F7),
-    Jol600 = Color(0xFF5BA8E8),
+    // iOS systemBlue (dark): light enough to feel native on black, yet dark
+    // enough that WHITE content stays legible on it — mirrors iOS systemBlue
+    // (#0A84FF) which carries white labels in dark mode everywhere.
+    Jol600 = Color(0xFF0A84FF),
     Jol100 = Color(0xFF16324C),
     Jol700 = Color(0xFF9CCCF0),
     Paper50 = Color(0xFF151B22),

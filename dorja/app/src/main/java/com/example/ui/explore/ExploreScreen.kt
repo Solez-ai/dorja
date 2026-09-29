@@ -753,7 +753,10 @@ private fun ExploreFilterSheet(
                         onReset()
                     },
                     modifier = Modifier.weight(1f),
-                    containerColor = DorjaColors.Gray700
+                    // Gray700 inverts to a light gray in dark mode; explicit
+                    // dark label keeps the white-text assumption true.
+                    containerColor = DorjaColors.Gray700,
+                    contentColor = DorjaColors.InverseFg
                 )
                 DorjaButton(
                     text = L("filter_apply"),

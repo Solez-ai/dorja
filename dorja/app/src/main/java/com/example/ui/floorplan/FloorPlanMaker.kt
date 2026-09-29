@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -125,8 +126,12 @@ fun FloorPlanMakerOverlay(
     )
 
     Dialog(
-        onDismissRequest = { onDone(null) },
-        properties = DialogProperties(usePlatformDefaultWidth = false)
+        onDismissRequest = { onDone(null) },            properties = DialogProperties(
+                usePlatformDefaultWidth = false,
+                // Edge-to-edge dialog so imePadding below receives real IME
+                // insets instead of relying on the system resizing the window.
+                decorFitsSystemWindows = false
+            )
     ) {
         Surface(
             modifier = Modifier.fillMaxSize(),
@@ -137,6 +142,7 @@ fun FloorPlanMakerOverlay(
                     .fillMaxSize()
                     .statusBarsPadding()
                     .navigationBarsPadding()
+                    .imePadding()
             ) {
                 // ── Header ──
                 Row(
@@ -286,22 +292,10 @@ fun FloorPlanMakerOverlay(
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                // ── Save bar ──
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    DorjaButton(
-                        text = L("floorplan_save"),
-                        onClick = { onDone(FloorPlanData(walls.toList(), rooms.toList()).toJson()) },
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-                Spacer(modifier = Modifier.height(8.dp))
-
                 // ── Room name prompt — inline panel, no nested dialog ──
+                // Placed ABOVE the save bar so it is never the bottom-most
+                // element; combined with imePadding on the root Column it
+                // always stays clear of the keyboard and a thumb's reach.
                 pendingRoomPoint?.let { point ->
                     var name by remember(point) { mutableStateOf("") }
                     Surface(
@@ -350,8 +344,23 @@ fun FloorPlanMakerOverlay(
                             }
                         }
                     }
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
                 }
+
+                // ── Save bar ──
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    DorjaButton(
+                        text = L("floorplan_save"),
+                        onClick = { onDone(FloorPlanData(walls.toList(), rooms.toList()).toJson()) },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                Spacer(modifier = Modifier.height(8.dp))
             }
         }
     }
