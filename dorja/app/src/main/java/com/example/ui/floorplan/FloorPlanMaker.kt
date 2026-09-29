@@ -52,6 +52,7 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
@@ -607,7 +608,7 @@ fun FloorPlanMakerOverlay(
                                                                 touchPx / viewport.scale
                                                             )
                                                             drawStart?.let { start ->
-                                                                wallPreview = constrainAngle(start, raw, orthoLock)
+                                                                wallPreview = start to constrainAngle(start, raw, orthoLock)
                                                             }
                                                             change.consume()
                                                         }
@@ -893,7 +894,7 @@ private fun DrawScope.drawOverlays(
 ) {
     fun toScreen(p: Offset): Offset = Offset(p.x * scale + offset.x, p.y * scale + offset.y)
 
-    val textSize = 13.dp.toPx()
+    val labelTextSize = 13.dp.toPx()
     val labelPaint = Paint().apply {
         color = android.graphics.Color.argb(
             (labelColor.alpha * 255).toInt(),
@@ -901,7 +902,7 @@ private fun DrawScope.drawOverlays(
             (labelColor.green * 255).toInt(),
             (labelColor.blue * 255).toInt()
         )
-        textSize = textSize
+        textSize = labelTextSize
         isAntiAlias = true
         textAlign = Paint.Align.CENTER
     }
@@ -909,7 +910,7 @@ private fun DrawScope.drawOverlays(
         rooms.forEach { room ->
             val sp = toScreen(Offset(room.cx, room.cy))
             if (sp.x in -100f..size.width + 100f && sp.y in -100f..size.height + 100f) {
-                canvas.nativeCanvas.drawText(room.name, sp.x, sp.y + textSize / 3f, labelPaint)
+                canvas.nativeCanvas.drawText(room.name, sp.x, sp.y + labelTextSize / 3f, labelPaint)
             }
         }
     }
@@ -919,6 +920,7 @@ private fun DrawScope.drawOverlays(
         val len = hypot(e.x - s.x, e.y - s.y)
         if (len > 0.05f) {
             val mid = toScreen(Offset((s.x + e.x) / 2f, (s.y + e.y) / 2f))
+            val dimTextSize = 12.dp.toPx()
             val dimPaint = Paint().apply {
                 color = android.graphics.Color.argb(
                     (accentColor.alpha * 255).toInt(),
@@ -926,7 +928,7 @@ private fun DrawScope.drawOverlays(
                     (accentColor.green * 255).toInt(),
                     (accentColor.blue * 255).toInt()
                 )
-                textSize = 12.dp.toPx()
+                textSize = dimTextSize
                 isAntiAlias = true
                 textAlign = Paint.Align.CENTER
                 isFakeBoldText = true
