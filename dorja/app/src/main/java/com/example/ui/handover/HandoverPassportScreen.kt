@@ -202,7 +202,10 @@ fun HandoverPassportScreen(
             item {
                 DorjaCard(
                     modifier = Modifier.fillMaxWidth(),
-                    backgroundColor = DorjaColors.Ink950
+                    // Always-dark "legal record" card: pinned ink so the
+                    // Sand300/White text pairing survives dark mode too.
+                    backgroundColor = androidx.compose.ui.graphics.Color(0xFF0B0E14),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, DorjaColors.Sand300)
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Row(
@@ -220,14 +223,16 @@ fun HandoverPassportScreen(
                                 text = "AUDITED",
                                 icon = Icons.Default.Shield,
                                 backgroundColor = DorjaColors.Jol600,
-                                textColor = DorjaColors.White
+                                // White on Jol600 is safe in both themes now,
+                                // but this card is always-dark — keep it literal.
+                                textColor = androidx.compose.ui.graphics.Color.White
                             )
                         }
                         Spacer(modifier = Modifier.height(10.dp))
                         Text(
                             text = listing?.title ?: "Property Handover Warranties",
                             style = MaterialTheme.typography.titleMedium,
-                            color = DorjaColors.White,
+                            color = DorjaColors.InverseFg,
                             fontWeight = FontWeight.Bold
                         )
                         Spacer(modifier = Modifier.height(4.dp))

@@ -183,11 +183,14 @@ fun ViewingPassScreen(
                         Spacer(modifier = Modifier.height(20.dp))
 
                         // QR Code Rendered
+                        // QRs must keep a literal WHITE quiet zone in every
+                        // theme or scanners fail — the token would invert in
+                        // dark mode and break the pass.
                         if (qrBitmap != null) {
                             Surface(
                                 shape = RoundedCornerShape(12.dp),
                                 border = androidx.compose.foundation.BorderStroke(2.dp, DorjaColors.Ink950),
-                                color = DorjaColors.White,
+                                color = androidx.compose.ui.graphics.Color.White,
                                 modifier = Modifier.padding(8.dp)
                             ) {
                                 Image(

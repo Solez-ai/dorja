@@ -2,9 +2,11 @@ package com.example.ui.floorplan
 
 import android.graphics.Paint
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -15,19 +17,27 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CenterFocusStrong
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Undo
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Redo
+import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.Undo
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -43,6 +53,7 @@ import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
@@ -54,17 +65,29 @@ import com.example.ui.components.DorjaOutlinedButton
 import com.example.ui.i18n.L
 import com.example.ui.theme.DorjaColors
 import com.google.gson.Gson
+import kotlin.math.abs
+import kotlin.math.atan2
+import kotlin.math.cos
 import kotlin.math.hypot
+import kotlin.math.roundToLong
+import kotlin.math.sin
 
-/** One wall segment in normalized canvas coordinates (0f..1f). */
+// ─────────────────────────────────────────────────────────────────────────────
+// Model (v2): walls and rooms live in METERS on an architectural plan.
+// v1 stored normalized 0..1 coordinates; fromJson() migrates those x10.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** One wall segment in meters. [thickness] is wall width in meters. */
 data class FloorPlanWall(
     val x1: Float,
     val y1: Float,
     val x2: Float,
-    val y2: Float
+    val y2: Float,
+    val thickness: Float = 0.15f,
+    val type: String = "interior" // "interior" | "exterior"
 )
 
-/** A text label anchored at a normalized canvas position. */
+/** A text label anchored at a plan position in meters. */
 data class FloorPlanRoomLabel(
     val name: String,
     val cx: Float,
@@ -74,34 +97,140 @@ data class FloorPlanRoomLabel(
 /** Full floor plan payload persisted as JSON in [com.example.data.model.Listing.floorPlanJson]. */
 data class FloorPlanData(
     val walls: List<FloorPlanWall> = emptyList(),
-    val rooms: List<FloorPlanRoomLabel> = emptyList()
+    val rooms: List<FloorPlanRoomLabel> = emptyList(),
+    val version: Int = 2
 ) {
     fun toJson(): String = Gson().toJson(this)
 
     companion object {
+        /** v1 coordinates were normalized to a 0..1 canvas ≈ 10 m across. */
+        private const val LEGACY_SPAN = 10f
+
         fun fromJson(json: String?): FloorPlanData? {
             if (json.isNullOrBlank()) return null
-            return runCatching { Gson().fromJson(json, FloorPlanData::class.java) }.getOrNull()
+            return runCatching {
+                val raw = Gson().fromJson(json, FloorPlanData::class.java)
+                    ?: return@runCatching null
+                val s = if (raw.version < 2) LEGACY_SPAN else 1f
+                FloorPlanData(
+                    walls = raw.walls.map {
+                        FloorPlanWall(
+                            x1 = it.x1 * s,
+                            y1 = it.y1 * s,
+                            x2 = it.x2 * s,
+                            y2 = it.y2 * s,
+                            // Gson bypasses Kotlin defaults: normalize blanks.
+                            thickness = if (it.thickness > 0f) it.thickness
+                            else if (it.type == "exterior") 0.25f else 0.15f,
+                            type = it.type ?: "interior"
+                        )
+                    },
+                    rooms = raw.rooms.map {
+                        FloorPlanRoomLabel(it.name, it.cx * s, it.cy * s)
+                    },
+                    version = 2
+                )
+            }.getOrNull()
         }
     }
 }
 
-/** Grid resolution for snapping: every coordinate snaps to a multiple of 1/[GRID_STEPS]. */
-private const val GRID_STEPS = 24
+// ─────────────────────────────────────────────────────────────────────────────
+// Plan constants
+// ─────────────────────────────────────────────────────────────────────────────
 
-private fun snap(v: Float): Float =
-    (kotlin.math.round(v * GRID_STEPS) / GRID_STEPS).coerceIn(0f, 1f)
+/** Editable plan extent in meters (grid runs 0..EXTENT on both axes). */
+private const val PLAN_EXTENT = 40f
 
-/** Small erase hit-range in normalized units. */
-private const val ERASE_RADIUS = 0.035f
+/** Initial visible span (meters) when the editor opens. */
+private const val BASE_SPAN = 12f
+
+/** Snap quantum: 0.25 m per grid sub-cell. */
+private const val SNAP_M = 0.25f
+
+/** Minimum committed wall length in meters. */
+private const val MIN_WALL_LEN = 0.30f
+
+/** Zoom bounds in px-per-meter, refined by canvas width at runtime. */
+private const val MAX_SCALE = 480f
+
+/** Wall thickness presets (meters). */
+private val THICKNESS_OPTIONS = listOf(0.10f, 0.15f, 0.20f, 0.25f, 0.30f)
+private const val INTERIOR_DEFAULT = 0.15f
+private const val EXTERIOR_DEFAULT = 0.25f
+
+private enum class PlanTool { WALL, ROOM, ERASE, PAN }
+
+/** Pan/zoom viewport: screen = plan * scale + offset. */
+private data class Viewport(
+    val scale: Float,
+    val offsetX: Float,
+    val offsetY: Float
+)
+
+private data class EditorSnapshot(
+    val walls: List<FloorPlanWall>,
+    val rooms: List<FloorPlanRoomLabel>
+)
+
+private fun snapToGrid(v: Float): Float =
+    (Math.round(v / SNAP_M) * SNAP_M).coerceIn(0f, PLAN_EXTENT)
+
+private fun snapPoint(p: Offset, walls: List<FloorPlanWall>, threshold: Float): Offset {
+    // Snap-to-corner: existing endpoints win over the grid.
+    var best: Offset? = null
+    var bestD = threshold
+    walls.forEach { w ->
+        listOf(Offset(w.x1, w.y1), Offset(w.x2, w.y2)).forEach { corner ->
+            val d = hypot(p.x - corner.x, p.y - corner.y)
+            if (d < bestD) {
+                bestD = d
+                best = corner
+            }
+        }
+    }
+    best?.let { return it }
+    return Offset(snapToGrid(p.x), snapToGrid(p.y))
+}
+
+/** Orthogonal / 45° angle constraint for the in-progress wall. */
+private fun constrainAngle(start: Offset, end: Offset, ortho: Boolean): Offset {
+    val dx = end.x - start.x
+    val dy = end.y - start.y
+    if (ortho) {
+        return if (abs(dx) >= abs(dy)) Offset(end.x, start.y) else Offset(start.x, end.y)
+    }
+    val len = hypot(dx, dy)
+    if (len < 0.2f) return end
+    val angle = atan2(dy, dx)
+    val quadrant = (kotlin.math.PI / 4)
+    val target = kotlin.math.round(angle / quadrant) * quadrant
+    if (abs(angle - target) < kotlin.math.PI / 22.5) { // within ~8°
+        return start + Offset((cos(target) * len).toFloat(), (sin(target) * len).toFloat())
+    }
+    return end
+}
+
+private fun distPointToSegment(p: Offset, a: Offset, b: Offset): Float {
+    val dx = b.x - a.x
+    val dy = b.y - a.y
+    val lenSq = dx * dx + dy * dy
+    val t = if (lenSq == 0f) 0f
+    else (((p.x - a.x) * dx + (p.y - a.y) * dy) / lenSq).coerceIn(0f, 1f)
+    return hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy))
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Editor overlay
+// ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Full-screen interactive floor plan editor. Sellers sketch walls with their
- * finger (snapped to a grid), drop room labels, erase mistakes, and save the
- * plan as compact JSON. Rendered as a full-screen dialog so no navigation
- * changes are needed.
+ * Full-screen CAD-style floor plan editor: infinite pan/pinch-zoom canvas,
+ * 1 m grid with 0.25 m snap, snap-to-corner, orthogonal and 45° angle
+ * constraints, wall thickness/type control, room labels, erase, undo/redo,
+ * live dimension readout and a scale bar. Saved as metric v2 JSON.
  *
- * @param initialJson previously saved plan, or null for a blank canvas
+ * @param initialJson previously saved plan (v1 or v2), or null for a blank canvas
  * @param onDone called with the serialized plan on save, or null on discard
  */
 @Composable
@@ -110,28 +239,139 @@ fun FloorPlanMakerOverlay(
     onDone: (String?) -> Unit
 ) {
     val initial = remember { FloorPlanData.fromJson(initialJson) ?: FloorPlanData() }
-    val walls = remember { mutableStateListOf<FloorPlanWall>().apply { addAll(initial.walls) } }
-    val rooms = remember { mutableStateListOf<FloorPlanRoomLabel>().apply { addAll(initial.rooms) } }
+    var plan by remember {
+        mutableStateOf(EditorSnapshot(initial.walls, initial.rooms))
+    }
+    val undoStack = remember { mutableStateListOf<EditorSnapshot>() }
+    val redoStack = remember { mutableStateListOf<EditorSnapshot>() }
 
-    // WALL | ROOM | ERASE
-    var mode by remember { mutableStateOf("WALL") }
+    fun mutate(transform: (EditorSnapshot) -> EditorSnapshot) {
+        undoStack.add(plan)
+        if (undoStack.size > 60) undoStack.removeAt(0)
+        redoStack.clear()
+        plan = transform(plan)
+    }
+
+    fun undo() {
+        if (undoStack.isNotEmpty()) {
+            redoStack.add(plan)
+            plan = undoStack.removeAt(undoStack.lastIndex)
+        }
+    }
+
+    fun redo() {
+        if (redoStack.isNotEmpty()) {
+            undoStack.add(plan)
+            plan = redoStack.removeAt(redoStack.lastIndex)
+        }
+    }
+
+    var tool by remember { mutableStateOf(PlanTool.WALL) }
+    var orthoLock by remember { mutableStateOf(true) }
+    var wallType by remember { mutableStateOf("interior") }
+    var wallThickness by remember { mutableStateOf(INTERIOR_DEFAULT) }
+
     var canvasSize by remember { mutableStateOf(IntSize.Zero) }
-    var dragStart by remember { mutableStateOf<Offset?>(null) }
-    var dragEnd by remember { mutableStateOf<Offset?>(null) }
+    var viewport by remember { mutableStateOf(Viewport(60f, 0f, 0f)) }
+    var viewportInitialized by remember { mutableStateOf(false) }
+    var wallPreview by remember { mutableStateOf<Pair<Offset, Offset>?>(null) }
     var pendingRoomPoint by remember { mutableStateOf<Offset?>(null) }
+    var eraseHit by remember { mutableStateOf(-1) }
 
-    fun normalized(offset: Offset): Offset = Offset(
-        x = (offset.x / canvasSize.width.coerceAtLeast(1)).coerceIn(0f, 1f),
-        y = (offset.y / canvasSize.height.coerceAtLeast(1)).coerceIn(0f, 1f)
+    val density = LocalDensity.current
+    val touchPx = with(density) { 26.dp.toPx() }
+    val minScale: () -> Float = {
+        canvasSize.width.coerceAtLeast(1) / (PLAN_EXTENT * 1.15f)
+    }
+
+    // Center the base span once the canvas has a real size.
+    LaunchedEffect(canvasSize) {
+        if (!viewportInitialized && canvasSize != IntSize.Zero) {
+            viewportInitialized = true
+            val s = canvasSize.width / (BASE_SPAN * 1.12f)
+            val center = Offset(BASE_SPAN / 2f, BASE_SPAN / 2f)
+            viewport = Viewport(
+                scale = s,
+                offsetX = canvasSize.width / 2f - center.x * s,
+                offsetY = canvasSize.height / 2f - center.y * s
+            )
+        }
+    }
+
+    fun screenToPlan(screen: Offset): Offset = Offset(
+        x = (screen.x - viewport.offsetX) / viewport.scale,
+        y = (screen.y - viewport.offsetY) / viewport.scale
     )
 
-    Dialog(
-        onDismissRequest = { onDone(null) },            properties = DialogProperties(
-                usePlatformDefaultWidth = false,
-                // Edge-to-edge dialog so imePadding below receives real IME
-                // insets instead of relying on the system resizing the window.
-                decorFitsSystemWindows = false
+    fun fitToPlan() {
+        val walls = plan.walls
+        if (walls.isEmpty()) {
+            val s = canvasSize.width / (BASE_SPAN * 1.12f)
+            viewport = Viewport(
+                scale = s,
+                offsetX = canvasSize.width / 2f - BASE_SPAN / 2f * s,
+                offsetY = canvasSize.height / 2f - BASE_SPAN / 2f * s
             )
+            return
+        }
+        val minX = walls.minOf { minOf(it.x1, it.x2) } - 1f
+        val maxX = walls.maxOf { maxOf(it.x1, it.x2) } + 1f
+        val minY = walls.minOf { minOf(it.y1, it.y2) } - 1f
+        val maxY = walls.maxOf { maxOf(it.y1, it.y2) } + 1f
+        val w = (maxX - minX).coerceAtLeast(2f)
+        val h = (maxY - minY).coerceAtLeast(2f)
+        val s = minOf(
+            canvasSize.width.coerceAtLeast(1) / w,
+            canvasSize.height.coerceAtLeast(1) / h
+        )
+        viewport = Viewport(
+            scale = s,
+            offsetX = canvasSize.width / 2f - (minX + w / 2f) * s,
+            offsetY = canvasSize.height / 2f - (minY + h / 2f) * s
+        )
+    }
+
+    fun zoomBy(factor: Float) {
+        val c = Offset(canvasSize.width / 2f, canvasSize.height / 2f)
+        val newScale = (viewport.scale * factor).coerceIn(minScale(), MAX_SCALE)
+        val k = newScale / viewport.scale
+        viewport = Viewport(
+            scale = newScale,
+            offsetX = c.x * (1 - k) + viewport.offsetX * k,
+            offsetY = c.y * (1 - k) + viewport.offsetY * k
+        )
+    }
+
+    fun eraseAtPlan(p: Offset) {
+        val hitPx = touchPx / viewport.scale
+        val walls = plan.walls
+        var found = -1
+        var bestD = Float.MAX_VALUE
+        walls.forEachIndexed { i, w ->
+            val a = Offset(w.x1, w.y1)
+            val b = Offset(w.x2, w.y2)
+            val d = distPointToSegment(p, a, b) - w.thickness / 2f
+            if (d < hitPx && d < bestD) {
+                bestD = d
+                found = i
+            }
+        }
+        eraseHit = found
+        if (found >= 0) {
+            mutate { snapshot ->
+                snapshot.copy(walls = snapshot.walls.filterIndexed { idx, _ -> idx != found })
+            }
+        }
+    }
+
+    Dialog(
+        onDismissRequest = { onDone(null) },
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            // Edge-to-edge dialog so imePadding below receives real IME
+            // insets instead of relying on the system resizing the window.
+            decorFitsSystemWindows = false
+        )
     ) {
         Surface(
             modifier = Modifier.fillMaxSize(),
@@ -167,7 +407,23 @@ fun FloorPlanMakerOverlay(
                             color = DorjaColors.Gray600
                         )
                     }
-                    IconButton(onClick = { onDone(FloorPlanData(walls.toList(), rooms.toList()).toJson()) }) {
+                    IconButton(onClick = ::undo, enabled = undoStack.isNotEmpty()) {
+                        Icon(Icons.Default.Undo, contentDescription = L("floorplan_undo"), tint = DorjaColors.Gray700)
+                    }
+                    IconButton(onClick = ::redo, enabled = redoStack.isNotEmpty()) {
+                        Icon(Icons.Default.Redo, contentDescription = L("floorplan_redo"), tint = DorjaColors.Gray700)
+                    }
+                    IconButton(
+                        onClick = { mutate { EditorSnapshot(emptyList(), emptyList()) } },
+                        enabled = plan.walls.isNotEmpty() || plan.rooms.isNotEmpty()
+                    ) {
+                        Icon(Icons.Default.Delete, contentDescription = L("floorplan_clear"), tint = DorjaColors.Error)
+                    }
+                    IconButton(
+                        onClick = {
+                            onDone(FloorPlanData(plan.walls, plan.rooms, version = 2).toJson())
+                        }
+                    ) {
                         Icon(Icons.Default.Check, contentDescription = L("common_save"), tint = DorjaColors.Jol600)
                     }
                 }
@@ -176,42 +432,72 @@ fun FloorPlanMakerOverlay(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 6.dp),
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     DorjaChip(
-                        selected = mode == "WALL",
+                        selected = tool == PlanTool.WALL,
                         label = L("floorplan_tool_wall"),
-                        onClick = { mode = "WALL" }
+                        onClick = { tool = PlanTool.WALL }
                     )
                     DorjaChip(
-                        selected = mode == "ROOM",
+                        selected = tool == PlanTool.ROOM,
                         label = L("floorplan_tool_room"),
-                        onClick = { mode = "ROOM" }
+                        onClick = { tool = PlanTool.ROOM }
                     )
                     DorjaChip(
-                        selected = mode == "ERASE",
+                        selected = tool == PlanTool.ERASE,
                         label = L("floorplan_tool_erase"),
-                        onClick = { mode = "ERASE" }
+                        onClick = { tool = PlanTool.ERASE }
                     )
-                    Spacer(modifier = Modifier.weight(1f))
-                    IconButton(
-                        onClick = {
-                            if (walls.isNotEmpty()) walls.removeAt(walls.size - 1)
-                        },
-                        enabled = walls.isNotEmpty()
+                    DorjaChip(
+                        selected = tool == PlanTool.PAN,
+                        label = L("floorplan_tool_pan"),
+                        onClick = { tool = PlanTool.PAN }
+                    )
+                }
+
+                // ── Context row: drawing controls ──
+                if (tool == PlanTool.WALL) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(Icons.Default.Undo, contentDescription = L("floorplan_undo"), tint = DorjaColors.Gray700)
-                    }
-                    IconButton(
-                        onClick = {
-                            walls.clear()
-                            rooms.clear()
-                        },
-                        enabled = walls.isNotEmpty() || rooms.isNotEmpty()
-                    ) {
-                        Icon(Icons.Default.Delete, contentDescription = L("floorplan_clear"), tint = DorjaColors.Error)
+                        DorjaChip(
+                            selected = orthoLock,
+                            label = L("floorplan_ortho"),
+                            onClick = { orthoLock = !orthoLock }
+                        )
+                        DorjaChip(
+                            selected = wallType == "interior",
+                            label = L("floorplan_type_interior"),
+                            onClick = {
+                                wallType = "interior"
+                                wallThickness = INTERIOR_DEFAULT
+                            }
+                        )
+                        DorjaChip(
+                            selected = wallType == "exterior",
+                            label = L("floorplan_type_exterior"),
+                            onClick = {
+                                wallType = "exterior"
+                                wallThickness = EXTERIOR_DEFAULT
+                            }
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        DorjaChip(
+                            selected = false,
+                            label = L("floorplan_thickness") + " " +
+                                formatMeters(wallThickness),
+                            onClick = {
+                                val idx = THICKNESS_OPTIONS.indexOf(wallThickness)
+                                wallThickness = THICKNESS_OPTIONS[(idx + 1).mod(THICKNESS_OPTIONS.size)]
+                            }
+                        )
                     }
                 }
 
@@ -219,8 +505,10 @@ fun FloorPlanMakerOverlay(
                 // @Composable and cannot be read inside the Canvas draw lambda.
                 val editorWallColor = DorjaColors.Ink950
                 val editorGridColor = DorjaColors.Sand300
+                val editorGridMajor = DorjaColors.Gray500.copy(alpha = 0.55f)
                 val editorAccentColor = DorjaColors.Jol600
                 val editorLabelColor = DorjaColors.Gray700
+                val editorEraseColor = DorjaColors.Error
 
                 // ── Canvas ──
                 Surface(
@@ -230,63 +518,186 @@ fun FloorPlanMakerOverlay(
                         .padding(horizontal = 16.dp),
                     shape = RoundedCornerShape(20.dp),
                     color = DorjaColors.White,
-                    border = androidx.compose.foundation.BorderStroke(1.dp, DorjaColors.BentoCardBorder)
+                    border = BorderStroke(1.dp, DorjaColors.BentoCardBorder)
                 ) {
-                    Canvas(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .onSizeChanged { canvasSize = it }
-                            .pointerInput(mode) {
-                                when (mode) {
-                                    "WALL" -> detectDragGestures(
-                                        onDragStart = { offset ->
-                                            dragStart = Offset(snap(offset.x / size.width), snap(offset.y / size.height))
-                                            dragEnd = null
-                                        },
-                                        onDrag = { change, _ ->
-                                            dragEnd = Offset(snap(change.position.x / size.width), snap(change.position.y / size.height))
-                                        },
-                                        onDragEnd = {
-                                            val s = dragStart
-                                            val e = dragEnd
-                                            if (s != null && e != null && hypot((e.x - s.x).toDouble(), (e.y - s.y).toDouble()) > 0.02) {
-                                                walls.add(FloorPlanWall(s.x, s.y, e.x, e.y))
+                    Box {
+                        Canvas(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .onSizeChanged { canvasSize = it }
+                                .pointerInput(tool, orthoLock) {
+                                    awaitEachGesture {
+                                        val down = awaitFirstDown()
+                                        val downScreen = down.position
+                                        var lastScreen = downScreen
+                                        var drawStart: Offset? = null
+                                        if (tool == PlanTool.WALL) {
+                                            drawStart = snapPoint(
+                                                screenToPlan(downScreen),
+                                                plan.walls,
+                                                touchPx / viewport.scale
+                                            )
+                                        }
+                                        var multi = false
+                                        var prevCentroid = downScreen
+                                        var prevSpan = 0f
+                                        if (tool == PlanTool.PAN || tool == PlanTool.ERASE) {
+                                            down.consume()
+                                        }
+
+                                        while (true) {
+                                            val event = awaitPointerEvent()
+                                            val pressed = event.changes.filter { it.pressed }
+                                            if (pressed.isEmpty()) break
+
+                                            if (pressed.size >= 2) {
+                                                // Two fingers → pan + pinch zoom.
+                                                multi = true
+                                                drawStart = null
+                                                wallPreview = null
+                                                eraseHit = -1
+                                                val a = pressed[0]
+                                                val b = pressed[1]
+                                                val centroid = (a.position + b.position) / 2f
+                                                val span = hypot(
+                                                    a.position.x - b.position.x,
+                                                    a.position.y - b.position.y
+                                                )
+                                                if (prevSpan > 0f) {
+                                                    // Scale around the centroid...
+                                                    val newScale =
+                                                        (viewport.scale * (span / prevSpan))
+                                                            .coerceIn(minScale(), MAX_SCALE)
+                                                    val k = newScale / viewport.scale
+                                                    viewport = Viewport(
+                                                        scale = newScale,
+                                                        offsetX = centroid.x * (1 - k) + viewport.offsetX * k,
+                                                        offsetY = centroid.y * (1 - k) + viewport.offsetY * k
+                                                    )
+                                                    // ...then pan by centroid motion.
+                                                    val delta = centroid - prevCentroid
+                                                    viewport = viewport.copy(
+                                                        offsetX = viewport.offsetX + delta.x,
+                                                        offsetY = viewport.offsetY + delta.y
+                                                    )
+                                                }
+                                                // First multi-touch frame only sets
+                                                // the baseline — applying its delta
+                                                // would make the canvas jump.
+                                                prevCentroid = centroid
+                                                prevSpan = span
+                                                pressed.forEach { it.consume() }
+                                            } else {
+                                                val change = pressed[0]
+                                                lastScreen = change.position
+                                                when (tool) {
+                                                    PlanTool.PAN -> {
+                                                        val d = change.positionChange()
+                                                        viewport = viewport.copy(
+                                                            offsetX = viewport.offsetX + d.x,
+                                                            offsetY = viewport.offsetY + d.y
+                                                        )
+                                                        change.consume()
+                                                    }
+                                                    PlanTool.WALL -> {
+                                                        if (!multi) {
+                                                            val raw = snapPoint(
+                                                                screenToPlan(change.position),
+                                                                plan.walls,
+                                                                touchPx / viewport.scale
+                                                            )
+                                                            drawStart?.let { start ->
+                                                                wallPreview = constrainAngle(start, raw, orthoLock)
+                                                            }
+                                                            change.consume()
+                                                        }
+                                                    }
+                                                    PlanTool.ERASE -> {
+                                                        if (!multi) {
+                                                            eraseAtPlan(screenToPlan(change.position))
+                                                            change.consume()
+                                                        }
+                                                    }
+                                                    PlanTool.ROOM -> {
+                                                        // Decided on release (tap).
+                                                    }
+                                                }
                                             }
-                                            dragStart = null
-                                            dragEnd = null
                                         }
-                                    )
-                                    "ROOM" -> detectTapGestures { offset ->
-                                        pendingRoomPoint = normalized(offset)
-                                    }
-                                    "ERASE" -> detectTapGestures { offset ->
-                                        val p = normalized(offset)
-                                        val wallHit = walls.indexOfFirst { w ->
-                                            distToSegment(p, w) < ERASE_RADIUS
-                                        }
-                                        if (wallHit >= 0) {
-                                            walls.removeAt(wallHit)
-                                        } else {
-                                            val roomHit = rooms.indexOfFirst { r ->
-                                                hypot((r.cx - p.x).toDouble(), (r.cy - p.y).toDouble()) < ERASE_RADIUS * 2
+
+                                        // ── Gesture ended ──
+                                        if (tool == PlanTool.WALL && !multi) {
+                                            wallPreview?.let { (s, e) ->
+                                                if (hypot(e.x - s.x, e.y - s.y) >= MIN_WALL_LEN) {
+                                                    val wall = FloorPlanWall(
+                                                        x1 = s.x.coerceIn(0f, PLAN_EXTENT),
+                                                        y1 = s.y.coerceIn(0f, PLAN_EXTENT),
+                                                        x2 = e.x.coerceIn(0f, PLAN_EXTENT),
+                                                        y2 = e.y.coerceIn(0f, PLAN_EXTENT),
+                                                        thickness = wallThickness,
+                                                        type = wallType
+                                                    )
+                                                    mutate { it.copy(walls = it.walls + wall) }
+                                                }
                                             }
-                                            if (roomHit >= 0) rooms.removeAt(roomHit)
+                                            wallPreview = null
                                         }
+                                        if (tool == PlanTool.ROOM && !multi) {
+                                            val travel = hypot(
+                                                lastScreen.x - downScreen.x,
+                                                lastScreen.y - downScreen.y
+                                            )
+                                            if (travel < touchPx * 0.6f) {
+                                                pendingRoomPoint = screenToPlan(lastScreen)
+                                            }
+                                        }
+                                        eraseHit = -1
                                     }
                                 }
+                        ) {
+                            drawPlanBody(
+                                walls = plan.walls,
+                                scale = viewport.scale,
+                                offset = Offset(viewport.offsetX, viewport.offsetY),
+                                gridColor = editorGridColor,
+                                gridMajorColor = editorGridMajor,
+                                wallColor = editorWallColor,
+                                accentColor = editorAccentColor,
+                                eraseColor = editorEraseColor,
+                                preview = wallPreview,
+                                eraseHitIndex = eraseHit,
+                                showGrid = true
+                            )
+
+                            // Screen-space overlays: room labels, live
+                            // dimension, scale bar (constant px sizes).
+                            drawOverlays(
+                                rooms = plan.rooms,
+                                preview = wallPreview,
+                                scale = viewport.scale,
+                                offset = Offset(viewport.offsetX, viewport.offsetY),
+                                labelColor = editorLabelColor,
+                                accentColor = editorAccentColor
+                            )
+                        }
+
+                        // Zoom controls (CAD corner cluster).
+                        Column(
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .padding(10.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OverlayToolButton(icon = Icons.Default.Add, desc = L("floorplan_zoom_in")) {
+                                zoomBy(1.35f)
                             }
-                    ) {
-                        drawFloorPlan(
-                            walls = walls,
-                            rooms = rooms,
-                            gridSteps = GRID_STEPS,
-                            wallColor = editorWallColor,
-                            gridColor = editorGridColor,
-                            accentColor = editorAccentColor,
-                            labelColor = editorLabelColor,
-                            activeStart = dragStart,
-                            activeEnd = dragEnd
-                        )
+                            OverlayToolButton(icon = Icons.Default.Remove, desc = L("floorplan_zoom_out")) {
+                                zoomBy(1f / 1.35f)
+                            }
+                            OverlayToolButton(icon = Icons.Default.CenterFocusStrong, desc = L("floorplan_zoom_fit")) {
+                                fitToPlan()
+                            }
+                        }
                     }
                 }
 
@@ -301,7 +712,7 @@ fun FloorPlanMakerOverlay(
                     Surface(
                         shape = RoundedCornerShape(14.dp),
                         color = DorjaColors.White,
-                        border = androidx.compose.foundation.BorderStroke(1.dp, DorjaColors.BentoCardBorder),
+                        border = BorderStroke(1.dp, DorjaColors.BentoCardBorder),
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp)
@@ -325,13 +736,15 @@ fun FloorPlanMakerOverlay(
                                 DorjaButton(
                                     text = L("common_save"),
                                     onClick = {
-                                        rooms.add(
-                                            FloorPlanRoomLabel(
-                                                name = name.ifBlank { "Room ${rooms.size + 1}" },
-                                                cx = point.x,
-                                                cy = point.y
+                                        mutate { snapshot ->
+                                            snapshot.copy(
+                                                rooms = snapshot.rooms + FloorPlanRoomLabel(
+                                                    name = name.ifBlank { "Room ${snapshot.rooms.size + 1}" },
+                                                    cx = point.x.coerceIn(0f, PLAN_EXTENT),
+                                                    cy = point.y.coerceIn(0f, PLAN_EXTENT)
+                                                )
                                             )
-                                        )
+                                        }
                                         pendingRoomPoint = null
                                     },
                                     modifier = Modifier.weight(1f)
@@ -356,7 +769,9 @@ fun FloorPlanMakerOverlay(
                 ) {
                     DorjaButton(
                         text = L("floorplan_save"),
-                        onClick = { onDone(FloorPlanData(walls.toList(), rooms.toList()).toJson()) },
+                        onClick = {
+                            onDone(FloorPlanData(plan.walls, plan.rooms, version = 2).toJson())
+                        },
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -365,6 +780,189 @@ fun FloorPlanMakerOverlay(
         }
     }
 }
+
+@Composable
+private fun OverlayToolButton(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    desc: String,
+    onClick: () -> Unit
+) {
+    Surface(
+        shape = CircleShape,
+        color = DorjaColors.White,
+        border = BorderStroke(1.dp, DorjaColors.BentoCardBorder),
+        shadowElevation = 2.dp
+    ) {
+        IconButton(onClick = onClick) {
+            Icon(icon, contentDescription = desc, tint = DorjaColors.Ink950, modifier = Modifier.size(18.dp))
+        }
+    }
+}
+
+/** "4.25 m" formatting without trailing zeros. */
+private fun formatMeters(v: Float): String {
+    val rounded = (v * 100).roundToLong() / 100.0
+    return if (rounded == rounded.toLong().toDouble()) {
+        "${rounded.toLong()} m"
+    } else {
+        String.format(java.util.Locale.US, "%.2f m", rounded)
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Drawing
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** Plan-space pass: grid + walls + preview, under the caller's transform. */
+private fun DrawScope.drawPlanBody(
+    walls: List<FloorPlanWall>,
+    scale: Float,
+    offset: Offset,
+    gridColor: Color,
+    gridMajorColor: Color,
+    wallColor: Color,
+    accentColor: Color,
+    eraseColor: Color,
+    preview: Pair<Offset, Offset>?,
+    eraseHitIndex: Int,
+    showGrid: Boolean
+) {
+    if (showGrid) {
+        val minor = 1f / scale // 1 px after transform
+        val visibleMinX = -offset.x / scale
+        val visibleMaxX = (size.width - offset.x) / scale
+        val visibleMinY = -offset.y / scale
+        val visibleMaxY = (size.height - offset.y) / scale
+        val fromX = visibleMinX.toInt().coerceIn(0, PLAN_EXTENT.toInt())
+        val toX = (visibleMaxX.toInt() + 1).coerceIn(0, PLAN_EXTENT.toInt())
+        val fromY = visibleMinY.toInt().coerceIn(0, PLAN_EXTENT.toInt())
+        val toY = (visibleMaxY.toInt() + 1).coerceIn(0, PLAN_EXTENT.toInt())
+        for (m in fromX..toX) {
+            val major = m % 5 == 0
+            drawLine(
+                color = if (major) gridMajorColor else gridColor,
+                start = Offset(m.toFloat(), 0f),
+                end = Offset(m.toFloat(), PLAN_EXTENT),
+                strokeWidth = if (major) minor * 1.6f else minor
+            )
+        }
+        for (m in fromY..toY) {
+            val major = m % 5 == 0
+            drawLine(
+                color = if (major) gridMajorColor else gridColor,
+                start = Offset(0f, m.toFloat()),
+                end = Offset(PLAN_EXTENT, m.toFloat()),
+                strokeWidth = if (major) minor * 1.6f else minor
+            )
+        }
+    }
+
+    // Walls — strokeWidth is in meters; the transform scales it to px.
+    walls.forEachIndexed { i, w ->
+        drawLine(
+            color = if (i == eraseHitIndex) eraseColor else wallColor,
+            start = Offset(w.x1, w.y1),
+            end = Offset(w.x2, w.y2),
+            strokeWidth = w.thickness,
+            cap = StrokeCap.Round
+        )
+    }
+
+    // In-progress wall + endpoint handles.
+    preview?.let { (s, e) ->
+        drawLine(
+            color = accentColor,
+            start = s,
+            end = e,
+            strokeWidth = 0.08f,
+            cap = StrokeCap.Round
+        )
+        drawCircle(accentColor, radius = 0.10f, center = s)
+        drawCircle(accentColor, radius = 0.10f, center = e)
+    }
+}
+
+/** Screen-space pass: labels, live dimension text, scale bar. */
+private fun DrawScope.drawOverlays(
+    rooms: List<FloorPlanRoomLabel>,
+    preview: Pair<Offset, Offset>?,
+    scale: Float,
+    offset: Offset,
+    labelColor: Color,
+    accentColor: Color
+) {
+    fun toScreen(p: Offset): Offset = Offset(p.x * scale + offset.x, p.y * scale + offset.y)
+
+    val textSize = 13.dp.toPx()
+    val labelPaint = Paint().apply {
+        color = android.graphics.Color.argb(
+            (labelColor.alpha * 255).toInt(),
+            (labelColor.red * 255).toInt(),
+            (labelColor.green * 255).toInt(),
+            (labelColor.blue * 255).toInt()
+        )
+        textSize = textSize
+        isAntiAlias = true
+        textAlign = Paint.Align.CENTER
+    }
+    drawIntoCanvas { canvas ->
+        rooms.forEach { room ->
+            val sp = toScreen(Offset(room.cx, room.cy))
+            if (sp.x in -100f..size.width + 100f && sp.y in -100f..size.height + 100f) {
+                canvas.nativeCanvas.drawText(room.name, sp.x, sp.y + textSize / 3f, labelPaint)
+            }
+        }
+    }
+
+    // Live dimension while drawing.
+    preview?.let { (s, e) ->
+        val len = hypot(e.x - s.x, e.y - s.y)
+        if (len > 0.05f) {
+            val mid = toScreen(Offset((s.x + e.x) / 2f, (s.y + e.y) / 2f))
+            val dimPaint = Paint().apply {
+                color = android.graphics.Color.argb(
+                    (accentColor.alpha * 255).toInt(),
+                    (accentColor.red * 255).toInt(),
+                    (accentColor.green * 255).toInt(),
+                    (accentColor.blue * 255).toInt()
+                )
+                textSize = 12.dp.toPx()
+                isAntiAlias = true
+                textAlign = Paint.Align.CENTER
+                isFakeBoldText = true
+            }
+            drawIntoCanvas { canvas ->
+                canvas.nativeCanvas.drawText(formatMeters(len), mid.x, mid.y - 14.dp.toPx(), dimPaint)
+            }
+        }
+    }
+
+    // Scale bar: 1 m at current zoom, bottom-start.
+    val barY = size.height - 18.dp.toPx()
+    val startX = 16.dp.toPx()
+    val endX = startX + scale // scale == px per meter
+    val barPaint = Paint().apply {
+        color = android.graphics.Color.argb(
+            (labelColor.alpha * 255).toInt(),
+            (labelColor.red * 255).toInt(),
+            (labelColor.green * 255).toInt(),
+            (labelColor.blue * 255).toInt()
+        )
+        strokeWidth = 2f
+        isAntiAlias = true
+    }
+    drawIntoCanvas { canvas ->
+        val n = canvas.nativeCanvas
+        n.drawLine(startX, barY, endX, barY, barPaint)
+        n.drawLine(startX, barY - 5f, startX, barY + 5f, barPaint)
+        n.drawLine(endX, barY - 5f, endX, barY + 5f, barPaint)
+        n.drawText("1 m", (startX + endX) / 2f, barY - 9.dp.toPx(), labelPaint)
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Read-only preview
+// ─────────────────────────────────────────────────────────────────────────────
 
 /** Read-only floor plan renderer for listing detail cards. */
 @Composable
@@ -378,106 +976,50 @@ fun FloorPlanPreview(
     val wallColor = DorjaColors.Ink950
     val gridColor = DorjaColors.Sand300
     val labelColor = DorjaColors.Gray700
+
     Canvas(modifier = modifier.fillMaxWidth().aspectRatio(aspectRatio)) {
-        drawFloorPlan(
-            walls = plan.walls,
-            rooms = plan.rooms,
-            gridSteps = GRID_STEPS,
-            wallColor = wallColor,
-            gridColor = gridColor,
-            accentColor = Color.Transparent,
-            labelColor = labelColor,
-            activeStart = null,
-            activeEnd = null
-        )
-    }
-}
-
-private fun DrawScope.drawFloorPlan(
-    walls: List<FloorPlanWall>,
-    rooms: List<FloorPlanRoomLabel>,
-    gridSteps: Int,
-    wallColor: Color,
-    gridColor: Color,
-    accentColor: Color,
-    labelColor: Color,
-    activeStart: Offset?,
-    activeEnd: Offset?
-) {
-    val w = size.width
-    val h = size.height
-
-    // Grid
-    val gridStroke = 1f
-    for (i in 1 until gridSteps) {
-        val fx = i / gridSteps.toFloat()
-        drawLine(gridColor, Offset(fx * w, 0f), Offset(fx * w, h), gridStroke)
-        drawLine(gridColor, Offset(0f, fx * h), Offset(w, fx * h), gridStroke)
-    }
-
-    // Walls
-    val stroke = w * 0.012f
-    walls.forEach { wall ->
-        drawLine(
-            color = wallColor,
-            start = Offset(wall.x1 * w, wall.y1 * h),
-            end = Offset(wall.x2 * w, wall.y2 * h),
-            strokeWidth = stroke,
-            cap = StrokeCap.Round
-        )
-    }
-
-    // In-progress wall
-    val s = activeStart
-    val e = activeEnd
-    if (s != null && e != null) {
-        drawLine(
-            color = accentColor,
-            start = Offset(s.x * w, s.y * h),
-            end = Offset(e.x * w, e.y * h),
-            strokeWidth = stroke,
-            cap = StrokeCap.Round
-        )
-    } else if (s != null) {
-        drawCircle(accentColor, radius = stroke, center = Offset(s.x * w, s.y * h))
-    }
-
-    // Room labels
-    val density = 42f * (w / 1000f).coerceIn(0.7f, 1.6f)
-    val textPaint = Paint().apply {
-        color = android.graphics.Color.argb(
-            (labelColor.alpha * 255).toInt(),
-            (labelColor.red * 255).toInt(),
-            (labelColor.green * 255).toInt(),
-            (labelColor.blue * 255).toInt()
-        )
-        textSize = density
-        isAntiAlias = true
-        textAlign = Paint.Align.CENTER
-    }
-    drawIntoCanvas { canvas ->
-        rooms.forEach { room ->
-            canvas.nativeCanvas.drawText(
-                room.name,
-                room.cx * w,
-                room.cy * h + density / 3f,
-                textPaint
-            )
+        // Fit plan bounds (or the base span) into the card.
+        val walls = plan.walls
+        val minX: Float
+        val maxX: Float
+        val minY: Float
+        val maxY: Float
+        if (walls.isEmpty()) {
+            minX = 0f; minY = 0f; maxX = BASE_SPAN; maxY = BASE_SPAN
+        } else {
+            minX = walls.minOf { minOf(it.x1, it.x2) } - 0.8f
+            maxX = walls.maxOf { maxOf(it.x1, it.x2) } + 0.8f
+            minY = walls.minOf { minOf(it.y1, it.y2) } - 0.8f
+            maxY = walls.maxOf { maxOf(it.y1, it.y2) } + 0.8f
         }
-    }
-}
+        val w = (maxX - minX).coerceAtLeast(1f)
+        val h = (maxY - minY).coerceAtLeast(1f)
+        val s = minOf(size.width / w, size.height / h)
+        val offset = Offset(
+            (size.width - w * s) / 2f - minX * s,
+            (size.height - h * s) / 2f - minY * s
+        )
 
-/** Distance from point [p] to segment [seg] in normalized space (aspect-corrected for 4:3). */
-private fun distToSegment(p: Offset, seg: FloorPlanWall): Float {
-    val ax = seg.x1; val ay = seg.y1
-    val bx = seg.x2; val by = seg.y2
-    val dx = bx - ax
-    val dy = by - ay
-    val lenSq = dx * dx + dy * dy
-    val raw = if (lenSq == 0f) 0f else ((p.x - ax) * dx + (p.y - ay) * dy) / lenSq
-    val t = raw.coerceIn(0f, 1f)
-    val cx = ax + t * dx
-    val cy = ay + t * dy
-    // Weight y more so erase feels consistent on a 4:3-ish canvas
-    return hypot(((p.x - cx) * 1.0).toDouble(), ((p.y - cy) * 1.3).toDouble()).toFloat()
+        drawPlanBody(
+            walls = walls,
+            scale = s,
+            offset = offset,
+            gridColor = gridColor,
+            gridMajorColor = gridColor,
+            wallColor = wallColor,
+            accentColor = Color.Transparent,
+            eraseColor = Color.Transparent,
+            preview = null,
+            eraseHitIndex = -1,
+            showGrid = true
+        )
+        drawOverlays(
+            rooms = plan.rooms,
+            preview = null,
+            scale = s,
+            offset = offset,
+            labelColor = labelColor,
+            accentColor = Color.Transparent
+        )
+    }
 }
