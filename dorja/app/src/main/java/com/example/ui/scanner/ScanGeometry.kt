@@ -190,12 +190,12 @@ object ScanGeometry {
  * comfortably inside that budget.
  */
 object ScanTuning {
-    /** Max |pitch| and |heading| error (deg) for GREEN — capture eligible. */
+    /** Max |pitch| and |heading| error (deg) for GREEN — ring sits on the dot. */
     const val GREEN_DEG = 8f
 
-    /** Max error (deg) for YELLOW — approaching. Beyond this is RED. */
-    const val YELLOW_DEG = 22f
+    /** Max |heading| error (deg) for YELLOW — ring is inside the frame. */
+    const val ON_SCREEN_DEG = 26f
 
-    /** GREEN must hold this long (ms) before the automatic capture fires. */
-    const val STABILITY_MS = 900
+    /** Max |pitch| error (deg) for YELLOW — ring is inside the frame. */
+    const val ON_SCREEN_PITCH_DEG = 18f
 }
