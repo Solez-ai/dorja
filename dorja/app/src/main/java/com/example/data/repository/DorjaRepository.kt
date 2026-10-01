@@ -64,12 +64,50 @@ class DorjaRepository(private val database: DorjaDatabase, private val appContex
     private val _currentUser = MutableStateFlow<User?>(null)
     val currentUser: StateFlow<User?> = _currentUser.asStateFlow()
 
-    init {
+    private val _authState = MutableStateFlow(AuthState.INITIALIZING)
+
+    /**
+     * Three-phase session lifecycle. The app must not render logged-out UI
+     * while the persisted session is still being restored: INITIALIZING is
+     * resolved by [restoreSession] before the splash hands off to navigation.
+     */
+    val authState: StateFlow<AuthState> = _authState.asStateFlow()
+
+    private val sessionPrefs by lazy {
+        appContext?.getSharedPreferences("dorja_session", Context.MODE_PRIVATE)
+    }
+
+    /** Explicit logout is the ONLY thing that terminates the session. */
+    private fun setActiveUser(user: User) {
+        _currentUser.value = user
+        sessionPrefs?.edit()?.putString(KEY_ACTIVE_USER_ID, user.id)?.apply()
+    }
+
+    private fun clearActiveUser() {
+        _currentUser.value = null
+        sessionPrefs?.edit()?.remove(KEY_ACTIVE_USER_ID)?.apply()
+    }
+
+    /** Restores the persisted session after process death. Never stores passwords. */
+    private fun restoreSession() {
         CoroutineScope(Dispatchers.IO).launch {
-            // No seed accounts: a fresh install starts signed-out and the
-            // first real account is created through the auth screen.
-            _currentUser.value = null
+            val savedId = sessionPrefs?.getString(KEY_ACTIVE_USER_ID, null)
+            if (savedId != null) {
+                val user = userDao.getUserById(savedId)
+                if (user != null) {
+                    _currentUser.value = user
+                    _authState.value = AuthState.AUTHENTICATED
+                    return@launch
+                }
+                // Stale id (account deleted on this device) — drop it.
+                sessionPrefs?.edit()?.remove(KEY_ACTIVE_USER_ID)?.apply()
+            }
+            _authState.value = AuthState.UNAUTHENTICATED
         }
+    }
+
+    init {
+        restoreSession()
     }
 
     // User lookups
@@ -80,15 +118,15 @@ class DorjaRepository(private val database: DorjaDatabase, private val appContex
         CoroutineScope(Dispatchers.IO).launch {
             val user = userDao.getUserById(userId)
             if (user != null) {
-                _currentUser.value = user
+                setActiveUser(user)
             }
         }
     }
 
-    /** Clears the active session. All accounts stay on the device. */
+    /** Explicit sign-out. All accounts stay on the device. */
     fun logout() {
         CoroutineScope(Dispatchers.IO).launch {
-            _currentUser.value = null
+            clearActiveUser()
         }
     }
 
@@ -135,7 +173,7 @@ class DorjaRepository(private val database: DorjaDatabase, private val appContex
         userCredentialDao.insert(
             UserCredential(userId = id, salt = salt, passwordHash = sha256(salt + password))
         )
-        _currentUser.value = user
+        setActiveUser(user)
         return null
     }
 
@@ -172,7 +210,7 @@ class DorjaRepository(private val database: DorjaDatabase, private val appContex
         val cred = userCredentialDao.getByUser(user.id)
             ?: return "This account has no password set. Delete it in Settings → Accounts and create it again."
         if (sha256(cred.salt + password) != cred.passwordHash) return "Incorrect password."
-        _currentUser.value = user
+        setActiveUser(user)
         return null
     }
 
@@ -198,7 +236,8 @@ class DorjaRepository(private val database: DorjaDatabase, private val appContex
         userCredentialDao.deleteByUser(userId)
         userDao.deleteById(userId)
         if (_currentUser.value?.id == userId) {
-            _currentUser.value = userDao.getAdminUser() ?: userDao.getAllUsersSync().firstOrNull()
+            val fallback = userDao.getAdminUser() ?: userDao.getAllUsersSync().firstOrNull()
+            if (fallback != null) setActiveUser(fallback) else clearActiveUser()
         }
     }
 
@@ -652,7 +691,7 @@ class DorjaRepository(private val database: DorjaDatabase, private val appContex
         userDao.deleteAllUsers()
         userCredentialDao.deleteAll()
         database.clearAllTables()
-        _currentUser.value = null
+        clearActiveUser()
     }
 
     // Rooms
@@ -1248,6 +1287,16 @@ class DorjaRepository(private val database: DorjaDatabase, private val appContex
 
     suspend fun resetAllData() {
         database.clearAllTables()
-        _currentUser.value = null
+        clearActiveUser()
+    }
+
+    companion object {
+        private const val KEY_ACTIVE_USER_ID = "active_user_id"
     }
 }
+
+/**
+ * Session lifecycle phases for startup navigation. INITIALIZING persists only
+ * until the stored session (if any) has been resolved from disk.
+ */
+enum class AuthState { INITIALIZING, AUTHENTICATED, UNAUTHENTICATED }

@@ -244,7 +244,7 @@ fun DorjaButton(
             text = text,
             style = MaterialTheme.typography.labelLarge,
             fontWeight = FontWeight.SemiBold,
-            maxLines = 2,
+            maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             lineHeight = 16.sp,
             textAlign = androidx.compose.ui.text.style.TextAlign.Center
@@ -294,7 +294,7 @@ fun StainedLiquidGlassButton(
                 style = MaterialTheme.typography.labelLarge,
                 color = Color.White,
                 fontWeight = FontWeight.Bold,
-                maxLines = 2,
+                maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 lineHeight = 16.sp,
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center
@@ -336,7 +336,7 @@ fun DorjaOutlinedButton(
             text = text,
             style = MaterialTheme.typography.labelLarge,
             fontWeight = FontWeight.Medium,
-            maxLines = 2,
+            maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             lineHeight = 16.sp,
             textAlign = androidx.compose.ui.text.style.TextAlign.Center

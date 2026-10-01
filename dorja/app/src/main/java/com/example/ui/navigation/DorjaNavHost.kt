@@ -60,6 +60,7 @@ import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.LayoutDirection
+import com.example.data.repository.AuthState
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavType
@@ -173,13 +174,21 @@ fun DorjaNavHost() {
         modifier = Modifier.fillMaxSize()
     ) {
         composable(Screen.Splash.route) {
-            SplashScreen(
-                onTimeout = {
-                    navController.navigate(Screen.Auth.route) {
+            // Route only after BOTH the branding minimum time has elapsed AND
+            // the persisted session has been resolved — never flash the
+            // logged-out screen while the session is still restoring.
+            val authState by repository.authState.collectAsState()
+            var splashDone by remember { mutableStateOf(false) }
+            LaunchedEffect(splashDone, authState) {
+                if (splashDone && authState != AuthState.INITIALIZING) {
+                    val target =
+                        if (authState == AuthState.AUTHENTICATED) Screen.Main.route else Screen.Auth.route
+                    navController.navigate(target) {
                         popUpTo(Screen.Splash.route) { inclusive = true }
                     }
                 }
-            )
+            }
+            SplashScreen(onTimeout = { splashDone = true })
         }
 
         composable(

@@ -1388,46 +1388,43 @@ fun CreateListingScreen(
             // ==========================================
             BentoCard(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(12.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = Icons.Default.MeetingRoom,
-                                    contentDescription = null,
-                                    tint = DorjaColors.Jol600,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = "1. ADD ROOMS (${customRooms.size})",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = DorjaColors.Ink950,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
+                    Column {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.MeetingRoom,
+                                contentDescription = null,
+                                tint = DorjaColors.Jol600,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = "Specify individual rooms for photos and 3D spatial scanning",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = DorjaColors.Gray700
+                                text = "1. ADD ROOMS (${customRooms.size})",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = DorjaColors.Ink950,
+                                fontWeight = FontWeight.Bold
                             )
                         }
-
-                        DorjaButton(
-                            text = "+ Add Room",
-                            onClick = {
-                                newRoomName = ""
-                                newRoomDescription = ""
-                                showAddRoomDialog = true
-                            },
-                            icon = Icons.Default.Add,
-                            modifier = Modifier.heightIn(min = 36.dp),
-                            testTag = "add_room_button"
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "Specify individual rooms for photos and 3D spatial scanning",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = DorjaColors.Gray700
                         )
                     }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    DorjaButton(
+                        text = "+ Add Room",
+                        onClick = {
+                            newRoomName = ""
+                            newRoomDescription = ""
+                            showAddRoomDialog = true
+                        },
+                        icon = Icons.Default.Add,
+                        modifier = Modifier.fillMaxWidth(),
+                        testTag = "add_room_button"
+                    )
 
                     Spacer(modifier = Modifier.height(8.dp))
 
@@ -1558,47 +1555,45 @@ fun CreateListingScreen(
             // ==========================================
             BentoCard(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(12.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = Icons.Default.Image,
-                                    contentDescription = null,
-                                    tint = DorjaColors.Jol600,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = "2. ADD PICTURES FOR ROOMS (${photoAssignments.size})",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = DorjaColors.Ink950,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
+                    Column {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Image,
+                                contentDescription = null,
+                                tint = DorjaColors.Jol600,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = "Select multiple photos and assign each to specific rooms",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = DorjaColors.Gray700
+                                text = "2. ADD PICTURES FOR ROOMS (${photoAssignments.size})",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = DorjaColors.Ink950,
+                                fontWeight = FontWeight.Bold
                             )
                         }
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "Select multiple photos and assign each to specific rooms",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = DorjaColors.Gray700
+                        )
+                    }
 
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         DorjaButton(
                             text = "+ Add Photos",
                             onClick = { showMultiPhotoSelectorDialog = true },
                             icon = Icons.Default.AddPhotoAlternate,
-                            modifier = Modifier.heightIn(min = 36.dp),
+                            modifier = Modifier.weight(1f),
                             testTag = "select_multiple_photos_button"
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
                         DorjaOutlinedButton(
                             text = if (floorPlanJson == null) "Add Floor Plan" else "Edit Floor Plan",
                             onClick = { showFloorPlanMaker = true },
                             icon = Icons.Default.SquareFoot,
-                            modifier = Modifier.heightIn(min = 36.dp),
+                            modifier = Modifier.weight(1f),
                             testTag = "add_floor_plan_button"
                         )
                     }
@@ -1822,47 +1817,44 @@ fun CreateListingScreen(
             // ==========================================
             BentoCard(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(12.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = Icons.Default.ViewInAr,
-                                    contentDescription = null,
-                                    tint = Color(0xFF00BCD4),
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = "3. 3D PANORAMA SCANNER",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = DorjaColors.Ink950,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
+                    Column {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.ViewInAr,
+                                contentDescription = null,
+                                tint = Color(0xFF00BCD4),
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = "Capture 360° cylindrical panoramas for each room",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = DorjaColors.Gray700
+                                text = "3. 3D PANORAMA SCANNER",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = DorjaColors.Ink950,
+                                fontWeight = FontWeight.Bold
                             )
                         }
-
-                        DorjaButton(
-                            text = "Scan Rooms",
-                            onClick = {
-                                val lid = createdListingId
-                                if (lid != null && onScanRooms != null) {
-                                    onScanRooms(lid)
-                                }
-                            },
-                            icon = Icons.Default.ViewInAr,
-                            modifier = Modifier.heightIn(min = 36.dp),
-                            testTag = "scan_rooms_button"
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "Capture 360° cylindrical panoramas for each room",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = DorjaColors.Gray700
                         )
                     }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    DorjaButton(
+                        text = "Scan Rooms",
+                        onClick = {
+                            val lid = createdListingId
+                            if (lid != null && onScanRooms != null) {
+                                onScanRooms(lid)
+                            }
+                        },
+                        icon = Icons.Default.ViewInAr,
+                        modifier = Modifier.fillMaxWidth(),
+                        testTag = "scan_rooms_button"
+                    )
 
                     Spacer(modifier = Modifier.height(8.dp))
 

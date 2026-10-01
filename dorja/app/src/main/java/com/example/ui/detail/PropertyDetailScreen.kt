@@ -763,7 +763,12 @@ fun PropertyDetailScreen(
                             }
                         }
                     ) {
-                        Text("Overturn & reopen", color = DorjaColors.Gray700)
+                        Text(
+                            "Overturn & reopen",
+                            color = DorjaColors.Gray700,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
                     }
                 }
             }
