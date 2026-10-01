@@ -116,6 +116,7 @@ import com.example.ui.theme.DorjaFontFamily
 import com.example.ui.theme.DorjaColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.FileOutputStream
