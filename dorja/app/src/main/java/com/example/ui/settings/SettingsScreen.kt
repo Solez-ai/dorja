@@ -18,7 +18,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
-import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Public
@@ -27,7 +26,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
-import com.slapps.cupertino.CupertinoSwitch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -61,7 +59,6 @@ import com.example.ui.i18n.L
 import com.example.ui.i18n.LocaleSettings
 import com.example.ui.theme.DorjaFontFamily
 import com.example.ui.theme.DorjaColors
-import com.example.ui.theme.ThemeSettings
 import kotlinx.coroutines.launch
 
 @Composable
@@ -103,7 +100,6 @@ fun SettingsScreen(
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val currentUser by repository.currentUser.collectAsState()
-    val darkMode by ThemeSettings.darkMode.collectAsState()
     val storedCountry by LocaleSettings.countryCode.collectAsState()
     val countryCode = currentUser?.countryCode ?: storedCountry
     val profile = CountryRegistry.profile(countryCode)
@@ -188,55 +184,10 @@ fun SettingsScreen(
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                start = 16.dp, end = 16.dp, top = 4.dp, bottom = 16.dp
+                start = 16.dp, end = 16.dp, top = 12.dp, bottom = 16.dp
             ),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            item {
-                BentoCard(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text(
-                            text = L("settings_appearance"),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = DorjaColors.Gray500,
-                            fontFamily = DorjaFontFamily,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.DarkMode,
-                                contentDescription = null,
-                                tint = DorjaColors.Jol600,
-                                modifier = Modifier.size(22.dp)
-                            )
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = L("settings_dark_mode"),
-                                    style = MaterialTheme.typography.titleSmall,
-                                    color = DorjaColors.Ink950,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Text(
-                                    text = L("settings_dark_mode_sub"),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = DorjaColors.Gray700
-                                )
-                            }
-                            CupertinoSwitch(
-                                checked = darkMode,
-                                onCheckedChange = { ThemeSettings.setDarkMode(context, it) },
-                                modifier = Modifier.testTag("settings_dark_mode_switch")
-                            )
-                        }
-                    }
-                }
-            }
-
             item {
                 BentoCard(
                     modifier = Modifier.fillMaxWidth(),

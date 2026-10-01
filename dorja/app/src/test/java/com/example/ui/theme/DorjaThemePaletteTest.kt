@@ -13,15 +13,9 @@ class DorjaThemePaletteTest {
     }
 
     @Test
-    fun darkPaletteKeepsHighContrastTextOnCanvas() {
-        assertTrue(DorjaDarkColors.CanvasBg.red < 0.15f)
-        assertTrue(DorjaDarkColors.Ink950.red > 0.85f)
-        assertTrue(DorjaDarkColors.White.red < 0.2f)
-        assertTrue(DorjaDarkColors.InverseFg.red > 0.9f)
-    }
-
-    @Test
-    fun darkModeStateDefaultsToOff() {
-        assertEquals(false, ThemeSettings.darkMode.value)
+    fun darkModeIsRemovedAndDefaultsToLight() {
+        // Light-only application: no dark palette exists, and the composition
+        // local defaults to the light token set.
+        assertEquals(DorjaLightColors, LocalDorjaColors.defaultValue)
     }
 }

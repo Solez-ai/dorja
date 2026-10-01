@@ -322,8 +322,6 @@ data class DorjaStrings(
             "settings_title" to "Settings",
             "settings_subtitle" to "Appearance, country, and data",
             "settings_appearance" to "APPEARANCE",
-            "settings_dark_mode" to "Dark Mode",
-            "settings_dark_mode_sub" to "Light mode is the default. Turn this on for a dark canvas.",
             "settings_country_section" to "COUNTRY & LANGUAGE",
             "settings_country_currency" to "Currency",
             "settings_country_identity" to "Identity",

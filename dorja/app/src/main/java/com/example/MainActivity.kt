@@ -17,13 +17,11 @@ import com.example.ui.i18n.LocalDorjaLocale
 import com.example.ui.i18n.LocaleSettings
 import com.example.ui.navigation.DorjaNavHost
 import com.example.ui.theme.DorjaTheme
-import com.example.ui.theme.ThemeSettings
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         LocaleSettings.init(applicationContext)
-        ThemeSettings.init(applicationContext)
         // Required by the Cactus SDK before any on-device AI call.
         // AI REMOVED FOR NOW — restore with the cactus dependency (AI_FEATURES_RESTORE.md)
         // com.cactus.CactusContextInitializer.initialize(this)
@@ -31,7 +29,6 @@ class MainActivity : ComponentActivity() {
         setContent {
             val tag by LocaleSettings.languageTag.collectAsState()
             val strings = remember(tag) { DorjaStrings.forLanguageTag(tag) }
-            val darkTheme by ThemeSettings.darkMode.collectAsState()
             val currentUser by DorjaApp.instance.repository.currentUser.collectAsState()
             val context = LocalContext.current
             // Keep the app language/country pinned to the user's explicit Settings
@@ -48,7 +45,9 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             }
-            DorjaTheme(darkTheme = darkTheme) {
+            // Light-only theme: the application renders in light mode even when
+            // the Android system is configured for dark mode.
+            DorjaTheme {
                 CompositionLocalProvider(
                     LocalDorjaLocale provides strings,
                     LocalLayoutDirection provides if (strings.rtl) LayoutDirection.Rtl else LayoutDirection.Ltr

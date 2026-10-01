@@ -2,7 +2,6 @@ package com.example.ui.theme
 
 import android.app.Activity
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -10,7 +9,6 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
 import com.slapps.cupertino.theme.CupertinoTheme
-import com.slapps.cupertino.theme.darkColorScheme as cupertinoDarkColorScheme
 import com.slapps.cupertino.theme.lightColorScheme as cupertinoLightColorScheme
 
 private val DorjaLightColorScheme = lightColorScheme(
@@ -38,61 +36,31 @@ private val DorjaLightColorScheme = lightColorScheme(
     onErrorContainer = DorjaLightColors.Error
 )
 
-private val DorjaDarkColorScheme = darkColorScheme(
-    primary = DorjaDarkColors.Jol600,
-    // Jol600-dark is a saturated blue, so onPrimary must stay light. Ink950
-    // inverts to near-white and produced light-on-light invisible labels.
-    onPrimary = DorjaDarkColors.InverseFg,
-    primaryContainer = DorjaDarkColors.Jol100,
-    onPrimaryContainer = DorjaDarkColors.Jol700,
-    secondary = DorjaDarkColors.Sand300,
-    onSecondary = DorjaDarkColors.CanvasBg,
-    secondaryContainer = DorjaDarkColors.Sand100,
-    onSecondaryContainer = DorjaDarkColors.Ink950,
-    tertiary = DorjaDarkColors.Teal100,
-    onTertiary = DorjaDarkColors.Ink950,
-    background = DorjaDarkColors.InverseBg, // iOS dark mode: true pitch-black canvas
-    onBackground = DorjaDarkColors.Ink950,
-    surface = DorjaDarkColors.CanvasBg,     // elevated layers: near-black, not white
-    onSurface = DorjaDarkColors.Ink950,
-    surfaceVariant = DorjaDarkColors.Sand100,
-    onSurfaceVariant = DorjaDarkColors.Gray700,
-    outline = DorjaDarkColors.BentoCardBorder,
-    outlineVariant = DorjaDarkColors.Gray300,
-    error = DorjaDarkColors.Error,
-    onError = DorjaDarkColors.CanvasBg,
-    errorContainer = DorjaDarkColors.ErrorContainer,
-    onErrorContainer = DorjaDarkColors.Error
-)
-
+/**
+ * The single application theme. DORJA is light-only: even when the Android
+ * system is in dark mode the app renders with the light palette.
+ */
 @Composable
-fun DorjaTheme(
-    darkTheme: Boolean = false,
-    content: @Composable () -> Unit
-) {
-    val tokens = if (darkTheme) DorjaDarkColors else DorjaLightColors
-    val colorScheme = if (darkTheme) DorjaDarkColorScheme else DorjaLightColorScheme
-
+fun DorjaTheme(content: @Composable () -> Unit) {
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as? Activity)?.window ?: return@SideEffect
             WindowCompat.getInsetsController(window, view).apply {
-                isAppearanceLightStatusBars = !darkTheme
-                isAppearanceLightNavigationBars = !darkTheme
+                isAppearanceLightStatusBars = true
+                isAppearanceLightNavigationBars = true
             }
         }
     }
 
     CompositionLocalProvider(
-        LocalDorjaColors provides tokens,
-        LocalDarkTheme provides darkTheme
+        LocalDorjaColors provides DorjaLightColors
     ) {
         CupertinoTheme(
-            colorScheme = if (darkTheme) cupertinoDarkColorScheme() else cupertinoLightColorScheme()
+            colorScheme = cupertinoLightColorScheme()
         ) {
             MaterialTheme(
-                colorScheme = colorScheme,
+                colorScheme = DorjaLightColorScheme,
                 typography = DorjaTypography,
                 content = content
             )

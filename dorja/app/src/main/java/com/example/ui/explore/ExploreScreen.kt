@@ -89,7 +89,6 @@ import com.example.ui.components.DorjaOutlinedButton
 import com.example.ui.i18n.L
 import com.example.ui.i18n.Lf
 import com.example.ui.theme.DorjaColors
-import com.example.ui.theme.LocalDarkTheme
 import com.example.ui.util.Formatters
 import com.example.ui.components.DorjaLogo
 import com.example.ui.util.Formatters.formatPriceShort
@@ -213,15 +212,11 @@ fun ExploreScreen(
             .background(DorjaColors.CanvasBg)
             .testTag("explore_screen")
     ) {
-        // Top Header — glass panel: warm white in light mode, deep ink in dark
+        // Top header — warm white glass panel with hairline border.
         Surface(
             modifier = Modifier.fillMaxWidth(),
-            color = if (LocalDarkTheme.current) DorjaColors.InverseBg else DorjaColors.White,
-            border = if (LocalDarkTheme.current) {
-                null
-            } else {
-                BorderStroke(width = 1.dp, color = DorjaColors.BentoCardBorder)
-            }
+            color = DorjaColors.White,
+            border = BorderStroke(width = 1.dp, color = DorjaColors.BentoCardBorder)
         ) {
             Column(
                 modifier = Modifier

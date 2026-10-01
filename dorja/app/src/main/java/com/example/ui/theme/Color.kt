@@ -6,8 +6,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 
 /**
- * Semantic Dorja palette. Light is the default; [DorjaDarkColors] is swapped
- * in through [LocalDorjaColors] when the user enables Dark Mode in Settings.
+ * Semantic Dorja palette (light-only application theme).
  */
 data class DorjaColorTokens(
     val CanvasBg: Color,
@@ -99,60 +98,11 @@ val DorjaLightColors = DorjaColorTokens(
     DrawerAccent = Color(0xFF9BD4A8)
 )
 
-val DorjaDarkColors = DorjaColorTokens(
-    CanvasBg = Color(0xFF0F1419),
-    Ink950 = Color(0xFFF2F4F7),
-    // iOS systemBlue (dark): light enough to feel native on black, yet dark
-    // enough that WHITE content stays legible on it — mirrors iOS systemBlue
-    // (#0A84FF) which carries white labels in dark mode everywhere.
-    Jol600 = Color(0xFF0A84FF),
-    Jol100 = Color(0xFF16324C),
-    Jol700 = Color(0xFF9CCCF0),
-    Paper50 = Color(0xFF151B22),
-    Sand300 = Color(0xFF2C3542),
-    Sand100 = Color(0xFF1A222C),
-    Teal100 = Color(0xFF17324A),
-    Teal900 = Color(0xFFD4E6FF),
-    Gray700 = Color(0xFFC8CDD6),
-    Gray600 = Color(0xFFA8B0BC),
-    Gray500 = Color(0xFF8B93A0),
-    Gray300 = Color(0xFF2C3542),
-    White = Color(0xFF1C2430),
-    InverseBg = Color(0xFF080A0E),
-    InverseFg = Color(0xFFF5F7FA),
-    Error = Color(0xFFFFB4AB),
-    ErrorContainer = Color(0xFF5C1A1A),
-    Success = Color(0xFF7DCA82),
-    Warning = Color(0xFFE8A84A),
-    WarningContainer = Color(0xFF33240E),
-    BentoBlueBg = Color(0xFF17324A),
-    BentoBlueText = Color(0xFFD4E6FF),
-    BentoBlueIcon = Color(0xFF7EB8F0),
-    BentoGreenBg = Color(0xFF17301C),
-    BentoGreenText = Color(0xFFC5E8C8),
-    BentoGreenIcon = Color(0xFF7DCA82),
-    BentoAmberBg = Color(0xFF33240E),
-    BentoAmberText = Color(0xFFFFD9A0),
-    BentoAmberIcon = Color(0xFFE8A84A),
-    BentoPurpleBg = Color(0xFF2A1F3D),
-    BentoPurpleText = Color(0xFFE4D0FF),
-    BentoPurpleIcon = Color(0xFFC4A0F0),
-    BentoCardBg = Color(0xFF1C2430),
-    BentoCardBorder = Color(0xFF2C3542),
-    DrawerBackdrop = Color(0xFF070E0B),
-    DrawerSidebar = Color(0xFF0E1F18),
-    DrawerSidebarSoft = Color(0x33FFFFFF),
-    DrawerCream = Color(0xFFF2EFE4),
-    DrawerMuted = Color(0xFF8FA89A),
-    DrawerAccent = Color(0xFF9BD4A8)
-)
-
 val LocalDorjaColors = staticCompositionLocalOf { DorjaLightColors }
-val LocalDarkTheme = staticCompositionLocalOf { false }
 
 /**
  * Theme-aware color access used by every screen. Reads [LocalDorjaColors],
- * so existing `DorjaColors.CanvasBg` call sites pick up Dark Mode automatically.
+ * which always carries the light palette in this light-only application.
  */
 object DorjaColors {
     val CanvasBg: Color @Composable @ReadOnlyComposable get() = LocalDorjaColors.current.CanvasBg

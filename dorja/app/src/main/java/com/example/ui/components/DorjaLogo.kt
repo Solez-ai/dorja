@@ -11,18 +11,16 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.example.R
-import com.example.ui.theme.LocalDarkTheme
 
 /**
- * Dorja wordmark. On dark surfaces the teal/ink mark disappears, so a thin
- * white stroke is drawn behind the original artwork when [outlined] is true
- * (defaults to the active Dark Mode flag).
+ * Dorja wordmark. [outlined] draws a thin white stroke behind the original
+ * artwork for use on dark surfaces (e.g. the green navigation drawer).
  */
 @Composable
 fun DorjaLogo(
     modifier: Modifier = Modifier,
     contentDescription: String? = "Dorja Logo",
-    outlined: Boolean = LocalDarkTheme.current,
+    outlined: Boolean = false,
     strokeWidth: Dp = 1.4.dp
 ) {
     val painter = painterResource(id = R.drawable.ic_dorja_logo)

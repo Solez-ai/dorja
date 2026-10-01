@@ -53,7 +53,6 @@ import com.example.ui.components.DorjaButton
 import com.example.ui.components.DorjaCard
 import com.example.ui.theme.DorjaFontFamily
 import com.example.ui.theme.DorjaColors
-import com.example.ui.theme.LocalDarkTheme
 import com.example.ui.util.Formatters
 import com.example.ui.util.QrCodeGenerator
 import kotlinx.coroutines.launch
@@ -150,12 +149,12 @@ fun ViewingPassScreen(
             } else {
                 val pass = viewing!!
 
-                // Main Pass Card — mint accent ring in light mode, soft border in dark
+                // Main pass card — mint accent ring.
                 DorjaCard(
                     modifier = Modifier.fillMaxWidth(),
                     backgroundColor = DorjaColors.BentoCardBg,
-                    borderColor = if (LocalDarkTheme.current) DorjaColors.BentoCardBorder else DorjaColors.BentoGreenIcon,
-                    borderWidth = if (LocalDarkTheme.current) 0.5.dp else 1.5.dp
+                    borderColor = DorjaColors.BentoGreenIcon,
+                    borderWidth = 1.5.dp
                 ) {
                     Column(
                         modifier = Modifier.padding(20.dp),

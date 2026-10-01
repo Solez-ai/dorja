@@ -46,7 +46,6 @@ import com.example.data.model.Listing
 import com.example.ui.i18n.DorjaLocales
 import com.example.ui.i18n.LocaleSettings
 import com.example.ui.theme.DorjaColors
-import com.example.ui.theme.LocalDarkTheme
 import com.example.ui.theme.LiquidGlassDefaults
 import com.example.ui.theme.liquidGlass
 import com.example.ui.theme.pressScale
@@ -215,19 +214,10 @@ fun DorjaButton(
     contentColor: Color = Color.White,
     testTag: String? = null
 ) {
-    // Dark mode: a disabled filled button must not melt into the pitch-black
-    // canvas (InverseBg = #080A0E) — give it an elevated dark fill and muted
-    // label so its shape stays visible.
-    val disabledContainer = if (LocalDarkTheme.current) {
-        DorjaColors.White.copy(alpha = 0.35f)
-    } else {
-        DorjaColors.Sand300
-    }
-    val disabledContent = if (LocalDarkTheme.current) {
-        DorjaColors.Gray500
-    } else {
-        DorjaColors.Gray600
-    }
+    // Disabled filled button: elevated grey fill with a muted label so its
+    // shape stays visible against the white canvas.
+    val disabledContainer = DorjaColors.Sand300
+    val disabledContent = DorjaColors.Gray600
     val finalModifier = if (testTag != null) modifier.testTag(testTag) else modifier
     // iOS: real CupertinoButton (filled, .borderedProminent style) with native
     // press-dim physics and iOS disabled states.

@@ -57,7 +57,6 @@ import com.example.ui.components.DorjaChip
 import com.example.ui.components.DorjaLogo
 import com.example.ui.components.DorjaCard
 import com.example.ui.theme.DorjaColors
-import com.example.ui.theme.LocalDarkTheme
 import kotlinx.coroutines.launch
 
 @Composable
@@ -318,11 +317,11 @@ fun AuthScreen(
                                 }
                             },
                             icon = Icons.Default.AdminPanelSettings,
-                            // Black with white text in dark mode; white with
-                            // black text in light mode (Ink950 is semantic and
-                            // inverts, which read as disabled here).
-                            containerColor = if (LocalDarkTheme.current) Color(0xFF000000) else Color(0xFFFFFFFF),
-                            contentColor = if (LocalDarkTheme.current) Color.White else DorjaColors.Ink950,
+                            // Explicit white card: Ink950 is semantic, but the
+                            // surrounding canvas is already near-white and the
+                            // button read as disabled.
+                            containerColor = Color(0xFFFFFFFF),
+                            contentColor = DorjaColors.Ink950,
                             testTag = "auth_create_admin"
                         )
                         Spacer(modifier = Modifier.height(6.dp))

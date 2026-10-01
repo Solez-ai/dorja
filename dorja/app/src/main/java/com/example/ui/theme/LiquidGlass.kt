@@ -38,7 +38,6 @@ import kotlinx.coroutines.launch
  */
 object LiquidGlassDefaults {
     val LightGlassTint = Color(0xCCF4F7FB)        // Translucent frost white
-    val DarkGlassTint = Color(0xCC1A1C1E)         // Translucent dark slate
     val StainedGlassTint = Color(0xD90061A4)      // Stained Jol600 brand accent for primary CTAs
     val SpecularHighlightTop = Color(0x66FFFFFF)   // Top specular lens stroke
     val SpecularHighlightBottom = Color(0x14000000)// Bottom subtle shadow stroke
@@ -165,7 +164,7 @@ fun Modifier.pressScale(
 fun LiquidGlassSurface(
     modifier: Modifier = Modifier,
     shape: Shape = RoundedCornerShape(20.dp),
-    tint: Color = if (LocalDarkTheme.current) LiquidGlassDefaults.DarkGlassTint else LiquidGlassDefaults.LightGlassTint,
+    tint: Color = LiquidGlassDefaults.LightGlassTint,
     blurRadius: Dp = 24.dp,
     content: @Composable BoxScope.() -> Unit
 ) {

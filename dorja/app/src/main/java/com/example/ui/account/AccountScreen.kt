@@ -97,7 +97,6 @@ import com.example.ui.i18n.L
 import com.example.ui.i18n.Lf
 import com.example.ui.theme.DorjaFontFamily
 import com.example.ui.theme.DorjaColors
-import com.example.ui.theme.LocalDarkTheme
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.material3.CircularProgressIndicator
@@ -604,7 +603,7 @@ fun AccountScreen(
                                 modifier = Modifier
                                     .size(36.dp)
                                     .clip(CircleShape)
-                                    .background(if (LocalDarkTheme.current) DorjaColors.CanvasBg else DorjaColors.Sand100)
+                                    .background(DorjaColors.Sand100)
                             ) {
                                 Icon(Icons.Default.Edit, contentDescription = L("account_edit_profile"), modifier = Modifier.size(18.dp), tint = DorjaColors.Ink950)
                             }
