@@ -941,6 +941,7 @@ private fun CapturingPhase(
         VerticalRingRail(
             scanTargets = scanTargets,
             capturedFrames = capturedFrames,
+            currentTargetIdx = currentTargetIdx,
             onReshoot = if (captureState == CaptureState.COMPLETED) onRetakeTarget else null,
             modifier = Modifier.align(Alignment.CenterEnd).padding(end = 12.dp)
         )
@@ -1591,6 +1592,7 @@ private fun cropBlackBorders(bitmap: Bitmap): Bitmap {
 private fun VerticalRingRail(
     scanTargets: List<ScanGeometry.ScanTarget>,
     capturedFrames: List<FrameData>,
+    currentTargetIdx: Int,
     modifier: Modifier = Modifier,
     onReshoot: ((Int) -> Unit)? = null
 ) {
