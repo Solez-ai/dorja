@@ -119,22 +119,13 @@ object ScanGeometry {
     }
 
     /**
-     * Generates target grid points for scan modes:
-     * Full Sphere:
-     *   - Cap Zenith (+90° pitch, 1 shot)
-     *   - Ring 1 (+70° pitch, 12 stops)
-     *   - Ring 2 (+35° pitch, 12 stops)
-     *   - Ring 3 (0° pitch, 12 stops)
-     *   - Ring 4 (-35° pitch, 12 stops)
-     *   - Ring 5 (-70° pitch, 12 stops)
-     *   - Cap Nadir (-90° pitch, 1 shot)
-     * Total: 62 shots.
+     * Generates target grid points for scan modes.
      *
-     * Quick Scan:
-     *   - Ring 1 (+35° pitch, 8 stops)
-     *   - Ring 2 (0° pitch, 8 stops)
-     *   - Ring 3 (-35° pitch, 8 stops)
-     * Total: 24 shots.
+     * QUICK_SCAN: a classic 360° horizontal panorama — one ring on the
+     * horizon (pitch 0°) with 12 stops at 30° increments. 12 shots total.
+     * The headings generated here are RELATIVE offsets; the caller re-bases
+     * them on the user-confirmed anchor heading, so targets stay fixed
+     * relative to the room regardless of compass drift.
      */
     fun generateScanTargets(mode: ScanMode): List<ScanTarget> {
         val targets = mutableListOf<ScanTarget>()

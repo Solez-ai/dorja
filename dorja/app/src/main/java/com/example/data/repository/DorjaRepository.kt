@@ -77,14 +77,23 @@ class DorjaRepository(private val database: DorjaDatabase, private val appContex
         appContext?.getSharedPreferences("dorja_session", Context.MODE_PRIVATE)
     }
 
-    /** Explicit logout is the ONLY thing that terminates the session. */
+    /**
+     * Establishes the active session (sign-in, sign-up, account switch) and
+     * persists it across process death. Passwords are never stored.
+     */
     private fun setActiveUser(user: User) {
         _currentUser.value = user
+        _authState.value = AuthState.AUTHENTICATED
         sessionPrefs?.edit()?.putString(KEY_ACTIVE_USER_ID, user.id)?.apply()
     }
 
+    /**
+     * Terminates the session. ONLY an explicit sign-out (or destructive
+     * data reset) may call this — never a background event.
+     */
     private fun clearActiveUser() {
         _currentUser.value = null
+        _authState.value = AuthState.UNAUTHENTICATED
         sessionPrefs?.edit()?.remove(KEY_ACTIVE_USER_ID)?.apply()
     }
 

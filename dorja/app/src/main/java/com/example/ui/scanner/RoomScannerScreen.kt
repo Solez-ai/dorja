@@ -242,7 +242,15 @@ fun RoomScannerScreen(
         } ?: emptyList()
     }
 
+    // Planned shot count. The frozen target list only exists once the anchor
+    // is confirmed, so UI totals (e.g. "Frame 1 of 13") must fall back to the
+    // planned count instead of the size of the not-yet-generated list.
+    val plannedShots = remember(scanMode) { ScanGeometry.generateScanTargets(scanMode).size }
+
     // Stitching progress & live preview states
+    // Bumped every time any frame is captured or replaced; DonePhase re-stitches
+    // whenever it changes, so reshots update the panorama without a full retake.
+    var captureStamp by remember { mutableIntStateOf(0) }
     var stitchingStatus by remember { mutableStateOf<String?>(null) }
     var stitchingPreviewBmp by remember { mutableStateOf<Bitmap?>(null) }
     var stitchedPath by remember { mutableStateOf<String?>(null) }
@@ -344,8 +352,24 @@ fun RoomScannerScreen(
         if (!hasCamera) permLauncher.launch(Manifest.permission.CAMERA)
     }
 
+    var captureFailures by remember { mutableIntStateOf(0) }
+
+    // Recover from the ERROR state: abandon the guided sequence (keeping any
+    // good frames) and let the user re-confirm the anchor with the camera
+    // re-bound.
+    val onRetryCapture: () -> Unit = {
+        captureFailures = 0
+        anchorHeading = null
+        greenSinceMs = null
+        alignLevel = AlignLevel.RED
+        currentTargetIdx = 0
+        captureState = CaptureState.WAITING_FOR_INITIAL_ANCHOR
+    }
+
     // Single capture entry point — guarantees exactly one in-flight photo per
     // target and that frame bookkeeping never duplicates (keyed by col).
+    // Repeated errors surface the ERROR state (with a RETRY pill) instead of
+    // silently looping.
     val captureFrame: (ScanGeometry.ScanTarget) -> Unit = { target ->
         val ic = imageCapture
         if (ic == null) {
@@ -373,8 +397,15 @@ fun RoomScannerScreen(
                         )
                         val existingIdx = capturedFrames.indexOfFirst { it.col == target.targetIndex }
                         if (existingIdx >= 0) capturedFrames[existingIdx] = frame else capturedFrames.add(frame)
+                        captureFailures = 0
+                        captureStamp++
                         vibrateShutter(ctx)
-                        if (currentTargetIdx < scanTargets.size - 1) {
+                        if (capturedFrames.size >= scanTargets.size) {
+                            // Every target already has a frame, so this capture
+                            // REPLACED one (rail reshot) — return to COMPLETED
+                            // instead of marching through the remaining tail.
+                            captureState = CaptureState.COMPLETED
+                        } else if (currentTargetIdx < scanTargets.size - 1) {
                             currentTargetIdx++
                             greenSinceMs = null
                             captureState = CaptureState.MOVING_TO_TARGET
@@ -385,7 +416,15 @@ fun RoomScannerScreen(
 
                     override fun onError(exc: ImageCaptureException) {
                         Log.e("Scanner", "Capture failed", exc)
-                        captureState = CaptureState.MOVING_TO_TARGET
+                        captureFailures++
+                        // A single hiccup retries the same target (alignment is
+                        // still held, so the debounce refires); three in a row
+                        // stop the guided loop and surface RETRY.
+                        if (captureFailures >= 3) {
+                            captureState = CaptureState.ERROR
+                        } else {
+                            captureState = CaptureState.MOVING_TO_TARGET
+                        }
                     }
                 }
             )
@@ -468,7 +507,6 @@ fun RoomScannerScreen(
                 onCaptureReady = { imageCapture = it },
                 hasCamera = hasCamera,
                 roomName = selectedRoom?.displayName ?: "Room",
-                scanMode = scanMode,
                 zoomRatio = zoomRatio,
                 minZoomRatio = minZoomRatio,
                 onZoomPicked = { zoomRatio = it },
@@ -496,8 +534,8 @@ fun RoomScannerScreen(
                         heading = heading,
                         currentPitch = pitch,
                         captureState = captureState,
-                        scanMode = scanMode,
                         scanTargets = scanTargets,
+                        plannedShots = plannedShots,
                         currentTargetIdx = currentTargetIdx,
                         capturedFrames = capturedFrames,
                         alignLevel = alignLevel,
@@ -510,11 +548,15 @@ fun RoomScannerScreen(
                             }
                         },
                         onRetakeTarget = { targetIndex ->
-                            if (captureState == CaptureState.COMPLETED) {
-                                currentTargetIdx = targetIndex
-                                captureState = CaptureState.MOVING_TO_TARGET
-                            }
+                            // Per-target reshot: jump to exactly the shot the
+                            // user picked on the rail. The frame is overwritten
+                            // (keyed by col) and DonePhase re-stitches on
+                            // re-entry, so the rest of the sequence stays.
+                            currentTargetIdx = targetIndex
+                            greenSinceMs = null
+                            captureState = CaptureState.MOVING_TO_TARGET
                         },
+                        onRetryCapture = onRetryCapture,
                         onStop = { phase = Phase.DONE },
                         onBack = {
                             // Leaving mid-session resets the scan coordinate
@@ -532,10 +574,11 @@ fun RoomScannerScreen(
                 roomName = selectedRoom?.displayName ?: "Room",
                 frameCount = capturedFrames.size,
                 capturedFrames = capturedFrames.toList(),
+                captureStamp = captureStamp,
                 stitchingStatus = stitchingStatus,
                 stitchingPreviewBmp = stitchingPreviewBmp,
                 stitchedPath = stitchedPath,
-                onStitch = { frames ->
+                onStitch = { frames, stamp ->
                     scope.launch {
                         stitchingStatus = "Stitching ${frames.size} frames on-device…"
                         val stitched = withContext(Dispatchers.IO) {
@@ -697,7 +740,6 @@ private fun PreviewPhase(
     onCaptureReady: (ImageCapture) -> Unit,
     hasCamera: Boolean,
     roomName: String,
-    scanMode: ScanGeometry.ScanMode,
     zoomRatio: Float,
     minZoomRatio: Float,
     onZoomPicked: (Float) -> Unit,
@@ -788,8 +830,8 @@ private fun CapturingPhase(
     heading: Float,
     currentPitch: Float,
     captureState: CaptureState,
-    scanMode: ScanGeometry.ScanMode,
     scanTargets: List<ScanGeometry.ScanTarget>,
+    plannedShots: Int,
     currentTargetIdx: Int,
     capturedFrames: SnapshotStateList<FrameData>,
     alignLevel: AlignLevel,
@@ -797,6 +839,7 @@ private fun CapturingPhase(
     onToggleGyro: () -> Unit,
     onConfirmAnchor: () -> Unit,
     onRetakeTarget: (Int) -> Unit,
+    onRetryCapture: () -> Unit,
     onStop: () -> Unit,
     onBack: () -> Unit,
     lifecycleOwner: androidx.lifecycle.LifecycleOwner
@@ -814,11 +857,13 @@ private fun CapturingPhase(
     }
 
     val progressText = when (captureState) {
-        CaptureState.WAITING_FOR_INITIAL_ANCHOR -> "STEP 1/${scanTargets.size + 1} — SET ANCHOR"
+        // The anchor frame IS target 0's capture, so the sequence is
+        // plannedShots total — 11 remain after the anchor is confirmed.
+        CaptureState.WAITING_FOR_INITIAL_ANCHOR -> "STEP 1/$plannedShots — SET ANCHOR"
         CaptureState.CAPTURING_INITIAL_FRAME -> "CAPTURING FRAME 1…"
         CaptureState.MOVING_TO_TARGET, CaptureState.STABILIZING ->
             "SHOT ${currentTargetIdx + 1}/${scanTargets.size} • RING ${target?.ringIndex ?: 0}"
-        CaptureState.COMPLETED -> "${scanTargets.size + 1}/${scanTargets.size + 1} — SCAN COMPLETE"
+        CaptureState.COMPLETED -> "$plannedShots/$plannedShots — SCAN COMPLETE"
         CaptureState.ERROR -> "TRACKING UNAVAILABLE"
     }
 
@@ -827,7 +872,7 @@ private fun CapturingPhase(
             if (trackingAvailable) "Point at your start wall, then tap SET ANCHOR"
             else "Waiting for sensors…"
         captureState == CaptureState.CAPTURING_INITIAL_FRAME -> "Capturing frame 1 — hold still"
-        captureState == CaptureState.ERROR -> "Sensors unavailable — restart the scan"
+        captureState == CaptureState.ERROR -> "Camera capture failed — use RETRY below"
         captureState == CaptureState.COMPLETED -> "All shots captured"
         target == null -> ""
         else -> {
@@ -894,8 +939,6 @@ private fun CapturingPhase(
 
         // Vertical Ring Rail (Right Edge) — reshots available once complete.
         VerticalRingRail(
-            scanMode = scanMode,
-            currentRing = target?.ringIndex ?: 0,
             scanTargets = scanTargets,
             capturedFrames = capturedFrames,
             onReshoot = if (captureState == CaptureState.COMPLETED) onRetakeTarget else null,
@@ -906,8 +949,9 @@ private fun CapturingPhase(
 
         // Contextual bottom control: SET ANCHOR during step 1, a passive
         // capture indicator once the frozen-target sequence is running
-        // (captures fire automatically after the stability window), and an
-        // ACTIVE reshop control on the rail once the scan is complete.
+        // (captures fire automatically after the stability window), RETRY
+        // if capture errors stack up, and per-shot retakes on the rail
+        // once the scan is complete.
         when (captureState) {
             CaptureState.WAITING_FOR_INITIAL_ANCHOR -> {
                 Column(
@@ -931,9 +975,28 @@ private fun CapturingPhase(
                     }
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        "Frame 1 of ${scanTargets.size + 1} captures at this direction",
+                        "Frame 1 of $plannedShots captures at this direction",
                         color = Color.White.copy(alpha = 0.8f),
                         fontSize = 11.sp
+                    )
+                }
+            }
+            CaptureState.ERROR -> {
+                // Camera-side failure (capture not bound, or errors stacking
+                // up): offer an explicit way back instead of a dead end.
+                Surface(
+                    onClick = onRetryCapture,
+                    shape = RoundedCornerShape(24.dp),
+                    color = AlignRed,
+                    border = androidx.compose.foundation.BorderStroke(2.dp, Color.White),
+                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 20.dp)
+                ) {
+                    Text(
+                        "RETRY CAPTURE",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp,
+                        modifier = Modifier.padding(horizontal = 28.dp, vertical = 14.dp)
                     )
                 }
             }
@@ -1137,10 +1200,11 @@ private fun DonePhase(
     roomName: String,
     frameCount: Int,
     capturedFrames: List<FrameData>,
+    captureStamp: Int,
     stitchingStatus: String?,
     stitchingPreviewBmp: Bitmap?,
     stitchedPath: String?,
-    onStitch: (List<FrameData>) -> Unit,
+    onStitch: (List<FrameData>, Int) -> Unit,
     onApplyLighting: (String, Float, Float, Float) -> Unit,
     onSave: () -> Unit,
     onRetake: () -> Unit,
@@ -1185,9 +1249,11 @@ private fun DonePhase(
         } else null
     }
 
-    // Auto-stitch once the frames are in — the user lands on a preview, not a blank page.
-    LaunchedEffect(capturedFrames.size) {
-        if (capturedFrames.isNotEmpty()) onStitch(capturedFrames)
+    // Auto-stitch once the frames are in — the user lands on a preview, not a
+    // blank page. Keyed on a monotonically bumped stamp (not the frame count)
+    // so a reshot that REPLACES a frame re-stitches too.
+    LaunchedEffect(capturedFrames.size, captureStamp) {
+        if (capturedFrames.isNotEmpty()) onStitch(capturedFrames, captureStamp)
     }
 
     Box(Modifier.fillMaxSize().background(DorjaColors.CanvasBg).padding(20.dp), contentAlignment = Alignment.Center) {
@@ -1523,16 +1589,15 @@ private fun cropBlackBorders(bitmap: Bitmap): Bitmap {
 
 @Composable
 private fun VerticalRingRail(
-    scanMode: ScanGeometry.ScanMode,
-    currentRing: Int,
     scanTargets: List<ScanGeometry.ScanTarget>,
     capturedFrames: List<FrameData>,
     modifier: Modifier = Modifier,
     onReshoot: ((Int) -> Unit)? = null
 ) {
-    val rings = remember(scanMode) {
-        scanTargets.map { it.ringIndex }.distinct().sorted()
-    }
+    // One dot per scan target — with 12 stops on a single ring this reads as
+    // a vertical progress strip. Each captured dot is independently tappable
+    // (when reshooting is enabled) to retake exactly that shot.
+    val dots = scanTargets.sortedBy { it.targetIndex }
 
     Surface(
         shape = RoundedCornerShape(16.dp),
@@ -1545,16 +1610,14 @@ private fun VerticalRingRail(
             verticalArrangement = Arrangement.spacedBy(8.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text("RING", color = Accent, fontSize = 8.sp, fontFamily = DorjaFontFamily, fontWeight = FontWeight.Bold)
+            Text("SHOTS", color = Accent, fontSize = 8.sp, fontFamily = DorjaFontFamily, fontWeight = FontWeight.Bold)
 
-            for (ring in rings) {
-                val targetsInRing = scanTargets.filter { it.ringIndex == ring }
-                val capturedInRing = capturedFrames.count { f -> targetsInRing.any { t -> t.targetIndex == f.col } }
-                val ringComplete = capturedInRing >= targetsInRing.size
-                val isCurrent = ring == currentRing
+            for (t in dots) {
+                val captured = capturedFrames.any { it.col == t.targetIndex }
+                val isCurrent = t.targetIndex == currentTargetIdx
 
                 val dotColor = when {
-                    ringComplete -> Green
+                    captured -> Green
                     isCurrent -> TargetYellow
                     else -> Color.White.copy(alpha = 0.3f)
                 }
@@ -1566,8 +1629,8 @@ private fun VerticalRingRail(
                         .background(dotColor)
                         .border(if (isCurrent) 2.dp else 0.dp, Color.White, CircleShape)
                         .let {
-                            if (onReshoot != null && ringComplete) {
-                                it.clickable { onReshoot(targetsInRing.first().targetIndex) }
+                            if (onReshoot != null && captured) {
+                                it.clickable { onReshoot(t.targetIndex) }
                             } else {
                                 it
                             }
@@ -1576,7 +1639,7 @@ private fun VerticalRingRail(
             }
             if (onReshoot != null) {
                 Text(
-                    "TAP RING TO RESHOT",
+                    "TAP A SHOT TO RETAKE IT",
                     color = Accent,
                     fontSize = 7.sp,
                     fontFamily = DorjaFontFamily,
