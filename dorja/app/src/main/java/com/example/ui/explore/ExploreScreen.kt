@@ -748,8 +748,8 @@ private fun ExploreFilterSheet(
                         onReset()
                     },
                     modifier = Modifier.weight(1f),
-                    // Gray700 inverts to a light gray in dark mode; explicit
-                    // dark label keeps the white-text assumption true.
+                    // Intentional fixed contrast pair: dark Gray700
+                    // container with a light label.
                     containerColor = DorjaColors.Gray700,
                     contentColor = DorjaColors.InverseFg
                 )

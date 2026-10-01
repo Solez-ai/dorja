@@ -95,7 +95,7 @@ fun ViewingPassScreen(
             .background(DorjaColors.CanvasBg)
             .testTag("viewing_pass_screen")
     ) {
-        // Top Header — cream canvas that melts into the page, dark ink in dark mode
+        // Top Header — cream canvas that melts into the page
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -182,9 +182,8 @@ fun ViewingPassScreen(
                         Spacer(modifier = Modifier.height(20.dp))
 
                         // QR Code Rendered
-                        // QRs must keep a literal WHITE quiet zone in every
-                        // theme or scanners fail — the token would invert in
-                        // dark mode and break the pass.
+                        // QRs must keep a literal WHITE quiet zone or
+                        // scanners fail — never swap this for a theme token.
                         if (qrBitmap != null) {
                             Surface(
                                 shape = RoundedCornerShape(12.dp),

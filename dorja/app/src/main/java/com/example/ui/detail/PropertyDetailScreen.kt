@@ -1161,8 +1161,8 @@ fun PropertyDetailScreen(
     // ═════════════════════════════════════════════════════════════════════
     //  THE REDESIGNED SURFACE
     //
-    //  One continuous canvas: deep ink in dark mode, warm cream in light
-    //  mode. The photo gallery fills the entire top; an editorial sheet
+    //  One continuous warm-cream canvas. The photo gallery fills the
+    //  entire top; an editorial sheet
     //  slides over it with a rounded top edge. Stats are a snap-scrolling
     //  ribbon, rooms are story cards, every action floats.
     // ═════════════════════════════════════════════════════════════════════

@@ -202,8 +202,8 @@ fun HandoverPassportScreen(
             item {
                 DorjaCard(
                     modifier = Modifier.fillMaxWidth(),
-                    // Always-dark "legal record" card: pinned ink so the
-                    // Sand300/White text pairing survives dark mode too.
+                    // Always-dark "legal record" card: pinned ink hex keeps
+                    // the Sand300/White text pairing stable.
                     backgroundColor = androidx.compose.ui.graphics.Color(0xFF0B0E14),
                     border = androidx.compose.foundation.BorderStroke(1.dp, DorjaColors.Sand300)
                 ) {

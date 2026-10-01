@@ -389,8 +389,8 @@ fun DorjaChip(
     modifier: Modifier = Modifier,
     icon: ImageVector? = null
 ) {
-    // Unselected chip fill uses the elevated dark token in dark mode; the
-    // selected pair keeps white content on the saturated Jol600 blue.
+    // Unselected chips fill white; the selected pair keeps white content
+    // on the saturated Jol600 blue.
     val animatedBg by animateColorAsState(
         targetValue = if (selected) DorjaColors.Jol600 else DorjaColors.White,
         label = "chipBg"

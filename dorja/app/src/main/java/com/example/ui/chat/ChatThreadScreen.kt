@@ -384,9 +384,8 @@ private fun SystemMessageBubble(message: Message) {
                 Text(
                     text = message.body,
                     style = MaterialTheme.typography.bodySmall,
-                    // The Ink950 pill inverts (dark pill in light mode, light
-                    // pill in dark mode); CanvasBg is its true opposite in
-                    // both themes so the label never washes out.
+                    // Ink950 pill with CanvasBg label — a fixed high-
+                    // contrast pair, no theme inversion involved.
                     color = DorjaColors.CanvasBg,
                     fontWeight = FontWeight.SemiBold
                 )
