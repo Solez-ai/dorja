@@ -191,3 +191,20 @@ object ScanGeometry {
         return (coveredCells.toFloat() / totalCells) * 100f
     }
 }
+
+/**
+ * Tunable thresholds for the guided capture loop. Kept in one place so the
+ * on-device feel can be adjusted without touching the session state machine.
+ * The stitcher tolerates ~12° of heading error per frame, so GREEN is set
+ * comfortably inside that budget.
+ */
+object ScanTuning {
+    /** Max |pitch| and |heading| error (deg) for GREEN — capture eligible. */
+    const val GREEN_DEG = 8f
+
+    /** Max error (deg) for YELLOW — approaching. Beyond this is RED. */
+    const val YELLOW_DEG = 22f
+
+    /** GREEN must hold this long (ms) before the automatic capture fires. */
+    const val STABILITY_MS = 900
+}

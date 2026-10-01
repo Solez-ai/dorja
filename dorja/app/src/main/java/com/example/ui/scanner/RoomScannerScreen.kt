@@ -125,6 +125,7 @@ import java.io.File
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.atan2
+import kotlin.math.max
 import kotlin.math.cos
 import kotlin.math.roundToInt
 import kotlin.math.sin
@@ -134,9 +135,33 @@ import com.slapps.cupertino.ExperimentalCupertinoApi
 
 private enum class Phase { SELECT, PREVIEW, CAPTURING, DONE }
 
+/**
+ * Explicit capture-session state machine (spec Parts 6-16). Deterministic
+ * transitions only — exactly one capture per target, targets frozen once
+ * generated, and GREEN is never shown without a valid current target.
+ */
+private enum class CaptureState {
+    /** Waiting for the user to point at the panorama's 0° reference. */
+    WAITING_FOR_INITIAL_ANCHOR,
+    /** Anchor confirmed: capture frame 1, then freeze the 12-target frame. */
+    CAPTURING_INITIAL_FRAME,
+    /** Targets frozen; guiding toward the frozen current target. */
+    MOVING_TO_TARGET,
+    /** GREEN and stability window running; cancels if tolerance is lost. */
+    STABILIZING,
+    /** Last target captured — wait for stitch hand-off. */
+    COMPLETED,
+    /** Sensor/tracking unavailable. */
+    ERROR
+}
+
+/** RED / YELLOW / GREEN alignment quality for the frozen target. */
+private enum class AlignLevel { RED, YELLOW, GREEN }
+
 private val Accent = Color(0xFF00BCD4)
 private val Green = Color(0xFF4CAF50)
 private val TargetYellow = Color(0xFFFFC107)
+private val AlignRed = Color(0xFFE53935)
 
 /**
  * Zoom choices the picker offers, based on the bound camera's minimum zoom
@@ -192,9 +217,29 @@ fun RoomScannerScreen(
     var pitch by remember { mutableFloatStateOf(0f) }
     var gyroOn by remember { mutableStateOf(true) }
     val capturedFrames = remember { mutableStateListOf<FrameData>() }
-    var currentTargetIdx by remember { mutableIntStateOf(0) }
 
-    val scanTargets = remember(scanMode) { ScanGeometry.generateScanTargets(scanMode) }
+    // ── Fixed-world-anchor capture session (spec Parts 6-16) ──
+    // The scan's own coordinate frame: headingDeg captured at the moment the
+    // user confirms the initial anchor. All 12 targets are offsets from this
+    // reference — NOT absolute compass values — so they stay frozen relative
+    // to the ROOM regardless of magnetic drift or where the user started.
+    var anchorHeading by remember { mutableStateOf<Float?>(null) }
+
+    var captureState by remember { mutableStateOf(CaptureState.WAITING_FOR_INITIAL_ANCHOR) }
+    var currentTargetIdx by remember { mutableIntStateOf(0) }
+    var greenSinceMs by remember { mutableStateOf<Long?>(null) }
+    var alignLevel by remember { mutableStateOf(AlignLevel.RED) }
+
+    // Absolute compass targets, generated ONCE from the frozen anchor and
+    // never regenerated while the session lives (spec Part 8: a target must
+    // not move with the phone).
+    val scanTargets = remember(scanMode, anchorHeading) {
+        anchorHeading?.let { a ->
+            ScanGeometry.generateScanTargets(scanMode).map {
+                it.copy(headingDeg = (a + it.headingDeg) % 360f)
+            }
+        } ?: emptyList()
+    }
 
     // Stitching progress & live preview states
     var stitchingStatus by remember { mutableStateOf<String?>(null) }
@@ -210,6 +255,9 @@ fun RoomScannerScreen(
     val rotMatrix = remember { FloatArray(9) }
     val remappedMatrix = remember { FloatArray(9) }
     val orientAngles = remember { FloatArray(3) }
+    // Tracking availability; resolved after the sensor objects above so the
+    // state machine can report ERROR instead of silently guessing.
+    var trackingAvailable by remember { mutableStateOf(rotVec != null || gameRotVec != null || accel != null) }
     // Smoothed orientation for stable AR-arrow anchoring (fast-out low-pass filter).
     var smoothHeading by remember { mutableStateOf<Float?>(null) }
     var smoothPitch by remember { mutableStateOf<Float?>(null) }
@@ -295,6 +343,107 @@ fun RoomScannerScreen(
         if (!hasCamera) permLauncher.launch(Manifest.permission.CAMERA)
     }
 
+    // Single capture entry point — guarantees exactly one in-flight photo per
+    // target and that frame bookkeeping never duplicates (keyed by col).
+    val captureFrame: (ScanGeometry.ScanTarget) -> Unit = { target ->
+        val ic = imageCapture
+        if (ic == null) {
+            captureState = CaptureState.ERROR
+        } else {
+            val file = File(
+                ctx.cacheDir,
+                "frame_r${target.ringIndex}_c${target.targetIndex}_${System.currentTimeMillis()}.jpg"
+            )
+            val capturedHeading = heading
+            val capturedPitch = pitch
+            ic.takePicture(
+                ImageCapture.OutputFileOptions.Builder(file).build(),
+                ContextCompat.getMainExecutor(ctx),
+                object : ImageCapture.OnImageSavedCallback {
+                    override fun onImageSaved(output: ImageCapture.OutputFileResults) {
+                        val frame = FrameData(
+                            path = file.absolutePath,
+                            heading = capturedHeading,
+                            pitchDeg = capturedPitch,
+                            row = target.ringIndex,
+                            col = target.targetIndex,
+                            isCap = target.isCap,
+                            capType = target.capType
+                        )
+                        val existingIdx = capturedFrames.indexOfFirst { it.col == target.targetIndex }
+                        if (existingIdx >= 0) capturedFrames[existingIdx] = frame else capturedFrames.add(frame)
+                        vibrateShutter(ctx)
+                        if (currentTargetIdx < scanTargets.size - 1) {
+                            currentTargetIdx++
+                            greenSinceMs = null
+                            captureState = CaptureState.MOVING_TO_TARGET
+                        } else {
+                            captureState = CaptureState.COMPLETED
+                        }
+                    }
+
+                    override fun onError(exc: ImageCaptureException) {
+                        Log.e("Scanner", "Capture failed", exc)
+                        captureState = CaptureState.MOVING_TO_TARGET
+                    }
+                }
+            )
+        }
+    }
+
+    // ── Stability debounce + automatic capture (spec Part 11) ──
+    // Runs only while targets exist and the session is active. A single
+    // noisy GREEN frame never captures: the pose must stay within GREEN
+    // tolerance for ScanTuning.STABILITY_MS, and dropping out cancels.
+    LaunchedEffect(captureState, currentTargetIdx, scanTargets) {
+        if (scanTargets.isEmpty()) return@LaunchedEffect
+        if (captureState != CaptureState.MOVING_TO_TARGET) return@LaunchedEffect
+        val target = scanTargets.getOrNull(currentTargetIdx) ?: return@LaunchedEffect
+        while (isActive && captureState == CaptureState.MOVING_TO_TARGET) {
+            val pErr = pitch - target.pitchDeg
+            val hErr = ((heading - target.headingDeg + 540f) % 360f) - 180f
+            val maxErr = max(abs(pErr), abs(hErr))
+            alignLevel = when {
+                maxErr <= ScanTuning.GREEN_DEG -> AlignLevel.GREEN
+                maxErr <= ScanTuning.YELLOW_DEG -> AlignLevel.YELLOW
+                else -> AlignLevel.RED
+            }
+            val now = System.currentTimeMillis()
+            if (alignLevel == AlignLevel.GREEN) {
+                val since = greenSinceMs ?: now.also { greenSinceMs = it }
+                if (now - since >= ScanTuning.STABILITY_MS) {
+                    greenSinceMs = null
+                    captureState = CaptureState.STABILIZING
+                    captureFrame(target)
+                    return@LaunchedEffect
+                }
+            } else {
+                greenSinceMs = null
+            }
+            delay(33)
+        }
+    }
+
+    // ── Initial frame + state transitions (spec Parts 7, 14) ──
+    // Deterministic path: anchor confirmed → capture frame 1 → frame the 12
+    // frozen targets → MOVING_TO_TARGET; last capture → COMPLETED.
+    LaunchedEffect(captureState) {
+        if (captureState != CaptureState.CAPTURING_INITIAL_FRAME) return@LaunchedEffect
+        val a = anchorHeading
+        if (a == null) {
+            captureState = CaptureState.WAITING_FOR_INITIAL_ANCHOR
+            return@LaunchedEffect
+        }
+        val first = ScanGeometry.ScanTarget(
+            targetIndex = 0,
+            ringIndex = 0,
+            pitchDeg = 0f,
+            headingDeg = a % 360f,
+            isCap = false
+        )
+        captureFrame(first)
+    }
+
     DisposableEffect(Unit) {
         onDispose {
             cleanupFrameFiles(ctx, capturedFrames)
@@ -342,58 +491,38 @@ fun RoomScannerScreen(
                         imageCapture = imageCapture,
                         onCaptureReady = { imageCapture = it },
                         hasCamera = hasCamera,
+                        trackingAvailable = trackingAvailable,
                         heading = heading,
                         currentPitch = pitch,
+                        captureState = captureState,
                         scanMode = scanMode,
                         scanTargets = scanTargets,
                         currentTargetIdx = currentTargetIdx,
                         capturedFrames = capturedFrames,
+                        alignLevel = alignLevel,
                         gyroOn = gyroOn,
                         onToggleGyro = { gyroOn = !gyroOn },
-                        onRetakeTarget = { targetIndex -> currentTargetIdx = targetIndex },
-                        onCapture = {
-                            val ic = imageCapture ?: return@CapturingPhase
-                            val target = scanTargets.getOrNull(currentTargetIdx) ?: return@CapturingPhase
-                            val file = File(ctx.cacheDir, "frame_r${target.ringIndex}_c${target.targetIndex}_${System.currentTimeMillis()}.jpg")
-                            val capturedHeading = heading
-                            val capturedPitch = pitch
-
-                            ic.takePicture(
-                                ImageCapture.OutputFileOptions.Builder(file).build(),
-                                ContextCompat.getMainExecutor(ctx),
-                                object : ImageCapture.OnImageSavedCallback {
-                                    override fun onImageSaved(output: ImageCapture.OutputFileResults) {
-                                        val frame = FrameData(
-                                            path = file.absolutePath,
-                                            heading = capturedHeading,
-                                            pitchDeg = capturedPitch,
-                                            row = target.ringIndex,
-                                            col = target.targetIndex,
-                                            isCap = target.isCap,
-                                            capType = target.capType
-                                        )
-
-                                        val existingIdx = capturedFrames.indexOfFirst { it.col == target.targetIndex }
-                                        if (existingIdx >= 0) {
-                                            capturedFrames[existingIdx] = frame
-                                        } else {
-                                            capturedFrames.add(frame)
-                                        }
-
-                                        vibrateShutter(ctx)
-                                        if (currentTargetIdx < scanTargets.size - 1) {
-                                            currentTargetIdx++
-                                        }
-                                    }
-
-                                    override fun onError(exc: ImageCaptureException) {
-                                        Log.e("Scanner", "Capture failed", exc)
-                                    }
-                                }
-                            )
+                        onConfirmAnchor = {
+                            if (captureState == CaptureState.WAITING_FOR_INITIAL_ANCHOR) {
+                                anchorHeading = heading
+                                captureState = CaptureState.CAPTURING_INITIAL_FRAME
+                            }
+                        },
+                        onRetakeTarget = { targetIndex ->
+                            if (captureState == CaptureState.COMPLETED) {
+                                currentTargetIdx = targetIndex
+                                captureState = CaptureState.MOVING_TO_TARGET
+                            }
                         },
                         onStop = { phase = Phase.DONE },
-                        onBack = { phase = Phase.PREVIEW },
+                        onBack = {
+                            // Leaving mid-session resets the scan coordinate
+                            // frame entirely — the anchor is session-scoped.
+                            anchorHeading = null
+                            greenSinceMs = null
+                            captureState = CaptureState.WAITING_FOR_INITIAL_ANCHOR
+                            phase = Phase.PREVIEW
+                        },
                         lifecycleOwner = lifecycleOwner
                 )
             }
@@ -464,6 +593,11 @@ fun RoomScannerScreen(
                     if (stitchedPath != null) File(stitchedPath!!).delete()
                     capturedFrames.clear()
                     currentTargetIdx = 0
+                    // A retake is a fresh scan: re-establish the anchor.
+                    anchorHeading = null
+                    greenSinceMs = null
+                    alignLevel = AlignLevel.RED
+                    captureState = CaptureState.WAITING_FOR_INITIAL_ANCHOR
                     stitchingStatus = null
                     stitchingPreviewBmp = null
                     stitchedPath = null
@@ -474,6 +608,10 @@ fun RoomScannerScreen(
                     if (stitchedPath != null) File(stitchedPath!!).delete()
                     capturedFrames.clear()
                     currentTargetIdx = 0
+                    anchorHeading = null
+                    greenSinceMs = null
+                    alignLevel = AlignLevel.RED
+                    captureState = CaptureState.WAITING_FOR_INITIAL_ANCHOR
                     stitchingStatus = null
                     stitchingPreviewBmp = null
                     stitchedPath = null
@@ -590,11 +728,11 @@ private fun PreviewPhase(
                 Column(Modifier.padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("HOW TO CAPTURE A PANORAMA", color = Accent, fontSize = 11.sp, fontFamily = DorjaFontFamily, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(10.dp))
-                    Text("1. Stand in middle of room (pivot like a tripod)", color = Color.White, fontSize = 12.sp)
+                    Text("1. Stand in the middle of the room, hold the phone steady", color = Color.White, fontSize = 12.sp)
                     Spacer(Modifier.height(4.dp))
-                    Text("2. Move phone to align center into green AR target ring", color = Color.White, fontSize = 12.sp)
+                    Text("2. Point at your start wall and tap SET ANCHOR — the scan grid locks to that direction", color = Color.White, fontSize = 12.sp)
                     Spacer(Modifier.height(4.dp))
-                    Text("3. Follow the 3D arrows all the way around", color = Color.White, fontSize = 12.sp)
+                    Text("3. Turn toward each target: get GREEN, hold still — it captures itself", color = Color.White, fontSize = 12.sp)
                 }
             }
         }
@@ -645,60 +783,107 @@ private fun CapturingPhase(
     imageCapture: ImageCapture?,
     onCaptureReady: (ImageCapture) -> Unit,
     hasCamera: Boolean,
+    trackingAvailable: Boolean,
     heading: Float,
     currentPitch: Float,
+    captureState: CaptureState,
     scanMode: ScanGeometry.ScanMode,
     scanTargets: List<ScanGeometry.ScanTarget>,
     currentTargetIdx: Int,
     capturedFrames: SnapshotStateList<FrameData>,
+    alignLevel: AlignLevel,
     gyroOn: Boolean,
     onToggleGyro: () -> Unit,
+    onConfirmAnchor: () -> Unit,
     onRetakeTarget: (Int) -> Unit,
-    onCapture: () -> Unit,
     onStop: () -> Unit,
     onBack: () -> Unit,
     lifecycleOwner: androidx.lifecycle.LifecycleOwner
 ) {
-    val target = scanTargets.getOrNull(currentTargetIdx) ?: scanTargets.last()
+    // A valid frozen target only exists while the sequence is active; GREEN
+    // is never displayed without one (spec Part 14).
+    val sessionActive = captureState == CaptureState.MOVING_TO_TARGET ||
+        captureState == CaptureState.STABILIZING
+    val target = if (sessionActive) scanTargets.getOrNull(currentTargetIdx) else null
 
-    val pitchError = currentPitch - target.pitchDeg
-    val headingError = ((heading - target.headingDeg + 540) % 360) - 180
-    val normalizedDelta = abs(minOf(abs(pitchError), abs(headingError)))
+    val stateColor = when (alignLevel) {
+        AlignLevel.GREEN -> Green
+        AlignLevel.YELLOW -> TargetYellow
+        AlignLevel.RED -> AlignRed
+    }
 
-    val onPitchTarget = abs(pitchError) <= 12f
-    val onHeadingTarget = target.isCap || abs(headingError) <= 12f
-    val isLocked = onPitchTarget && onHeadingTarget
+    val progressText = when (captureState) {
+        CaptureState.WAITING_FOR_INITIAL_ANCHOR -> "STEP 1/${scanTargets.size + 1} — SET ANCHOR"
+        CaptureState.CAPTURING_INITIAL_FRAME -> "CAPTURING FRAME 1…"
+        CaptureState.MOVING_TO_TARGET, CaptureState.STABILIZING ->
+            "SHOT ${currentTargetIdx + 1}/${scanTargets.size} • RING ${target?.ringIndex ?: 0}"
+        CaptureState.COMPLETED -> "${scanTargets.size + 1}/${scanTargets.size + 1} — SCAN COMPLETE"
+        CaptureState.ERROR -> "TRACKING UNAVAILABLE"
+    }
 
     val guidanceText = when {
-        target.isCap && target.capType == "zenith" -> if (currentPitch > 75f) "LOCK AT CEILING" else "POINT AT CEILING (+90°)"
-        target.isCap && target.capType == "nadir" -> if (currentPitch < -75f) "LOCK AT NADIR" else "POINT AT FLOOR (-90°)"
-        pitchError < -12f -> "TILT UP ${"%.0f".format(abs(pitchError))}°"
-        pitchError > 12f -> "TILT DOWN ${"%.0f".format(abs(pitchError))}°"
-        headingError > 12f -> "TURN LEFT ${"%.0f".format(abs(headingError))}°"
-        headingError < -12f -> "TURN RIGHT ${"%.0f".format(abs(headingError))}°"
-        else -> "ALIGNED — TAP SHUTTER"
+        captureState == CaptureState.WAITING_FOR_INITIAL_ANCHOR ->
+            if (trackingAvailable) "Point at your start wall, then tap SET ANCHOR"
+            else "Waiting for sensors…"
+        captureState == CaptureState.CAPTURING_INITIAL_FRAME -> "Capturing frame 1 — hold still"
+        captureState == CaptureState.ERROR -> "Sensors unavailable — restart the scan"
+        captureState == CaptureState.COMPLETED -> "All shots captured"
+        target == null -> ""
+        else -> {
+            val pErr = currentPitch - target.pitchDeg
+            val hErr = ((heading - target.headingDeg + 540f) % 360f) - 180f
+            when {
+                pErr < -ScanTuning.GREEN_DEG -> "TILT UP ${"%.0f".format(abs(pErr))}°"
+                pErr > ScanTuning.GREEN_DEG -> "TILT DOWN ${"%.0f".format(abs(pErr))}°"
+                hErr > ScanTuning.GREEN_DEG -> "TURN LEFT ${"%.0f".format(abs(hErr))}°"
+                hErr < -ScanTuning.GREEN_DEG -> "TURN RIGHT ${"%.0f".format(abs(hErr))}°"
+                captureState == CaptureState.STABILIZING -> "HOLD STILL — CAPTURING"
+                else -> "ALIGNED — HOLD"
+            }
+        }
     }
 
     Box(Modifier.fillMaxSize()) {
         CameraPreview(imageCapture, onCaptureReady, hasCamera, lifecycleOwner)
 
-        // INTERACTIVE 3D AR TARGET RETICLE & DIRECTIONAL ARROWS OVERLAY
-        ArTargetOverlay(
-            heading = heading,
-            currentPitch = currentPitch,
-            targetHeading = target.headingDeg,
-            targetPitch = target.pitchDeg,
-            isLocked = isLocked,
-            isCap = target.isCap
-        )
+        // Frozen-target reticle: only drawn when a valid frozen target exists.
+        if (target != null) {
+            ArTargetOverlay(
+                heading = heading,
+                currentPitch = currentPitch,
+                targetHeading = target.headingDeg,
+                targetPitch = target.pitchDeg,
+                alignColor = stateColor,
+                isLocked = alignLevel == AlignLevel.GREEN,
+                isCap = target.isCap
+            )
+        } else {
+            AnchorCrosshair()
+        }
+
+        if (!trackingAvailable) {
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = AlignRed.copy(alpha = 0.9f),
+                modifier = Modifier.align(Alignment.TopCenter).padding(top = 92.dp)
+            ) {
+                Text(
+                    "Orientation sensors unavailable — targets cannot be held",
+                    color = Color.White,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                )
+            }
+        }
 
         // Top Status Header
         Box(Modifier.fillMaxWidth().height(65.dp).background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.6f), Color.Transparent))).align(Alignment.TopCenter))
         Surface(shape = RoundedCornerShape(20.dp), color = Color.Black.copy(alpha = 0.65f), modifier = Modifier.align(Alignment.TopCenter).padding(top = 45.dp)) {
             Row(Modifier.padding(horizontal = 14.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    "SHOT ${currentTargetIdx + 1}/${scanTargets.size} • RING ${target.ringIndex} • TURN ${"%.0f".format(normalizedDelta)}°",
-                    color = if (isLocked) Green else Accent,
+                    progressText,
+                    color = if (sessionActive) stateColor else Accent,
                     fontWeight = FontWeight.Bold,
                     fontFamily = DorjaFontFamily,
                     fontSize = 11.sp
@@ -706,32 +891,112 @@ private fun CapturingPhase(
             }
         }
 
-        // Vertical Ring Rail (Right Edge)
+        // Vertical Ring Rail (Right Edge) — reshots available once complete.
         VerticalRingRail(
             scanMode = scanMode,
-            currentRing = target.ringIndex,
+            currentRing = target?.ringIndex ?: 0,
             scanTargets = scanTargets,
             capturedFrames = capturedFrames,
+            onReshoot = if (captureState == CaptureState.COMPLETED) onRetakeTarget else null,
             modifier = Modifier.align(Alignment.CenterEnd).padding(end = 12.dp)
         )
 
         Box(Modifier.fillMaxWidth().height(140.dp).background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.7f)))).align(Alignment.BottomCenter))
 
-        Row(Modifier.fillMaxWidth().align(Alignment.BottomCenter).padding(bottom = 20.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-            LastShotThumbnail(capturedFrames, capturedFrames.size, Modifier.align(Alignment.CenterVertically))
-            Spacer(Modifier.width(18.dp))
-            Box(
-                Modifier.size(68.dp).clip(CircleShape)
-                    .background(if (isLocked) Green.copy(alpha = 0.25f) else Color.White.copy(alpha = 0.15f))
-                    .border(3.dp, if (isLocked) Green else Color.White, CircleShape)
-                    .clickable { onCapture() },
-                contentAlignment = Alignment.Center
-            ) {
-                Box(Modifier.size(48.dp).clip(CircleShape).background(if (isLocked) Green else Color.White.copy(alpha = 0.9f)))
+        // Contextual bottom control: SET ANCHOR during step 1, a passive
+        // capture indicator once the frozen-target sequence is running
+        // (captures fire automatically after the stability window), and an
+        // ACTIVE reshop control on the rail once the scan is complete.
+        when (captureState) {
+            CaptureState.WAITING_FOR_INITIAL_ANCHOR -> {
+                Column(
+                    Modifier.fillMaxWidth().align(Alignment.BottomCenter).padding(bottom = 20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Surface(
+                        onClick = onConfirmAnchor,
+                        enabled = trackingAvailable,
+                        shape = RoundedCornerShape(24.dp),
+                        color = if (trackingAvailable) Green else Color.White.copy(alpha = 0.3f),
+                        border = androidx.compose.foundation.BorderStroke(2.dp, Color.White)
+                    ) {
+                        Text(
+                            "SET ANCHOR",
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp,
+                            modifier = Modifier.padding(horizontal = 28.dp, vertical = 14.dp)
+                        )
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Frame 1 of ${scanTargets.size + 1} captures at this direction",
+                        color = Color.White.copy(alpha = 0.8f),
+                        fontSize = 11.sp
+                    )
+                }
             }
-            Spacer(Modifier.width(18.dp))
-            Box(Modifier.size(48.dp).clip(CircleShape).background(Color(0xFFE53935)).border(2.dp, Color.White, CircleShape).clickable { onStop() }, contentAlignment = Alignment.Center) {
-                Box(Modifier.size(16.dp).clip(RoundedCornerShape(3.dp)).background(Color.White))
+            CaptureState.COMPLETED -> {
+                // All shots captured — hand off to the stitching/viewer flow.
+                Surface(
+                    onClick = onStop,
+                    shape = RoundedCornerShape(24.dp),
+                    color = Green,
+                    border = androidx.compose.foundation.BorderStroke(2.dp, Color.White),
+                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 20.dp)
+                ) {
+                    Text(
+                        "FINISH SCAN — STITCH PANORAMA",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp,
+                        modifier = Modifier.padding(horizontal = 22.dp, vertical = 14.dp)
+                    )
+                }
+            }
+            else -> {
+                Row(
+                    Modifier.fillMaxWidth().align(Alignment.BottomCenter).padding(bottom = 20.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    LastShotThumbnail(capturedFrames, capturedFrames.size, Modifier.align(Alignment.CenterVertically))
+                    Spacer(Modifier.width(18.dp))
+                    Box(
+                        Modifier.size(68.dp).clip(CircleShape)
+                            .background(
+                                when (alignLevel) {
+                                    AlignLevel.GREEN -> Green.copy(alpha = 0.25f)
+                                    AlignLevel.YELLOW -> TargetYellow.copy(alpha = 0.18f)
+                                    AlignLevel.RED -> Color.White.copy(alpha = 0.15f)
+                                }
+                            )
+                            .border(
+                                3.dp,
+                                when (alignLevel) {
+                                    AlignLevel.GREEN -> Green
+                                    AlignLevel.YELLOW -> TargetYellow
+                                    AlignLevel.RED -> Color.White
+                                },
+                                CircleShape
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Box(
+                            Modifier.size(48.dp).clip(CircleShape).background(
+                                when (alignLevel) {
+                                    AlignLevel.GREEN -> Green
+                                    AlignLevel.YELLOW -> TargetYellow
+                                    AlignLevel.RED -> Color.White.copy(alpha = 0.9f)
+                                }
+                            )
+                        )
+                    }
+                    Spacer(Modifier.width(18.dp))
+                    Box(Modifier.size(48.dp).clip(CircleShape).background(AlignRed).border(2.dp, Color.White, CircleShape).clickable { onStop() }, contentAlignment = Alignment.Center) {
+                        Box(Modifier.size(16.dp).clip(RoundedCornerShape(3.dp)).background(Color.White))
+                    }
+                }
             }
         }
 
@@ -739,16 +1004,16 @@ private fun CapturingPhase(
             GyroChip(gyroOn, onToggleGyro)
         }
 
-        // Guidance Badge Banner
+        // Guidance Badge Banner — supports, not replaces, the RED/YELLOW/GREEN reticle.
         Surface(
             shape = RoundedCornerShape(20.dp),
             color = Color.Black.copy(alpha = 0.75f),
-            border = androidx.compose.foundation.BorderStroke(1.5.dp, if (isLocked) Green else TargetYellow),
+            border = androidx.compose.foundation.BorderStroke(1.5.dp, stateColor),
             modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 95.dp)
         ) {
             Text(
                 guidanceText,
-                color = if (isLocked) Green else TargetYellow,
+                color = stateColor,
                 fontSize = 11.sp,
                 fontFamily = DorjaFontFamily,
                 fontWeight = FontWeight.Bold,
@@ -770,6 +1035,7 @@ private fun ArTargetOverlay(
     currentPitch: Float,
     targetHeading: Float,
     targetPitch: Float,
+    alignColor: Color,
     isLocked: Boolean,
     isCap: Boolean
 ) {
@@ -788,7 +1054,9 @@ private fun ArTargetOverlay(
 
         val isTargetOnScreen = targetX in 0f..size.width && targetY in 0f..size.height
 
-        val ringColor = if (isLocked) Green else TargetYellow
+        // The ring IS the frozen world-space target: its projected screen
+        // position changes as the phone moves, but the target itself does not.
+        val ringColor = alignColor
         val ringRadius = if (isLocked) 34.dp.toPx() else 28.dp.toPx()
 
         // 1. Center Screen Crosshair
@@ -830,16 +1098,33 @@ private fun ArTargetOverlay(
             val p2 = Offset(-arrowSize * 0.6f, arrowSize * 0.6f)
             val p3 = Offset(arrowSize * 0.6f, arrowSize * 0.6f)
 
-            drawLine(TargetYellow, p1, p2, 3.dp.toPx())
-            drawLine(TargetYellow, p2, Offset(0f, 0f), 3.dp.toPx())
-            drawLine(TargetYellow, Offset(0f, 0f), p3, 3.dp.toPx())
-            drawLine(TargetYellow, p3, p1, 3.dp.toPx())
+            drawLine(alignColor, p1, p2, 3.dp.toPx())
+            drawLine(alignColor, p2, Offset(0f, 0f), 3.dp.toPx())
+            drawLine(alignColor, Offset(0f, 0f), p3, 3.dp.toPx())
+            drawLine(alignColor, p3, p1, 3.dp.toPx())
 
             drawContext.canvas.restore()
 
             // Line connecting center to arrow
-            drawLine(TargetYellow.copy(alpha = 0.4f), Offset(cx, cy), Offset(arrowX, arrowY), 2.dp.toPx())
+            drawLine(alignColor.copy(alpha = 0.4f), Offset(cx, cy), Offset(arrowX, arrowY), 2.dp.toPx())
         }
+    }
+}
+
+/** Step-1 crosshair shown while the user is establishing the initial anchor. */
+@Composable
+private fun AnchorCrosshair() {
+    Canvas(Modifier.fillMaxSize()) {
+        val cx = size.width / 2f
+        val cy = size.height / 2f
+        drawCircle(Color.White.copy(alpha = 0.85f), 3.dp.toPx(), Offset(cx, cy))
+        drawCircle(Color.White.copy(alpha = 0.45f), 46.dp.toPx(), Offset(cx, cy), style = Stroke(1.5.dp.toPx()))
+        // Tick marks at the circle's cardinal points.
+        val tick = 8.dp.toPx()
+        drawLine(Color.White.copy(alpha = 0.6f), Offset(cx, cy - 46.dp.toPx()), Offset(cx, cy - 46.dp.toPx() - tick), 2.dp.toPx())
+        drawLine(Color.White.copy(alpha = 0.6f), Offset(cx, cy + 46.dp.toPx()), Offset(cx, cy + 46.dp.toPx() + tick), 2.dp.toPx())
+        drawLine(Color.White.copy(alpha = 0.6f), Offset(cx - 46.dp.toPx(), cy), Offset(cx - 46.dp.toPx() - tick, cy), 2.dp.toPx())
+        drawLine(Color.White.copy(alpha = 0.6f), Offset(cx + 46.dp.toPx(), cy), Offset(cx + 46.dp.toPx() + tick, cy), 2.dp.toPx())
     }
 }
 
@@ -1241,7 +1526,8 @@ private fun VerticalRingRail(
     currentRing: Int,
     scanTargets: List<ScanGeometry.ScanTarget>,
     capturedFrames: List<FrameData>,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onReshoot: ((Int) -> Unit)? = null
 ) {
     val rings = remember(scanMode) {
         scanTargets.map { it.ringIndex }.distinct().sorted()
@@ -1278,6 +1564,22 @@ private fun VerticalRingRail(
                         .clip(CircleShape)
                         .background(dotColor)
                         .border(if (isCurrent) 2.dp else 0.dp, Color.White, CircleShape)
+                        .let {
+                            if (onReshoot != null && ringComplete) {
+                                it.clickable { onReshoot(targetsInRing.first().targetIndex) }
+                            } else {
+                                it
+                            }
+                        }
+                )
+            }
+            if (onReshoot != null) {
+                Text(
+                    "TAP RING TO RESHOT",
+                    color = Accent,
+                    fontSize = 7.sp,
+                    fontFamily = DorjaFontFamily,
+                    fontWeight = FontWeight.Bold
                 )
             }
         }
