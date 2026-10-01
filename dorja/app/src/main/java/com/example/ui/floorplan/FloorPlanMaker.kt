@@ -814,7 +814,12 @@ private fun formatMeters(v: Float): String {
 // Drawing
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Plan-space pass: grid + walls + preview, under the caller's transform. */
+/**
+ * Grid + walls + preview. Geometry is given in plan-space meters and must be
+ * converted to screen pixels via (p * scale + offset); stroke widths and radii
+ * are scaled the same way so they grow/shrink with zoom. Serves both the
+ * editor canvas and the read-only FloorPlanPreview card.
+ */
 private fun DrawScope.drawPlanBody(
     walls: List<FloorPlanWall>,
     scale: Float,
@@ -828,8 +833,10 @@ private fun DrawScope.drawPlanBody(
     eraseHitIndex: Int,
     showGrid: Boolean
 ) {
+    fun toScreen(p: Offset): Offset = Offset(p.x * scale + offset.x, p.y * scale + offset.y)
+
     if (showGrid) {
-        val minor = 1f / scale // 1 px after transform
+        val minor = 1f // grid line width in px (screen space)
         val visibleMinX = -offset.x / scale
         val visibleMaxX = (size.width - offset.x) / scale
         val visibleMinY = -offset.y / scale
@@ -842,8 +849,8 @@ private fun DrawScope.drawPlanBody(
             val major = m % 5 == 0
             drawLine(
                 color = if (major) gridMajorColor else gridColor,
-                start = Offset(m.toFloat(), 0f),
-                end = Offset(m.toFloat(), PLAN_EXTENT),
+                start = toScreen(Offset(m.toFloat(), 0f)),
+                end = toScreen(Offset(m.toFloat(), PLAN_EXTENT)),
                 strokeWidth = if (major) minor * 1.6f else minor
             )
         }
@@ -851,35 +858,35 @@ private fun DrawScope.drawPlanBody(
             val major = m % 5 == 0
             drawLine(
                 color = if (major) gridMajorColor else gridColor,
-                start = Offset(0f, m.toFloat()),
-                end = Offset(PLAN_EXTENT, m.toFloat()),
+                start = toScreen(Offset(0f, m.toFloat())),
+                end = toScreen(Offset(PLAN_EXTENT, m.toFloat())),
                 strokeWidth = if (major) minor * 1.6f else minor
             )
         }
     }
 
-    // Walls — strokeWidth is in meters; the transform scales it to px.
+    // Walls — thickness is in meters; scale converts it to px.
     walls.forEachIndexed { i, w ->
         drawLine(
             color = if (i == eraseHitIndex) eraseColor else wallColor,
-            start = Offset(w.x1, w.y1),
-            end = Offset(w.x2, w.y2),
-            strokeWidth = w.thickness,
+            start = toScreen(Offset(w.x1, w.y1)),
+            end = toScreen(Offset(w.x2, w.y2)),
+            strokeWidth = (w.thickness * scale).coerceAtLeast(1.5f),
             cap = StrokeCap.Round
         )
     }
 
-    // In-progress wall + endpoint handles.
+    // In-progress wall + endpoint handles (stroke/radius in px).
     preview?.let { (s, e) ->
         drawLine(
             color = accentColor,
-            start = s,
-            end = e,
-            strokeWidth = 0.08f,
+            start = toScreen(s),
+            end = toScreen(e),
+            strokeWidth = 0.08f * scale,
             cap = StrokeCap.Round
         )
-        drawCircle(accentColor, radius = 0.10f, center = s)
-        drawCircle(accentColor, radius = 0.10f, center = e)
+        drawCircle(accentColor, radius = 0.10f * scale, center = toScreen(s))
+        drawCircle(accentColor, radius = 0.10f * scale, center = toScreen(e))
     }
 }
 
