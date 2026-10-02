@@ -1137,16 +1137,38 @@ fun PropertyDetailScreen(
                                 }
                             }
                             Spacer(modifier = Modifier.height(10.dp))
+                            // Slots already gone on the picked day don't appear —
+                            // otherwise a buyer could book a time that passed an
+                            // hour ago. Picking a future day shows the full set.
+                            val pickingToday = visitDateMillis == Formatters.todayUtcDayMillis()
+                            val nowHour = java.util.Calendar.getInstance()
+                                .get(java.util.Calendar.HOUR_OF_DAY)
+                            val openSlots = listOf(9, 11, 13, 15, 17, 19)
+                                .filter { !pickingToday || it > nowHour }
+                            // Drop a previously selected hour that is no longer
+                            // bookable (e.g. the dialog stayed open past the slot).
+                            LaunchedEffect(openSlots) {
+                                val picked = visitHour
+                                if (picked != null && picked !in openSlots) visitHour = null
+                            }
                             FlowRow(
                                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                                 verticalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
-                                listOf(9, 11, 13, 15, 17, 19).forEach { hour ->
-                                    DorjaChip(
-                                        selected = visitHour == hour,
-                                        onClick = { visitHour = hour },
-                                        label = visitHourLabel(hour)
+                                if (openSlots.isEmpty()) {
+                                    Text(
+                                        text = "No slots left today — pick another day.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = DorjaColors.Gray700
                                     )
+                                } else {
+                                    openSlots.forEach { hour ->
+                                        DorjaChip(
+                                            selected = visitHour == hour,
+                                            onClick = { visitHour = hour },
+                                            label = visitHourLabel(hour)
+                                        )
+                                    }
                                 }
                             }
                         }
