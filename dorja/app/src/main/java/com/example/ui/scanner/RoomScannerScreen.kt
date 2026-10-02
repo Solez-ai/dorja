@@ -423,26 +423,6 @@ fun RoomScannerScreen(
         captureState = CaptureState.WAITING_FOR_INITIAL_ANCHOR
     }
 
-    // Manual shutter: fire a capture at the CURRENT pose for the active shot.
-    val onManualCapture: () -> Unit = {
-        val t = scanTargets.getOrNull(currentTargetIdx)
-        if (t != null && captureState == CaptureState.MOVING_TO_TARGET && !awaitingManualShot) {
-            awaitingManualShot = true
-            captureFrame(t)
-        }
-    }
-
-    // NEXT SHOT: mark the active shot done (reusing its existing capture if
-    // there is one) without pointing at the target — for spots that cannot
-    // be reached. Sequence finishes when every shot has a take.
-    val onNextShot: () -> Unit = {
-        if (captureState == CaptureState.MOVING_TO_TARGET || captureState == CaptureState.COMPLETED) {
-            currentTargetIdx = (currentTargetIdx + 1) % scanTargets.size.coerceAtLeast(1)
-            alignLevel = AlignLevel.RED
-            captureState = CaptureState.MOVING_TO_TARGET
-        }
-    }
-
     // Single capture entry point — guarantees exactly one in-flight photo per
     // target and that frame bookkeeping never duplicates (keyed by col).
     // Repeated errors surface the ERROR state (with a RETRY pill) instead of
@@ -511,6 +491,26 @@ fun RoomScannerScreen(
                     }
                 }
             )
+        }
+    }
+
+    // Manual shutter: fire a capture at the CURRENT pose for the active shot.
+    val onManualCapture: () -> Unit = {
+        val t = scanTargets.getOrNull(currentTargetIdx)
+        if (t != null && captureState == CaptureState.MOVING_TO_TARGET && !awaitingManualShot) {
+            awaitingManualShot = true
+            captureFrame(t)
+        }
+    }
+
+    // NEXT SHOT: mark the active shot done (reusing its existing capture if
+    // there is one) without pointing at the target — for spots that cannot
+    // be reached. Sequence finishes when every shot has a take.
+    val onNextShot: () -> Unit = {
+        if (captureState == CaptureState.MOVING_TO_TARGET || captureState == CaptureState.COMPLETED) {
+            currentTargetIdx = (currentTargetIdx + 1) % scanTargets.size.coerceAtLeast(1)
+            alignLevel = AlignLevel.RED
+            captureState = CaptureState.MOVING_TO_TARGET
         }
     }
 
@@ -618,8 +618,7 @@ fun RoomScannerScreen(
                         },
                         onManualCapture = onManualCapture,
                         onNextShot = onNextShot,
-                        onOpenAligner = { phase = Phase.DONE },
-                        shotDeltas = shotDeltasForAlign,
+                        awaitingManualShot = awaitingManualShot,
                         onRetakeTarget = { targetIndex ->
                             // Per-shot retake: jump to exactly the shot the
                             // user picked on the rail. The frame is overwritten
@@ -652,6 +651,13 @@ fun RoomScannerScreen(
                 stitchingStatus = stitchingStatus,
                 stitchingPreviewBmp = stitchingPreviewBmp,
                 stitchedPath = stitchedPath,
+                shotDeltas = shotDeltasForAlign,
+                onSyncDeltas = {
+                    if (shotDeltasForAlign.size != capturedFrames.size) {
+                        shotDeltasForAlign = captureCounts(capturedFrames.size)
+                    }
+                },
+                onAdjustDelta = { idx, d -> adjustShotDelta(idx, d) },
                 onStitch = { frames, stamp ->
                     scope.launch {
                         stitchingStatus = "Stitching ${frames.size} frames on-device…"
@@ -940,6 +946,7 @@ private fun CapturingPhase(
     onConfirmAnchor: () -> Unit,
     onManualCapture: () -> Unit,
     onNextShot: () -> Unit,
+    awaitingManualShot: Boolean,
     onRetakeTarget: (Int) -> Unit,
     onRetryCapture: () -> Unit,
     onStop: () -> Unit,
@@ -1364,7 +1371,8 @@ private fun DonePhase(
     stitchedPath: String?,
     onStitch: (List<FrameData>, Int) -> Unit,
     shotDeltas: List<Float>,
-    onOpenAligner: () -> Unit,
+    onSyncDeltas: () -> Unit,
+    onAdjustDelta: (Int, Float) -> Unit,
     onApplyLighting: (String, Float, Float, Float) -> Unit,
     onSave: () -> Unit,
     onRetake: () -> Unit,
@@ -1415,8 +1423,8 @@ private fun DonePhase(
     var stitchJobId by remember { mutableIntStateOf(0) }
     LaunchedEffect(capturedFrames.size, captureStamp) {
         if (capturedFrames.isNotEmpty()) {
-            if (shotDeltasForAlign.size != capturedFrames.size) {
-                shotDeltasForAlign = captureCounts(capturedFrames.size)
+            if (shotDeltas.size != capturedFrames.size) {
+                onSyncDeltas()
             }
             stitchJobId++
             onStitch(capturedFrames, stitchJobId)
@@ -1426,12 +1434,12 @@ private fun DonePhase(
     // Manual alignment mode — the user nudges each shot's heading so the
     // panorama seams line up perfectly, re-stitching live after every nudge.
     var alignmentMode by remember { mutableStateOf(false) }
-    if (alignmentMode && capturedFrames.isNotEmpty() && shotDeltasForAlign.size == capturedFrames.size) {
+    if (alignmentMode && capturedFrames.isNotEmpty() && shotDeltas.size == capturedFrames.size) {
         AlignmentModeDialog(
             frameCount = capturedFrames.size,
-            shotDeltas = shotDeltasForAlign,
+            shotDeltas = shotDeltas,
             onAdjust = { idx, d ->
-                adjustShotDelta(idx, d)
+                onAdjustDelta(idx, d)
                 stitchJobId++
                 onStitch(capturedFrames, stitchJobId)
             },
