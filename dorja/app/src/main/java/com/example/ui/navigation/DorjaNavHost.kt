@@ -453,11 +453,17 @@ fun MainContainer(
         }
     }
 
-    val progress by animateFloatAsState(
+    val rawProgress by animateFloatAsState(
         targetValue = if (drawerOpen) 1f else 0f,
         animationSpec = tween(durationMillis = DRAWER_DURATION_MS, easing = DrawerEasing),
         label = "drawerProgress"
     )
+    // Defensive clamp: if the animator ever emits a NaN or out-of-range frame
+    // (observed once as a teardown race), the graphicsLayer below would scale
+    // the main card to nothing, leaving only the dark DrawerBackdrop visible —
+    // the reported "blank screen" after opening the menu. A sane value keeps
+    // the app renderable no matter what the animation did.
+    val progress = if (rawProgress.isNaN()) 0f else rawProgress.coerceIn(0f, 1f)
 
     val activeTabTitle = L(
         when {
@@ -543,9 +549,11 @@ fun MainContainer(
                     // a sidebar that sits on the right edge.
                     val direction = if (isRtl) -1f else 1f
                     val slide = size.width * SIDEBAR_WIDTH_FRACTION
-                    val scale = 1f - (1f - DRAWER_SCALE) * progress
+                    val safeWidth = size.width.coerceAtLeast(0f)
+                    val scale = (1f - (1f - DRAWER_SCALE) * progress)
+                        .coerceIn(DRAWER_SCALE, 1f)
                     // Keep the card centered on the visible column while scaled.
-                    translationX = direction * (slide - (size.width * (1f - scale) / 2f)) * progress
+                    translationX = direction * (slide - (safeWidth * (1f - scale) / 2f)) * progress
                     scaleX = scale
                     scaleY = scale
                     shadowElevation = 24f * progress
