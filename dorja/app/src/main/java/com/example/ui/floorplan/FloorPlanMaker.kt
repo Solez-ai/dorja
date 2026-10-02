@@ -88,8 +88,9 @@ data class FloorPlanWall(
     val type: String = "interior" // "interior" | "exterior"
 )
 
-/** A text label anchored at a plan position in meters. */
+/** A text label anchored at a plan position in meters. [id] lets the editor move/rename/delete individual labels. */
 data class FloorPlanRoomLabel(
+    val id: String = java.util.UUID.randomUUID().toString().take(8),
     val name: String,
     val cx: Float,
     val cy: Float
@@ -127,7 +128,13 @@ data class FloorPlanData(
                         )
                     },
                     rooms = raw.rooms.map {
-                        FloorPlanRoomLabel(it.name, it.cx * s, it.cy * s)
+                        // Gson bypasses Kotlin defaults: mint ids for pre-move-era labels.
+                        FloorPlanRoomLabel(
+                            id = it.id ?: java.util.UUID.randomUUID().toString().take(8),
+                            name = it.name,
+                            cx = it.cx * s,
+                            cy = it.cy * s
+                        )
                     },
                     version = 2
                 )
@@ -160,7 +167,7 @@ private val THICKNESS_OPTIONS = listOf(0.10f, 0.15f, 0.20f, 0.25f, 0.30f)
 private const val INTERIOR_DEFAULT = 0.15f
 private const val EXTERIOR_DEFAULT = 0.25f
 
-private enum class PlanTool { WALL, ROOM, ERASE, PAN }
+private enum class PlanTool { WALL, ROOM, MOVE, ERASE, PAN }
 
 /** Pan/zoom viewport: screen = plan * scale + offset. */
 private data class Viewport(
@@ -279,6 +286,34 @@ fun FloorPlanMakerOverlay(
     var pendingRoomPoint by remember { mutableStateOf<Offset?>(null) }
     var eraseHit by remember { mutableStateOf(-1) }
 
+    // Gesture hints stay up until the first wall/label exists — after that the
+    // user has proven they know how to draw, so the strip retires itself.
+    var showGestureHints by remember { mutableStateOf(true) }
+    LaunchedEffect(plan.walls.size, plan.rooms.size) {
+        if (plan.walls.isNotEmpty() || plan.rooms.isNotEmpty()) showGestureHints = false
+    }
+
+    // MOVE tool: drag an existing wall or room label instead of erase-and-redraw.
+    // A wall drag is previewed as a ghost and committed once on release (one
+    // undo entry); a label drag updates live and pushes its undo entry on
+    // release too. A tap with no drag on a label opens rename/delete.
+    var dragWallIdx by remember { mutableStateOf(-1) }
+    var dragWallOrig by remember { mutableStateOf<FloorPlanWall?>(null) }
+    var dragLabelOrig by remember { mutableStateOf<FloorPlanRoomLabel?>(null) }
+    var dragStart by remember { mutableStateOf(Offset.Zero) }
+    var dragDelta by remember { mutableStateOf(Offset.Zero) }
+    var preDragPlan by remember { mutableStateOf(EditorSnapshot(emptyList(), emptyList())) }
+    var movePreview by remember { mutableStateOf<Pair<Offset, Offset>?>(null) }
+    var editingRoom by remember { mutableStateOf<FloorPlanRoomLabel?>(null) }
+    LaunchedEffect(tool) {
+        // Switching tools cancels any in-flight drag.
+        dragWallIdx = -1
+        dragWallOrig = null
+        dragLabelOrig = null
+        dragDelta = Offset.Zero
+        movePreview = null
+    }
+
     val density = LocalDensity.current
     val touchPx = with(density) { 26.dp.toPx() }
     val minScale: () -> Float = {
@@ -341,6 +376,32 @@ fun FloorPlanMakerOverlay(
             offsetX = c.x * (1 - k) + viewport.offsetX * k,
             offsetY = c.y * (1 - k) + viewport.offsetY * k
         )
+    }
+
+    /** Room label under a plan point (label hit box ≈ 1.6 m square), or -1. */
+    fun labelAtPlan(p: Offset): Int {
+        plan.rooms.forEachIndexed { i, room ->
+            if (abs(p.x - room.cx) <= 0.8f && abs(p.y - room.cy) <= 0.8f) return i
+        }
+        return -1
+    }
+
+    /** Wall whose segment lies within [tolerancePlan] meters of [p], or -1. */
+    fun wallAtPlan(p: Offset, tolerancePlan: Float): Int {
+        var found = -1
+        var bestD = Float.MAX_VALUE
+        plan.walls.forEachIndexed { i, w ->
+            val d = distPointToSegment(
+                p,
+                Offset(w.x1, w.y1),
+                Offset(w.x2, w.y2)
+            ) - w.thickness / 2f
+            if (d <= tolerancePlan && d < bestD) {
+                bestD = d
+                found = i
+            }
+        }
+        return found
     }
 
     fun eraseAtPlan(p: Offset) {
@@ -448,6 +509,11 @@ fun FloorPlanMakerOverlay(
                         onClick = { tool = PlanTool.ROOM }
                     )
                     DorjaChip(
+                        selected = tool == PlanTool.MOVE,
+                        label = L("floorplan_tool_move"),
+                        onClick = { tool = PlanTool.MOVE }
+                    )
+                    DorjaChip(
                         selected = tool == PlanTool.ERASE,
                         label = L("floorplan_tool_erase"),
                         onClick = { tool = PlanTool.ERASE }
@@ -539,6 +605,23 @@ fun FloorPlanMakerOverlay(
                                                 touchPx / viewport.scale
                                             )
                                         }
+                                        if (tool == PlanTool.MOVE) {
+                                            val p = screenToPlan(downScreen)
+                                            val hitWall = wallAtPlan(p, touchPx / viewport.scale)
+                                            if (hitWall >= 0) {
+                                                dragWallIdx = hitWall
+                                                dragWallOrig = plan.walls[hitWall]
+                                                dragStart = p
+                                                preDragPlan = plan
+                                            } else {
+                                                val hitLabel = labelAtPlan(p)
+                                                if (hitLabel >= 0) {
+                                                    dragLabelOrig = plan.rooms[hitLabel]
+                                                    dragStart = p
+                                                    preDragPlan = plan
+                                                }
+                                            }
+                                        }
                                         var multi = false
                                         var prevCentroid = downScreen
                                         var prevSpan = 0f
@@ -557,6 +640,16 @@ fun FloorPlanMakerOverlay(
                                                 drawStart = null
                                                 wallPreview = null
                                                 eraseHit = -1
+                                                if (dragWallIdx >= 0) {
+                                                    // A wall drag that became a pinch:
+                                                    // restore the original position.
+                                                    plan = preDragPlan
+                                                }
+                                                dragWallIdx = -1
+                                                dragWallOrig = null
+                                                dragLabelOrig = null
+                                                dragDelta = Offset.Zero
+                                                movePreview = null
                                                 val a = pressed[0]
                                                 val b = pressed[1]
                                                 val centroid = (a.position + b.position) / 2f
@@ -619,6 +712,29 @@ fun FloorPlanMakerOverlay(
                                                             change.consume()
                                                         }
                                                     }
+                                                    PlanTool.MOVE -> {
+                                                        if (!multi) {
+                                                            val raw = screenToPlan(change.position)
+                                                            if (dragWallIdx >= 0) {
+                                                                val orig = dragWallOrig
+                                                                if (orig != null) {
+                                                                    val d = raw - dragStart
+                                                                    // Snap the delta so the ghost
+                                                                    // lands on the grid.
+                                                                    dragDelta = Offset(
+                                                                        snapToGrid(orig.x1 + d.x) - snapToGrid(orig.x1),
+                                                                        snapToGrid(orig.y1 + d.y) - snapToGrid(orig.y1)
+                                                                    )
+                                                                    movePreview = Offset(orig.x1, orig.y1) to
+                                                                        Offset(orig.x2, orig.y2)
+                                                                }
+                                                            } else if (dragLabelOrig != null) {
+                                                                dragDelta = raw - dragStart
+                                                                movePreview = null
+                                                            }
+                                                            change.consume()
+                                                        }
+                                                    }
                                                     PlanTool.ROOM -> {
                                                         // Decided on release (tap).
                                                     }
@@ -642,6 +758,57 @@ fun FloorPlanMakerOverlay(
                                                 }
                                             }
                                             wallPreview = null
+                                        }
+                                        // MOVE tool: commit the drag, or — when the
+                                        // gesture was a tap with no drag on a label —
+                                        // open the rename/delete panel for it.
+                                        if (tool == PlanTool.MOVE && !multi) {
+                                            if (dragWallIdx >= 0 && dragDelta != Offset.Zero) {
+                                                val orig = dragWallOrig
+                                                if (orig != null) {
+                                                    val d = dragDelta
+                                                    plan = preDragPlan
+                                                    mutate { snap ->
+                                                        snap.copy(
+                                                            walls = snap.walls.mapIndexed { idx, w ->
+                                                                if (idx == dragWallIdx) {
+                                                                    w.copy(
+                                                                        x1 = (orig.x1 + d.x).coerceIn(0f, PLAN_EXTENT),
+                                                                        y1 = (orig.y1 + d.y).coerceIn(0f, PLAN_EXTENT),
+                                                                        x2 = (orig.x2 + d.x).coerceIn(0f, PLAN_EXTENT),
+                                                                        y2 = (orig.y2 + d.y).coerceIn(0f, PLAN_EXTENT)
+                                                                    )
+                                                                } else w
+                                                            }
+                                                        )
+                                                    }
+                                                }
+                                            } else if (dragWallIdx < 0 && dragLabelOrig != null) {
+                                                val orig = dragLabelOrig!!
+                                                if (dragDelta != Offset.Zero) {
+                                                    val d = dragDelta
+                                                    plan = preDragPlan
+                                                    mutate { snap ->
+                                                        snap.copy(
+                                                            rooms = snap.rooms.map { r ->
+                                                                if (r.id == orig.id) {
+                                                                    r.copy(
+                                                                        cx = (orig.cx + d.x).coerceIn(0f, PLAN_EXTENT),
+                                                                        cy = (orig.cy + d.y).coerceIn(0f, PLAN_EXTENT)
+                                                                    )
+                                                                } else r
+                                                            }
+                                                        )
+                                                    }
+                                                } else {
+                                                    editingRoom = orig
+                                                }
+                                            }
+                                            dragWallIdx = -1
+                                            dragWallOrig = null
+                                            dragLabelOrig = null
+                                            dragDelta = Offset.Zero
+                                            movePreview = null
                                         }
                                         if (tool == PlanTool.ROOM && !multi) {
                                             val travel = hypot(
@@ -699,10 +866,132 @@ fun FloorPlanMakerOverlay(
                                 fitToPlan()
                             }
                         }
+
+                        // ── MOVE ghost: the dragged wall drawn translucent at its
+                        // snapped future position, so the drop point is obvious.
+                        // Declared AFTER the Canvas so it draws on top. ──
+                        val ghost = movePreview
+                        val ghostDelta = dragDelta
+                        val ghostOrig = dragWallOrig
+                        if (tool == PlanTool.MOVE &&
+                            dragWallIdx >= 0 &&
+                            ghost != null &&
+                            ghostDelta != Offset.Zero &&
+                            ghostOrig != null
+                        ) {
+                            Canvas(modifier = Modifier.fillMaxSize()) {
+                                fun toGhost(p: Offset) = Offset(
+                                    p.x * viewport.scale + viewport.offsetX,
+                                    p.y * viewport.scale + viewport.offsetY
+                                )
+                                drawLine(
+                                    color = editorAccentColor.copy(alpha = 0.5f),
+                                    start = toGhost(Offset(ghostOrig.x1 + ghostDelta.x, ghostOrig.y1 + ghostDelta.y)),
+                                    end = toGhost(Offset(ghostOrig.x2 + ghostDelta.x, ghostOrig.y2 + ghostDelta.y)),
+                                    strokeWidth = (ghostOrig.thickness * viewport.scale).coerceAtLeast(1.5f),
+                                    cap = StrokeCap.Round
+                                )
+                                drawCircle(
+                                    color = editorAccentColor,
+                                    radius = 0.10f * viewport.scale,
+                                    center = toGhost(Offset(ghostOrig.x2 + ghostDelta.x, ghostOrig.y2 + ghostDelta.y))
+                                )
+                            }
+                        }
+
+                        // ── Gesture hint strip — answers "what do I do now?".
+                        // Also after the Canvas so the canvas cannot cover it. ──
+                        if (showGestureHints) {
+                            Surface(
+                                modifier = Modifier
+                                    .align(Alignment.TopCenter)
+                                    .padding(top = 10.dp),
+                                shape = RoundedCornerShape(10.dp),
+                                color = DorjaColors.Ink950.copy(alpha = 0.78f)
+                            ) {
+                                Text(
+                                    text = when (tool) {
+                                        PlanTool.WALL -> L("floorplan_hint_wall")
+                                        PlanTool.MOVE -> L("floorplan_hint_move")
+                                        PlanTool.ROOM -> L("floorplan_hint_room")
+                                        PlanTool.ERASE -> L("floorplan_hint_erase")
+                                        PlanTool.PAN -> L("floorplan_hint_pan")
+                                    },
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = DorjaColors.White,
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp)
+                                )
+                            }
+                        }
                     }
                 }
 
                 Spacer(modifier = Modifier.height(10.dp))
+
+                // ── Rename/delete panel — MOVE tool tap on a room label ──
+                val editTarget = editingRoom
+                if (editTarget != null && tool == PlanTool.MOVE) {
+                    pendingRoomPoint = null
+                    var editName by remember(editTarget.id) { mutableStateOf(editTarget.name) }
+                    Surface(
+                        shape = RoundedCornerShape(14.dp),
+                        color = DorjaColors.White,
+                        border = BorderStroke(1.dp, DorjaColors.BentoCardBorder),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(
+                                text = L("floorplan_room_name"),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = DorjaColors.Gray700
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            androidx.compose.material3.OutlinedTextField(
+                                value = editName,
+                                onValueChange = { editName = it },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                DorjaButton(
+                                    text = L("common_save"),
+                                    onClick = {
+                                        mutate { snap ->
+                                            snap.copy(
+                                                rooms = snap.rooms.map { r ->
+                                                    if (r.id == editTarget.id) {
+                                                        r.copy(name = editName.ifBlank { r.name })
+                                                    } else r
+                                                }
+                                            )
+                                        }
+                                        editingRoom = null
+                                    },
+                                    modifier = Modifier.weight(1f)
+                                )
+                                DorjaOutlinedButton(
+                                    text = L("common_delete"),
+                                    onClick = {
+                                        mutate { snap ->
+                                            snap.copy(rooms = snap.rooms.filterNot { it.id == editTarget.id })
+                                        }
+                                        editingRoom = null
+                                    },
+                                    modifier = Modifier.weight(1f)
+                                )
+                                DorjaOutlinedButton(
+                                    text = L("common_cancel"),
+                                    onClick = { editingRoom = null },
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
 
                 // ── Room name prompt — inline panel, no nested dialog ──
                 // Placed ABOVE the save bar so it is never the bottom-most
