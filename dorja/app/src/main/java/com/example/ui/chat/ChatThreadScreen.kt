@@ -1,6 +1,14 @@
 package com.example.ui.chat
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.media.MediaPlayer
+import android.media.MediaRecorder
+import android.util.Log
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,6 +22,7 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
@@ -25,7 +34,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -33,6 +45,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -45,11 +58,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import com.example.DorjaApp
 import com.example.data.model.Message
 import com.example.ui.components.DorjaAvatar
@@ -78,6 +93,108 @@ fun ChatThreadScreen(
     val messages by repository.getMessagesByConversation(conversationId)
         .collectAsState(initial = emptyList())
     var inputText by remember { mutableStateOf("") }
+
+    // ── Voice messages: tap mic to record, tap again to send; tap a voice
+    // bubble to play. Audio lives in cacheDir; kind="VOICE" messages store
+    // the file path in body.
+    val context = LocalContext.current
+    var micGranted by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+        )
+    }
+    val micLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { micGranted = it }
+    var recorder by remember { mutableStateOf<MediaRecorder?>(null) }
+    var recording by remember { mutableStateOf(false) }
+    var recFile by remember { mutableStateOf<java.io.File?>(null) }
+    var playingPath by remember { mutableStateOf<String?>(null) }
+    var player by remember { mutableStateOf<MediaPlayer?>(null) }
+    DisposableEffect(Unit) {
+        onDispose {
+            try { recorder?.release() } catch (_: Exception) {}
+            try { player?.release() } catch (_: Exception) {}
+        }
+    }
+
+    val startRecording: () -> Unit = {
+        if (!micGranted) {
+            micLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        } else try {
+            val out = java.io.File(context.cacheDir, "voice_${System.currentTimeMillis()}.m4a")
+            // The no-arg constructor is deprecated on API 31+ but works on every
+            // API level this app supports; the context constructor is API 31+ only.
+            @Suppress("DEPRECATION")
+            val mr = MediaRecorder()
+            mr.setAudioSource(MediaRecorder.AudioSource.MIC)
+            mr.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
+            mr.setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
+            mr.setAudioEncodingBitRate(96000)
+            mr.setAudioSamplingRate(44100)
+            mr.setOutputFile(out.absolutePath)
+            mr.prepare()
+            mr.start()
+            recorder = mr
+            recFile = out
+            recording = true
+        } catch (e: Exception) {
+            Log.e("Chat", "Voice record start failed", e)
+        }
+    }
+    val stopRecording: () -> Unit = {
+        val mr = recorder
+        val file = recFile
+        recording = false
+        recorder = null
+        recFile = null
+        if (mr != null && file != null) {
+            try { mr.stop() } catch (e: Exception) { Log.e("Chat", "Voice record stop failed", e) }
+            mr.release()
+            if (file.exists() && file.length() > 0) {
+                scope.launch {
+                    repository.sendMessage(
+                        conversationId = conversationId,
+                        senderId = userId,
+                        text = file.absolutePath,
+                        kind = "VOICE"
+                    )
+                }
+            } else {
+                file.delete()
+            }
+        }
+    }
+    val onTogglePlay: (Message) -> Unit = { msg ->
+        val current = player
+        if (playingPath == msg.body) {
+            try { current?.stop() } catch (_: Exception) {}
+            current?.release()
+            player = null
+            playingPath = null
+        } else {
+            try {
+                current?.release()
+                val np = MediaPlayer()
+                np.setAudioAttributes(
+                    android.media.AudioAttributes.Builder()
+                        .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SPEECH)
+                        .setUsage(android.media.AudioAttributes.USAGE_MEDIA)
+                        .build()
+                )
+                np.setDataSource(msg.body)
+                np.prepare()
+                np.setOnCompletionListener {
+                    it.release()
+                    player = null
+                    playingPath = null
+                }
+                np.start()
+                player = np
+                playingPath = msg.body
+            } catch (e: Exception) {
+                Log.e("Chat", "Voice playback failed", e)
+            }
+        }
+    }
 
     var otherPartyName by remember { mutableStateOf("") }
     var otherPartyPhone by remember { mutableStateOf("") }
@@ -108,6 +225,7 @@ fun ChatThreadScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(DorjaColors.CanvasBg)
+            .statusBarsPadding()
             .testTag("chat_thread_screen")
     ) {
         // ── Top bar: iOS plain, hairline separator, centered identity ──
@@ -201,8 +319,19 @@ fun ChatThreadScreen(
                     }
                 } else {
                     val isMe = msg.senderUserId == userId
-                    item(key = msg.id) {
-                        MessageBubble(message = msg, isMe = isMe)
+                    if (msg.kind == "VOICE") {
+                        item(key = msg.id) {
+                            VoiceBubble(
+                                message = msg,
+                                isMe = isMe,
+                                isPlaying = playingPath == msg.body,
+                                onTogglePlay = { onTogglePlay(msg) }
+                            )
+                        }
+                    } else {
+                        item(key = msg.id) {
+                            MessageBubble(message = msg, isMe = isMe)
+                        }
                     }
                 }
             }
@@ -244,6 +373,42 @@ fun ChatThreadScreen(
                     )
                 )
                 Spacer(modifier = Modifier.width(8.dp))
+                if (recording) {
+                    // Recording in progress: the mic button turns into a red
+                    // stop button that sends the clip.
+                    IconButton(
+                        onClick = stopRecording,
+                        modifier = Modifier
+                            .size(42.dp)
+                            .clip(CircleShape)
+                            .background(DorjaColors.Error)
+                            .testTag("chat_voice_stop")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Stop,
+                            contentDescription = "Stop and send voice message",
+                            tint = DorjaColors.White,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                } else {
+                    IconButton(
+                        onClick = startRecording,
+                        modifier = Modifier
+                            .size(42.dp)
+                            .clip(CircleShape)
+                            .background(DorjaColors.Paper50)
+                            .testTag("chat_voice_record")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Mic,
+                            contentDescription = "Record voice message",
+                            tint = DorjaColors.Gray600,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.width(8.dp))
                 val canSend = inputText.isNotBlank()
                 IconButton(
                     onClick = {
@@ -277,6 +442,65 @@ fun ChatThreadScreen(
                     )
                 }
             }
+        }
+    }
+}
+
+/** Playable voice-message bubble: kind=VOICE, body=audio file path. */
+@Composable
+private fun VoiceBubble(
+    message: Message,
+    isMe: Boolean,
+    isPlaying: Boolean,
+    onTogglePlay: () -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = if (isMe) Alignment.End else Alignment.Start
+    ) {
+        Surface(
+            shape = RoundedCornerShape(
+                topStart = 18.dp,
+                topEnd = 18.dp,
+                bottomStart = if (isMe) 18.dp else 4.dp,
+                bottomEnd = if (isMe) 4.dp else 18.dp
+            ),
+            color = if (isMe) DorjaColors.Jol600 else DorjaColors.White,
+            border = if (isMe) null
+            else androidx.compose.foundation.BorderStroke(0.5.dp, DorjaColors.BentoCardBorder),
+            modifier = Modifier.widthIn(max = 290.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .clickable(onClick = onTogglePlay)
+                    .padding(horizontal = 13.dp, vertical = 10.dp)
+            ) {
+                Icon(
+                    imageVector = if (isPlaying) Icons.Default.Stop else Icons.Default.PlayArrow,
+                    contentDescription = if (isPlaying) "Stop" else "Play voice message",
+                    tint = if (isMe) DorjaColors.White else DorjaColors.Ink950,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "Voice message",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (isMe) DorjaColors.White else DorjaColors.Ink950
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(2.dp))
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(horizontal = 4.dp)
+        ) {
+            Text(
+                text = Formatters.formatTimeOnly(message.createdAt),
+                style = MaterialTheme.typography.labelSmall,
+                color = DorjaColors.Gray500,
+                fontSize = 9.sp
+            )
         }
     }
 }

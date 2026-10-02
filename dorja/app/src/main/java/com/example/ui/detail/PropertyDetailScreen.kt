@@ -143,6 +143,7 @@ import com.example.ui.components.DorjaAlert
 import com.example.ui.components.DorjaBadge
 import com.example.ui.components.DorjaButton
 import com.example.ui.components.DorjaChip
+import com.example.ui.components.DorjaDatePickerDialog
 import com.example.ui.components.DorjaOutlinedButton
 import com.example.ui.components.EvidenceBadge
 import com.example.ui.components.SafeAddressShield
@@ -209,6 +210,10 @@ fun PropertyDetailScreen(
     // Restore guide: AI_FEATURES_RESTORE.md at repo root.
 
     var showVisitRequestDialog by remember { mutableStateOf(false) }
+    // Buyer visit slot: UTC-day millis picked from the host's window + a local hour.
+    var visitDateMillis by remember { mutableStateOf<Long?>(null) }
+    var visitHour by remember { mutableStateOf<Int?>(null) }
+    var showVisitDatePicker by remember { mutableStateOf(false) }
     var visitScheduledSuccess by remember { mutableStateOf(false) }
     var generatedPassToken by remember { mutableStateOf("") }
     var selectedRoomForDetail by remember { mutableStateOf<RoomItem?>(null) }
@@ -1033,6 +1038,13 @@ fun PropertyDetailScreen(
         )
     }
 
+    // Host availability window (day-granularity UTC millis). Listings published
+    // before the window existed fall back to a rolling 60-day window so buyers
+    // can still book an inspection.
+    val visitWindowFrom = safeListing.availableFrom ?: Formatters.todayUtcDayMillis()
+    val visitWindowTo = safeListing.availableTo
+        ?: (Formatters.todayUtcDayMillis() + 60L * 24L * 60L * 60L * 1000L)
+
     // SafeView Visit Request Dialog
     if (showVisitRequestDialog) {
         AlertDialog(
@@ -1070,23 +1082,73 @@ fun PropertyDetailScreen(
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
                             Text(
-                                text = "PROPOSED INSPECTION WINDOW",
+                                text = "HOST AVAILABILITY",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = DorjaColors.Gray500,
                                 fontFamily = DorjaFontFamily
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = "Today, 4:30 PM - 5:30 PM",
-                                style = MaterialTheme.typography.titleSmall,
-                                color = DorjaColors.Ink950,
-                                fontWeight = FontWeight.Bold
+                                text = if (safeListing.availableFrom != null && safeListing.availableTo != null) {
+                                    "${Formatters.formatDateUtcDay(visitWindowFrom)} – ${Formatters.formatDateUtcDay(visitWindowTo)}"
+                                } else {
+                                    "Host has not published a window yet — you can propose any date in the next 60 days."
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = DorjaColors.Gray700
                             )
                             Text(
                                 text = "Location: ${safeListing.publicArea}",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = DorjaColors.Gray700
                             )
+                            Spacer(modifier = Modifier.height(14.dp))
+                            Text(
+                                text = "YOUR INSPECTION SLOT",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = DorjaColors.Gray500,
+                                fontFamily = DorjaFontFamily
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Surface(
+                                modifier = Modifier.fillMaxWidth(),
+                                onClick = { showVisitDatePicker = true },
+                                shape = RoundedCornerShape(10.dp),
+                                color = DorjaColors.White,
+                                border = BorderStroke(1.dp, DorjaColors.BentoCardBorder)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.CalendarMonth,
+                                        contentDescription = null,
+                                        tint = DorjaColors.Jol600,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = visitDateMillis?.let { Formatters.formatDateUtcDay(it) } ?: "Choose a date",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = if (visitDateMillis != null) DorjaColors.Ink950 else DorjaColors.Gray500,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(10.dp))
+                            FlowRow(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                listOf(9, 11, 13, 15, 17, 19).forEach { hour ->
+                                    DorjaChip(
+                                        selected = visitHour == hour,
+                                        onClick = { visitHour = hour },
+                                        label = visitHourLabel(hour)
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -1094,15 +1156,19 @@ fun PropertyDetailScreen(
             confirmButton = {
                 DorjaButton(
                     text = "Confirm & Generate Pass",
+                    enabled = visitDateMillis != null && visitHour != null,
                     onClick = {
+                        val day = visitDateMillis ?: return@DorjaButton
+                        val hour = visitHour ?: return@DorjaButton
                         scope.launch {
                             val seekerId = currentUser?.id ?: ""
+                            val startsAt = Formatters.localMillisFor(day, hour)
                             val viewing = repository.requestViewing(
                                 listingId = safeListing.id,
                                 seekerId = seekerId,
                                 hostId = safeListing.ownerId,
-                                startsAt = System.currentTimeMillis() + 1000 * 60 * 60,
-                                endsAt = System.currentTimeMillis() + 1000 * 60 * 120
+                                startsAt = startsAt,
+                                endsAt = startsAt + 1000L * 60L * 60L
                             )
                             generatedPassToken = viewing.passToken
                             showVisitRequestDialog = false
@@ -1117,6 +1183,21 @@ fun PropertyDetailScreen(
                 TextButton(onClick = { showVisitRequestDialog = false }) {
                     Text("Cancel", color = DorjaColors.Gray700)
                 }
+            }
+        )
+    }
+
+    if (showVisitDatePicker) {
+        DorjaDatePickerDialog(
+            title = "Choose your inspection day",
+            initialMillis = visitDateMillis ?: visitWindowFrom,
+            minMillis = visitWindowFrom,
+            maxMillis = visitWindowTo,
+            testTag = "visit_date_confirm",
+            onDismiss = { showVisitDatePicker = false },
+            onPicked = { picked ->
+                visitDateMillis = picked
+                showVisitDatePicker = false
             }
         )
     }
@@ -2258,28 +2339,20 @@ fun PropertyDetailScreen(
                             )
                         }
                     }
+                    // Icon-only so the buyer action bar fits on screen:
+                    // Chat pill + calendar button + compare button.
                     Surface(
-                        shape = RoundedCornerShape(22.dp),
+                        shape = CircleShape,
                         color = DorjaColors.Jol600,
                         onClick = { showVisitRequestDialog = true },
                         modifier = Modifier.testTag("request_visit_button")
                     ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
+                        Box(contentAlignment = Alignment.Center, modifier = Modifier.size(40.dp)) {
                             Icon(
                                 Icons.Default.CalendarMonth,
-                                contentDescription = null,
+                                contentDescription = "Book Visit",
                                 tint = Color.White,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                "Book Visit",
-                                style = MaterialTheme.typography.labelLarge,
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold
+                                modifier = Modifier.size(19.dp)
                             )
                         }
                     }
@@ -2975,4 +3048,11 @@ private fun JourneyRow(
             )
         }
     }
+}
+
+/** 12-hour label for a visit slot hour (e.g. 15 -> "3:00 PM"). */
+private fun visitHourLabel(hour: Int): String {
+    val h12 = if (hour % 12 == 0) 12 else hour % 12
+    val suffix = if (hour < 12) "AM" else "PM"
+    return "$h12:00 $suffix"
 }

@@ -2,26 +2,18 @@ package com.example.ui.theme
 
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
-import com.example.R
 
 /**
- * App-wide typeface: Inter — metrics and proportions chosen to read like Apple's
- * SF Pro while remaining a free, bundled font (no runtime download, works
- * offline, renders identically on every device).
+ * App-wide typeface: SF Pro — Apple's system font. On Android this is the
+ * platform default family (Roboto-family stack), requested explicitly via
+ * FontFamily.Default so every surface — Material styles AND direct
+ * DorjaFontFamily references — renders with the same SF-style face.
+ * (Inter remains bundled in res/font but is no longer referenced.)
  */
-val DorjaFontFamily = FontFamily(
-    Font(R.font.inter_400, FontWeight.Normal),
-    Font(R.font.inter_400, FontWeight.Light),
-    Font(R.font.inter_500, FontWeight.Medium),
-    Font(R.font.inter_600, FontWeight.SemiBold),
-    Font(R.font.inter_700, FontWeight.Bold),
-    Font(R.font.inter_700, FontWeight.ExtraBold),
-    Font(R.font.inter_700, FontWeight.Black)
-)
+val DorjaFontFamily: FontFamily = FontFamily.Default
 
 /**
  * iOS-flavored type scale. Two deliberate changes from the old scale:

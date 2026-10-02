@@ -1,4 +1,4 @@
-@file:OptIn(ExperimentalCupertinoApi::class)
+@file:OptIn(ExperimentalCupertinoApi::class, ExperimentalMaterial3Api::class)
 
 package com.example.ui.components
 
@@ -237,12 +237,17 @@ fun DorjaButton(
             Icon(
                 imageVector = icon,
                 contentDescription = null,
+                tint = contentColor,
                 modifier = Modifier.size(18.dp)
             )
         }
         Text(
             text = text,
             style = MaterialTheme.typography.labelLarge,
+            // Bind the label to the button's content color explicitly: inside
+            // dialogs LocalContentColor resolves to dark ink, which rendered
+            // blue buttons as if they had no text at all.
+            color = contentColor,
             fontWeight = FontWeight.SemiBold,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -329,12 +334,15 @@ fun DorjaOutlinedButton(
             Icon(
                 imageVector = icon,
                 contentDescription = null,
+                tint = contentColor,
                 modifier = Modifier.size(18.dp)
             )
         }
         Text(
             text = text,
             style = MaterialTheme.typography.labelLarge,
+            // Same LocalContentColor trap as DorjaButton — bind explicitly.
+            color = contentColor,
             fontWeight = FontWeight.Medium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -1090,6 +1098,69 @@ fun CountryPicker(
                     }
                 }
             }
+        }
+    }
+}
+
+/**
+ * Date picker dialog used by host availability windows and buyer visit slots.
+ * Returns UTC-day millis (DatePicker's native convention), optionally bounded
+ * by [minMillis]/[maxMillis] — out-of-range picks surface an inline error
+ * instead of being silently clamped.
+ */
+@Composable
+fun DorjaDatePickerDialog(
+    title: String,
+    initialMillis: Long? = null,
+    minMillis: Long? = null,
+    maxMillis: Long? = null,
+    testTag: String? = null,
+    onDismiss: () -> Unit,
+    onPicked: (Long) -> Unit
+) {
+    val state = rememberDatePickerState(initialSelectedDateMillis = initialMillis)
+    var rangeError by remember { mutableStateOf(false) }
+    DatePickerDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            DorjaButton(
+                text = "Confirm",
+                onClick = {
+                    val picked = state.selectedDateMillis
+                    val withinRange = picked != null &&
+                        (minMillis == null || picked >= minMillis) &&
+                        (maxMillis == null || picked <= maxMillis)
+                    if (withinRange) {
+                        onPicked(picked!!)
+                    } else {
+                        rangeError = true
+                    }
+                },
+                modifier = Modifier.heightIn(min = 36.dp),
+                testTag = testTag
+            )
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel", color = DorjaColors.Gray700)
+            }
+        }
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleSmall,
+            color = DorjaColors.Ink950,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 16.dp)
+        )
+        DatePicker(state = state)
+        if (rangeError) {
+            Text(
+                text = "Pick a date inside the allowed window.",
+                style = MaterialTheme.typography.bodySmall,
+                color = DorjaColors.Error,
+                modifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 12.dp)
+            )
         }
     }
 }

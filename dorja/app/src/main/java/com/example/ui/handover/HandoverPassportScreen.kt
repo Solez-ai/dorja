@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.widthIn
@@ -149,6 +150,7 @@ fun HandoverPassportScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(DorjaColors.Paper50)
+            .statusBarsPadding()
             .testTag("handover_passport_screen")
     ) {
         // Top Header

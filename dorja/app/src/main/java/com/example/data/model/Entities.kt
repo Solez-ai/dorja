@@ -115,6 +115,9 @@ data class Listing(
     val buildingCondition: String? = null,
     val buildingAgeYears: Int? = null,
     val disasterContext: String? = null,
+    /** Visit-availability window the host must set (epoch millis, day granularity). */
+    val availableFrom: Long? = null,
+    val availableTo: Long? = null,
     val createdAt: Long = System.currentTimeMillis()
 ) {
     @Ignore

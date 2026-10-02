@@ -2,11 +2,21 @@ package com.example.ui.util
 
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Currency
 import java.util.Date
 import java.util.Locale
+import java.util.TimeZone
 
 object Formatters {
+
+    /**
+     * Visit-availability windows are stored as UTC-day millis (midnight UTC of
+     * the chosen calendar day) — the same convention Material3's DatePicker
+     * returns in `selectedDateMillis`. Keeping days timezone-free makes host
+     * windows and buyer picks directly comparable.
+     */
+    private val UtcZone: TimeZone = TimeZone.getTimeZone("UTC")
 
     /**
      * Map a currency code to a locale that formats it naturally
@@ -64,6 +74,50 @@ object Formatters {
     fun formatDateOnly(timestamp: Long): String {
         val sdf = SimpleDateFormat("EEEE, MMM d, yyyy", Locale.getDefault())
         return sdf.format(Date(timestamp))
+    }
+
+    /** Format a UTC-day millis (host window / buyer pick) as a readable day. */
+    fun formatDateUtcDay(millis: Long): String {
+        val sdf = SimpleDateFormat("EEE, MMM d, yyyy", Locale.getDefault())
+        sdf.timeZone = UtcZone
+        return sdf.format(Date(millis))
+    }
+
+    /**
+     * Today as a UTC-day millis (the local calendar date stamped at 00:00 UTC),
+     * matching how DatePicker marks "today" on this device.
+     */
+    fun todayUtcDayMillis(): Long {
+        val local = Calendar.getInstance()
+        val utc = Calendar.getInstance(UtcZone)
+        utc.clear()
+        utc.set(
+            local.get(Calendar.YEAR),
+            local.get(Calendar.MONTH),
+            local.get(Calendar.DAY_OF_MONTH),
+            0, 0, 0
+        )
+        return utc.timeInMillis
+    }
+
+    /**
+     * Combine a UTC-day millis with a local wall-clock hour into a concrete
+     * local timestamp. The chosen calendar day is preserved; only the hour is
+     * applied on the device's timezone (visit slots are local appointments).
+     */
+    fun localMillisFor(utcDayMillis: Long, hour: Int): Long {
+        val day = Calendar.getInstance(UtcZone).apply { timeInMillis = utcDayMillis }
+        val local = Calendar.getInstance()
+        local.clear()
+        local.set(
+            day.get(Calendar.YEAR),
+            day.get(Calendar.MONTH),
+            day.get(Calendar.DAY_OF_MONTH),
+            hour,
+            0,
+            0
+        )
+        return local.timeInMillis
     }
 
     fun getInitials(name: String): String {

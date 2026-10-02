@@ -58,6 +58,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AddPhotoAlternate
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Autorenew
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
@@ -156,6 +157,7 @@ import com.example.ui.components.CountryPicker
 import com.example.ui.components.DorjaBadge
 import com.example.ui.components.DorjaButton
 import com.example.ui.components.DorjaChip
+import com.example.ui.components.DorjaDatePickerDialog
 import com.example.ui.components.DorjaInput
 import com.example.ui.components.DorjaOutlinedButton
 import com.example.ui.components.EvidenceBadge
@@ -163,6 +165,7 @@ import com.example.ui.components.GovernmentSourceCard
 import com.example.ui.floorplan.FloorPlanMakerOverlay
 import com.example.ui.theme.DorjaFontFamily
 import com.example.ui.theme.DorjaColors
+import com.example.ui.util.Formatters
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.UUID
@@ -266,6 +269,13 @@ fun CreateListingScreen(
     // Floor plan maker (full-screen sketch canvas)
     var floorPlanJson by remember { mutableStateOf<String?>(null) }
     var showFloorPlanMaker by remember { mutableStateOf(false) }
+
+    // Visit availability window (required): buyers may only book inside it.
+    // Stored as UTC-day millis (see Formatters.todayUtcDayMillis).
+    var availableFrom by remember { mutableStateOf<Long?>(null) }
+    var availableTo by remember { mutableStateOf<Long?>(null) }
+    var pickingAvailabilityFrom by remember { mutableStateOf(false) }
+    var pickingAvailabilityTo by remember { mutableStateOf(false) }
 
     // Crop state
     var showCropDialog by remember { mutableStateOf(false) }
@@ -2458,6 +2468,80 @@ fun CreateListingScreen(
                 }
             }
 
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // ==========================================
+            // ______ 6. VISIT AVAILABILITY WINDOW ______
+            // ==========================================
+            BentoCard(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(12.dp)) {
+                    Column {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.CalendarMonth,
+                                contentDescription = null,
+                                tint = DorjaColors.Jol600,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "6. VISIT AVAILABILITY WINDOW",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = DorjaColors.Ink950,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "Required — buyers can only book SafeView inspections inside this window",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = DorjaColors.Gray700
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        BentoCard(
+                            modifier = Modifier.weight(1f),
+                            onClick = { pickingAvailabilityFrom = true }
+                        ) {
+                            Text(
+                                text = "FIRST BOOKABLE DAY",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = DorjaColors.Gray500,
+                                fontFamily = DorjaFontFamily
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = availableFrom?.let { Formatters.formatDateUtcDay(it) } ?: "Tap to set",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = if (availableFrom != null) DorjaColors.Ink950 else DorjaColors.Gray500,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        BentoCard(
+                            modifier = Modifier.weight(1f),
+                            onClick = { pickingAvailabilityTo = true }
+                        ) {
+                            Text(
+                                text = "LAST BOOKABLE DAY",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = DorjaColors.Gray500,
+                                fontFamily = DorjaFontFamily
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = availableTo?.let { Formatters.formatDateUtcDay(it) } ?: "Tap to set",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = if (availableTo != null) DorjaColors.Ink950 else DorjaColors.Gray500,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+            }
+
             if (errorMessage != null) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Surface(
@@ -2490,6 +2574,10 @@ fun CreateListingScreen(
                 onClick = {
                     if (title.isBlank()) {
                         errorMessage = "Please enter a property title."
+                        return@DorjaButton
+                    }
+                    if (availableFrom == null || availableTo == null) {
+                        errorMessage = "Please set your visit availability window so buyers can book an inspection."
                         return@DorjaButton
                     }
                     val price = priceText.toIntOrNull() ?: 25000
@@ -2543,7 +2631,9 @@ fun CreateListingScreen(
                             buildingCondition = buildingConditionText.trim().ifBlank { null },
                             buildingAgeYears = buildingAgeText.toIntOrNull(),
                             disasterContext = disasterContextText.trim().ifBlank { null },
-                            floorPlanJson = floorPlanJson
+                            floorPlanJson = floorPlanJson,
+                            availableFrom = availableFrom,
+                            availableTo = availableTo
                         )
                         // Save promises for this listing
                         customPromises.forEach { promise ->
@@ -2583,6 +2673,37 @@ fun CreateListingScreen(
             onDone = { json ->
                 if (json != null) floorPlanJson = json
                 showFloorPlanMaker = false
+            }
+        )
+    }
+
+    if (pickingAvailabilityFrom) {
+        DorjaDatePickerDialog(
+            title = "First day buyers can book a visit",
+            initialMillis = availableFrom ?: Formatters.todayUtcDayMillis(),
+            minMillis = Formatters.todayUtcDayMillis(),
+            maxMillis = availableTo,
+            testTag = "availability_from_confirm",
+            onDismiss = { pickingAvailabilityFrom = false },
+            onPicked = { picked ->
+                availableFrom = picked
+                // Keep the window coherent: a cleared end is re-picked next.
+                if (availableTo?.let { it < picked } == true) availableTo = null
+                pickingAvailabilityFrom = false
+            }
+        )
+    }
+
+    if (pickingAvailabilityTo) {
+        DorjaDatePickerDialog(
+            title = "Last day buyers can book a visit",
+            initialMillis = availableTo ?: availableFrom ?: Formatters.todayUtcDayMillis(),
+            minMillis = availableFrom ?: Formatters.todayUtcDayMillis(),
+            testTag = "availability_to_confirm",
+            onDismiss = { pickingAvailabilityTo = false },
+            onPicked = { picked ->
+                availableTo = picked
+                pickingAvailabilityTo = false
             }
         )
     }

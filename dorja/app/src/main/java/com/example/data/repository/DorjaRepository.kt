@@ -459,7 +459,10 @@ class DorjaRepository(private val database: DorjaDatabase, private val appContex
         buildingCondition: String? = null,
         buildingAgeYears: Int? = null,
         disasterContext: String? = null,
-        floorPlanJson: String? = null
+        floorPlanJson: String? = null,
+        /** Visit-availability window (UTC-day millis, day granularity). */
+        availableFrom: Long? = null,
+        availableTo: Long? = null
     ): String {
         val ownerId = _currentUser.value?.id
             ?: throw IllegalStateException("No signed-in account")
@@ -503,6 +506,8 @@ class DorjaRepository(private val database: DorjaDatabase, private val appContex
             buildingAgeYears = buildingAgeYears,
             disasterContext = disasterContext,
             floorPlanJson = floorPlanJson,
+            availableFrom = availableFrom,
+            availableTo = availableTo,
             createdAt = System.currentTimeMillis()
         )
         listingDao.insertListing(listing)
@@ -949,7 +954,11 @@ class DorjaRepository(private val database: DorjaDatabase, private val appContex
             conversationDao.updateConversation(
                 conv.copy(
                     lastMessageAt = System.currentTimeMillis(),
-                    lastMessageText = if (kind == "SYSTEM") "Notice: $text" else text
+                    lastMessageText = when {
+                        kind == "SYSTEM" -> "Notice: $text"
+                        kind == "VOICE" -> "Voice message"
+                        else -> text
+                    }
                 )
             )
         }

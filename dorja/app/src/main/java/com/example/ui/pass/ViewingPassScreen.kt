@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -93,6 +94,7 @@ fun ViewingPassScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(DorjaColors.CanvasBg)
+            .statusBarsPadding()
             .testTag("viewing_pass_screen")
     ) {
         // Top Header — cream canvas that melts into the page

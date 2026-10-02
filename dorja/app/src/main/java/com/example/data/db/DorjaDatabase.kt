@@ -45,7 +45,7 @@ import androidx.room.TypeConverters
         ThirdPartyCheck::class,
         HistoryEvent::class
     ],
-    version = 17,
+    version = 18,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
