@@ -59,6 +59,11 @@ jobs:
       - name: Build debug APK
         run: ./gradlew assembleDebug
 
+      - name: Run availability time-math tests
+        # Filtered to the new pure-JVM suite: gated release, no flaky
+        # legacy/screenshot tests in the path.
+        run: ./gradlew testDebugUnitTest --tests "com.example.FormattersTimeTest"
+
       - name: Upload APK as artifact
         uses: actions/upload-artifact@v4
         with:
