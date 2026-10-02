@@ -114,6 +114,9 @@ sealed class Screen(val route: String) {
         fun createRoute(listingId: String) = "compare/$listingId"
     }
     object CreateListing : Screen("create_listing")
+    object EditListing : Screen("edit_listing/{listingId}") {
+        fun createRoute(listingId: String) = "edit_listing/$listingId"
+    }
     object FinancialCalculator : Screen("financial_calculator")
     object History : Screen("history")
     object ChatThread : Screen("chat_thread/{conversationId}") {
@@ -225,6 +228,9 @@ fun DorjaNavHost() {
                 },
                 onNavigateToCreateListing = {
                     navController.navigate(Screen.CreateListing.route)
+                },
+                onNavigateToEditListing = { listingId ->
+                    navController.navigate(Screen.EditListing.createRoute(listingId))
                 },
                 onNavigateToScanner = { listingId ->
                     navController.navigate(Screen.RoomScanner.createRoute(listingId))
@@ -343,6 +349,17 @@ fun DorjaNavHost() {
         }
 
         composable(
+            route = Screen.EditListing.route,
+            arguments = listOf(navArgument("listingId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            CreateListingScreen(
+                onBack = { navController.popBackStack() },
+                onListingCreated = { navController.popBackStack() },
+                editListingId = backStackEntry.arguments?.getString("listingId")
+            )
+        }
+
+        composable(
             route = Screen.ChatThread.route,
             arguments = listOf(navArgument("conversationId") { type = NavType.StringType })
         ) { backStackEntry ->
@@ -399,6 +416,7 @@ fun MainContainer(
     onNavigateToDetail: (String) -> Unit,
     onNavigateToTour: (String) -> Unit,
     onNavigateToCreateListing: () -> Unit,
+    onNavigateToEditListing: (String) -> Unit = {},
     onNavigateToScanner: (String) -> Unit,
     onNavigateToChatThread: (String) -> Unit,
     onNavigateToPass: (String) -> Unit,
@@ -593,7 +611,8 @@ fun MainContainer(
                             HostTab.PROPERTIES -> HostListingsScreen(
                                 onCreateListing = onNavigateToCreateListing,
                                 onOpenListingDetail = onNavigateToDetail,
-                                onScan3DRooms = onNavigateToScanner
+                                onScan3DRooms = onNavigateToScanner,
+                                onEditListing = onNavigateToEditListing
                             )
                             HostTab.VISITS -> VisitsScreen(onOpenPass = onNavigateToPass)
                             HostTab.INBOX -> InboxScreen(onOpenConversation = onNavigateToChatThread)

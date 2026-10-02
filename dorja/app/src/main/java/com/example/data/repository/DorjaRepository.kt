@@ -550,6 +550,24 @@ class DorjaRepository(private val database: DorjaDatabase, private val appContex
         return id
     }
 
+    /** Host edit: update the editable surface fields of a published listing. */
+    suspend fun updateListingFields(listing: Listing) {
+        listingDao.updateListing(listing)
+        // DORJA History: the case-file records that the listing was revised
+        // (what changed is visible in the listing itself).
+        recordHistoryEvent(
+            type = HistoryEventTypes.LISTING_UPDATED,
+            title = listing.title,
+            listingId = listing.id,
+            listingLabel = listing.title,
+            place = listing.publicArea,
+            detail = mapOf(
+                "intent" to listing.intent,
+                "price" to listing.priceAmount.toString()
+            )
+        )
+    }
+
     suspend fun deleteListing(listingId: String) {
         listingDao.deleteListingById(listingId)
         propertyPassportDao.deleteByListing(listingId)
@@ -1261,6 +1279,21 @@ class DorjaRepository(private val database: DorjaDatabase, private val appContex
                 integrityHash = fingerprint
             )
             historyEventDao.insert(locked)
+            // The freeze has to be VISIBLE in the case-file, not just badge one
+            // row: append the Statement Record event. Until now STATEMENT_LOCKED
+            // had no producer, so locking appeared to "do nothing" in History.
+            recordHistoryEvent(
+                type = HistoryEventTypes.STATEMENT_LOCKED,
+                title = event.title,
+                listingId = event.listingId,
+                listingLabel = event.listingLabel,
+                place = event.place,
+                detail = mapOf(
+                    "locks" to event.id,
+                    "lockedFingerprint" to fingerprint
+                ),
+                relatedEntityId = event.id
+            )
             Result.success(locked)
         } catch (e: Exception) {
             Result.failure(e)

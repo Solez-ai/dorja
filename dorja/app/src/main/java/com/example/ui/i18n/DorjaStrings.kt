@@ -236,6 +236,7 @@ data class DorjaStrings(
             "host_delete_title" to "Delete Property Listing",
             "host_delete_body" to "Are you sure you want to remove '%1\$s'? All associated room data will also be removed.",
             "host_view_listing" to "View Listing",
+            "host_edit_listing" to "Edit Listing",
             "host_options" to "Options",
             "host_3d_tour" to "3D TOUR",
             // ── Explore extras ──

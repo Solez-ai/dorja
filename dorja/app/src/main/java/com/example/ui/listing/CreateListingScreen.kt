@@ -206,11 +206,14 @@ data class PhotoAssignmentItem(
 fun CreateListingScreen(
     onBack: () -> Unit,
     onListingCreated: (String) -> Unit,
-    onScanRooms: ((String) -> Unit)? = null
+    onScanRooms: ((String) -> Unit)? = null,
+    /** When set, the screen edits an existing listing instead of creating one. */
+    editListingId: String? = null
 ) {
     val repository = DorjaApp.instance.repository
     val scope = rememberCoroutineScope()
     val context = androidx.compose.ui.platform.LocalContext.current
+    val isEditMode = editListingId != null
 
     // 1. Basic Listing Info
     var title by remember { mutableStateOf("") }
@@ -276,6 +279,29 @@ fun CreateListingScreen(
     var availableTo by remember { mutableStateOf<Long?>(null) }
     var pickingAvailabilityFrom by remember { mutableStateOf(false) }
     var pickingAvailabilityTo by remember { mutableStateOf(false) }
+
+    // Edit mode: prefill the editable fields from the listing being revised.
+    // Photos/rooms/documents stay untouched — editing is for the listing's
+    // surface facts, not for re-uploading evidence.
+    LaunchedEffect(editListingId) {
+        val id = editListingId ?: return@LaunchedEffect
+        val existing = repository.getListingById(id) ?: return@LaunchedEffect
+        title = existing.title
+        intent = existing.intent
+        propertyType = existing.propertyType
+        publicArea = existing.publicArea
+        exactAddress = existing.exactAddress
+        priceText = existing.priceAmount.toString()
+        bedrooms = existing.bedrooms
+        bathrooms = existing.bathrooms
+        balconies = existing.balconies
+        sqftText = existing.sqft.toString()
+        description = existing.description
+        existing.tags.split(",").map { it.trim() }.filter { it.isNotBlank() }
+            .forEach { if (!selectedTags.contains(it)) selectedTags.add(it) }
+        availableFrom = existing.availableFrom
+        availableTo = existing.availableTo
+    }
 
     // Crop state
     var showCropDialog by remember { mutableStateOf(false) }
@@ -1066,7 +1092,7 @@ fun CreateListingScreen(
                     Spacer(modifier = Modifier.width(10.dp))
                     Column {
                         Text(
-                            text = "Create New Listing",
+                            text = if (isEditMode) "Edit Listing" else "Create New Listing",
                             style = MaterialTheme.typography.titleLarge,
                             color = DorjaColors.Ink950,
                             fontWeight = FontWeight.Bold
@@ -2570,7 +2596,7 @@ fun CreateListingScreen(
 
             // Submit Button
             DorjaButton(
-                text = "Publish Property Listing",
+                text = if (isEditMode) "Save Changes" else "Publish Property Listing",
                 onClick = {
                     if (title.isBlank()) {
                         errorMessage = "Please enter a property title."
@@ -2602,6 +2628,33 @@ fun CreateListingScreen(
                         // Refuses cleanly when there is no signed-in account
                         // (listing creation requires a real, verified owner).
                         val outcome = runCatching {
+                        if (isEditMode) {
+                            val existing = repository.getListingById(editListingId!!)
+                            if (existing != null) {
+                                repository.updateListingFields(
+                                    existing.copy(
+                                        title = title,
+                                        intent = intent,
+                                        propertyType = propertyType,
+                                        publicArea = publicArea,
+                                        exactAddress = exactAddress,
+                                        priceAmount = price,
+                                        bedrooms = bedrooms,
+                                        bathrooms = bathrooms,
+                                        balconies = balconies,
+                                        sqft = sqft,
+                                        tags = tagsString,
+                                        description = description,
+                                        availableFrom = availableFrom,
+                                        availableTo = availableTo
+                                    )
+                                )
+                                onListingCreated(existing.id)
+                            } else {
+                                errorMessage = "This listing no longer exists."
+                            }
+                            return@runCatching
+                        }
                         val newId = repository.createListingWithRooms(
                             title = title,
                             intent = intent,

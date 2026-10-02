@@ -33,6 +33,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Flag
@@ -142,6 +143,7 @@ private fun typeIcon(type: String): ImageVector = when (type) {
     HistoryEventTypes.DOCUMENT_ADDED -> Icons.Default.Description
     HistoryEventTypes.SELLER_CLAIM -> Icons.Default.RecordVoiceOver
     HistoryEventTypes.LISTING_CREATED -> Icons.Default.Home
+    HistoryEventTypes.LISTING_UPDATED -> Icons.Default.Edit
     HistoryEventTypes.STATEMENT_LOCKED -> Icons.Default.Lock
     HistoryEventTypes.CONTRADICTION_REPORTED -> Icons.Default.Flag
     else -> Icons.Default.CheckCircle
@@ -385,8 +387,17 @@ fun HistoryScreen(onBack: () -> Unit) {
                         CupertinoButton(
                             onClick = {
                                 scope.launch {
-                                    val locked = repository.lockHistoryEvent(selectedEvent.id)
-                                    locked.getOrNull()?.let { selected = it }
+                                    val result = repository.lockHistoryEvent(selectedEvent.id)
+                                    // Surface failures: a silent no-op looked like
+                                    // the lock button did nothing at all.
+                                    result.exceptionOrNull()?.let { e ->
+                                        android.widget.Toast.makeText(
+                                            context,
+                                            e.message ?: "Could not lock this record",
+                                            android.widget.Toast.LENGTH_LONG
+                                        ).show()
+                                    }
+                                    result.getOrNull()?.let { selected = it }
                                 }
                             },
                             modifier = Modifier.weight(1f),
@@ -735,6 +746,7 @@ private fun typeLabel(type: String): String = when (type) {
     HistoryEventTypes.DOCUMENT_ADDED -> "Document added"
     HistoryEventTypes.SELLER_CLAIM -> "Seller claim"
     HistoryEventTypes.LISTING_CREATED -> "Listing created"
+    HistoryEventTypes.LISTING_UPDATED -> "Listing updated"
     HistoryEventTypes.STATEMENT_LOCKED -> "Statement record"
     HistoryEventTypes.CONTRADICTION_REPORTED -> "Contradiction"
     else -> type.lowercase().replace('_', ' ')

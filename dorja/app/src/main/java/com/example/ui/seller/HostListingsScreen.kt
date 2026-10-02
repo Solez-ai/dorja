@@ -78,6 +78,7 @@ fun HostListingsScreen(
     onCreateListing: () -> Unit,
     onOpenListingDetail: (String) -> Unit,
     onScan3DRooms: (String) -> Unit = {},
+    onEditListing: (String) -> Unit = {},
 ) {
     val repository = DorjaApp.instance.repository
     val scope = rememberCoroutineScope()
@@ -253,6 +254,7 @@ fun HostListingsScreen(
                         listing = listing,
                         onClick = { onOpenListingDetail(listing.id) },
                         onScan = { onScan3DRooms(listing.id) },
+                        onEdit = { onEditListing(listing.id) },
                         onDelete = { listingToDelete = listing }
                     )
                 }
@@ -266,6 +268,7 @@ private fun HostListingCard(
     listing: Listing,
     onClick: () -> Unit,
     onScan: () -> Unit = {},
+    onEdit: () -> Unit = {},
     onDelete: () -> Unit
 ) {
     var showMenu by remember { mutableStateOf(false) }
@@ -337,6 +340,13 @@ private fun HostListingCard(
                             onClick = {
                                 showMenu = false
                                 onClick()
+                            }
+                        )
+                        DropdownMenuItem(
+                            text = { Text(L("host_edit_listing")) },
+                            onClick = {
+                                showMenu = false
+                                onEdit()
                             }
                         )
                         DropdownMenuItem(
