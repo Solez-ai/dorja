@@ -45,8 +45,10 @@ tasks.register("downloadOpenCvSdk") {
           tmp.outputStream().use { out ->
             (sourceUrl.openConnection() as HttpURLConnection).apply {
               connectTimeout = 30_000
-              readTimeout = 60_000
+              readTimeout = 180_000
               instanceFollowRedirects = true
+              setRequestProperty("User-Agent", "dorja-gradle-opencv-downloader")
+              setRequestProperty("Accept", "application/octet-stream")
             }.getInputStream().use { it.copyTo(out, 1 shl 20) }
           }
           if (tmp.length() >= minZipSize) {
@@ -58,6 +60,9 @@ tasks.register("downloadOpenCvSdk") {
             )
           }
         } catch (e: Exception) {
+          // Surface the real cause in the build output — ci-errors.txt only
+          // carries filtered tails, so a silent retry storm hides everything.
+          println("OpenCV SDK download attempt ${attempt + 1} failed: ${e.javaClass.simpleName}: ${e.message}")
           lastError = e
           attempt++
           if (attempt < 3) Thread.sleep(2000L * attempt)

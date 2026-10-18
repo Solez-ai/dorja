@@ -150,7 +150,7 @@ data class DorjaStrings(
             "scan_error_stitch" to "Couldn't stitch a panorama from these frames. Retake slowly, with clear overlap.",
             "scan_error_sys" to "Saving the scan failed. Try again.",
             "scan_retry" to "Retry",
-            "scan_frame_progress" to "Frame %1$d of %2$d",
+            "scan_frame_progress" to "Frame %1\$d of %2\$d",
             // ── Country picker ──
             "country_sheet_title" to "Change Country & Language",
             "country_sheet_subtitle" to "Choose your country to load market-specific evidence, law and language across DORJA.",
