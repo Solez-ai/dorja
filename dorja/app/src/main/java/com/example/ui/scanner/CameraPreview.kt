@@ -50,6 +50,7 @@ fun CameraPreview(
     onPreviewFrameAvailable: () -> Unit = {}
 ) {
     val context = LocalContext.current
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
 
     // Memoize the PreviewView to avoid expensive recompositions
     // AndroidView recomposition triggers full view tree reconstruction
@@ -69,10 +70,32 @@ fun CameraPreview(
         }
     }
 
-    // Calculate camera aspect ratio for layout
-    val cameraAspectRatio = remember(cameraManager, zoomCapabilities) {
-        calculateCameraAspectRatio(cameraManager, zoomCapabilities)
+    // Create or use provided CameraManager
+    val activeCameraManager = remember(previewView) {
+        cameraManager ?: CameraManager(context, lifecycleOwner, previewView)
     }
+
+    // Bind camera when component mounts
+    LaunchedEffect(activeCameraManager) {
+        val bound = activeCameraManager.bindCamera()
+        if (bound) {
+            Log.d(TAG, "Camera successfully bound in CameraPreview")
+            onPreviewFrameAvailable()
+        } else {
+            Log.e(TAG, "Failed to bind camera in CameraPreview")
+        }
+    }
+
+    // Unbind camera when component unmounts
+    DisposableEffect(activeCameraManager) {
+        onDispose {
+            kotlinx.coroutines.MainScope().launch {
+                activeCameraManager.unbindCamera()
+                Log.d(TAG, "Camera unbound on CameraPreview dispose")
+            }
+        }
+    }
+
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -82,16 +105,10 @@ fun CameraPreview(
             factory = { previewView },
             modifier = Modifier.fillMaxSize(),
             onRelease = {
-                // Cleanup is handled by lifecycle-aware camera manager
+                // Cleanup is handled by lifecycle-aware camera manager via DisposableEffect
                 Log.d(TAG, "PreviewView released")
             }
         )
-    }
-
-    // Invoke callback when preview is ready
-    remember {
-        onPreviewFrameAvailable()
-        Unit
     }
 }
 
