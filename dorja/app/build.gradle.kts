@@ -100,10 +100,6 @@ android {
     versionCode = 1
     versionName = "1.0"
 
-    ndk {
-      // Size control: only the two phone ABIs. No x86/x86_64 (emulators only).
-      abiFilters += listOf("arm64-v8a", "armeabi-v7a")
-    }
     externalNativeBuild {
       cmake {
         arguments += listOf("-DOPENCV_SDK_DIR=${openCvJniDir.asFile.absolutePath.replace("\\", "/")}")
