@@ -83,3 +83,18 @@
 - [ ] Save the interaction-upgrade checkpoint after final validation.
 
 **Current phase:** Interaction behavior validated; checkpoint save pending.
+
+
+## New Android Features Content Update (January 2026)
+
+- [x] Update 360° scanner feature with technical details: 12-frame capture, sensor fusion, AR guidance
+- [x] Add "On-device AI assistant" feature (Hey Dorja voice assistant with Cactus Compute)
+- [x] Document gyroscope-based orientation tracking and accelerometer fallback
+- [x] Add multi-device testing details (5+ manufacturers)
+- [x] Include haptic feedback and AR alignment guidance details
+- [x] Add Bot icon import for AI assistant feature
+- [x] TypeScript check passed after all updates
+
+**Current phase:** Feature content updated; ready for build and deployment.
+
+**Next action:** Build production version and deploy through GitHub Pages workflow.
