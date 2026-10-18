@@ -7,6 +7,7 @@ import {
   ArrowDownRight,
   ArrowRight,
   BadgeCheck,
+  Bot,
   Check,
   ChevronRight,
   FileCheck2,
@@ -16,6 +17,7 @@ import {
   Menu,
   MessageSquareText,
   MessagesSquare,
+  Scan,
   ScanLine,
   ShieldCheck,
   UsersRound,
@@ -104,10 +106,10 @@ const whatsNew = [
   },
   {
     icon: ScanLine,
-    title: "Scans that belong to the room",
+    title: "Professional 360° room capture",
     description:
       "360° panoramas are captured with the phone’s own camera and gyroscope, stitched on device, and replayed with gyro panning — no special hardware.",
-    points: ["Gyro-driven 360° viewer", "On-device panorama stitching", "Works with any phone camera"],
+    points: ["Sensor fusion for precise tracking", "AR alignment guidance with haptic feedback", "Multi-device support: 5+ manufacturers tested"],
   },
   {
     icon: MessagesSquare,
@@ -115,6 +117,13 @@ const whatsNew = [
     description:
       "Encrypted inbox, dispute records with both sides kept side by side, and neutral appeal tracking — conversations stay useful when they get serious.",
     points: ["Encrypted in-app messaging", "Balanced dispute records", "Neutral appeal history"],
+  },
+  {
+    icon: Bot,
+    title: "On-device AI assistant",
+    description:
+      "Hey Dorja voice assistant runs locally with Cactus Compute, offering property insights, document help, and voice control without sending data to the cloud.",
+    points: ["Voice-activated with 'Hey Dorja'", "4 specialized property tools", "100% on-device inference"],
   },
 ];
 
