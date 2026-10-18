@@ -33,57 +33,77 @@ tasks.register("downloadOpenCvSdk") {
   doLast {
     val zipFile = openCvZip.asFile
     val minZipSize = 300_000_000L // official 4.13.0 zip is ~318MB
-    if (!zipFile.exists() || zipFile.length() < minZipSize) {
+    // The zip's entries are rooted at "OpenCV-android-sdk/...", so extract
+    // them into the versioned folder — that is exactly where the
+    // openCvSdkDir / openCvJniDir constants expect them.
+    val extractRoot = openCvThirdParty.dir("opencv-$openCvSdkVersion-android-sdk")
+    val extractedConfig = openCvJniDir.asFile.resolve("OpenCVConfig.cmake")
+    // A stale or partial zip is untrusted: treat size-short archives as
+    // corrupt and delete before attempting anything else.
+    if (zipFile.exists() && zipFile.length() < minZipSize) {
+      zipFile.delete()
+    }
+    if (!zipFile.exists()) {
       zipFile.parentFile?.mkdirs() // download destination dir may not exist yet
       val sourceUrl = URL(
         "https://github.com/opencv/opencv/releases/download/$openCvSdkVersion/opencv-$openCvSdkVersion-android-sdk.zip"
-      )
-      val tmp = File(zipFile.absolutePath + ".tmp")
-      var attempt = 0
-      var lastError: Exception? = null
-      while (attempt < 3 && !zipFile.exists()) {
-        try {
-          tmp.outputStream().use { out ->
-            (sourceUrl.openConnection() as HttpURLConnection).apply {
-              connectTimeout = 30_000
-              readTimeout = 180_000
-              instanceFollowRedirects = true
-              setRequestProperty("User-Agent", "dorja-gradle-opencv-downloader")
-              setRequestProperty("Accept", "application/octet-stream")
-            }.getInputStream().use { it.copyTo(out, 1 shl 20) }
+      )          val retry = File(zipFile.absolutePath + ".tmp")
+          var attempt = 0
+          var lastError: Exception? = null
+          while (attempt < 3 && !zipFile.exists()) {
+            try {
+              retry.outputStream().use { out ->
+                val conn = (sourceUrl.openConnection() as HttpURLConnection).apply {
+                  connectTimeout = 30_000
+                  readTimeout = 180_000
+                  instanceFollowRedirects = true
+                  setRequestProperty("User-Agent", "dorja-gradle-opencv-downloader")
+                  setRequestProperty("Accept", "application/octet-stream")
+                }
+                // Fail fast on any non-2xx: never trust the body bytes.
+                val status = conn.responseCode
+                if (status !in 200..299) {
+                  throw IllegalStateException("HTTP $status fetching OpenCV SDK")
+                }
+                conn.inputStream.use { it.copyTo(out, 1 shl 20) }
+              }
+              // Rename to the real zip only after a complete, size-checked stream.
+              if (retry.length() >= minZipSize) {
+                retry.renameTo(zipFile)
+              } else {
+                retry.delete()
+                throw IllegalStateException(
+                  "OpenCV SDK zip too small (${retry.length()} bytes) — download truncated"
+                )
+              }
+            } catch (e: Exception) {
+              // Surface the real cause in the build output — the ci log only
+              // carries filtered tails, so a silent retry storm hides everything.
+              println("OpenCV SDK download attempt ${attempt + 1} failed: ${e.javaClass.simpleName}: ${e.message}")
+              retry.delete()
+              lastError = e
+              attempt++
+              if (attempt < 3) Thread.sleep(2000L * attempt)
+            }
           }
-          if (tmp.length() >= minZipSize) {
-            tmp.renameTo(zipFile)
-          } else {
-            tmp.delete()
-            throw IllegalStateException(
-              "OpenCV SDK zip too small (${tmp.length()} bytes) — download truncated"
-            )
+          if (!zipFile.exists()) {
+            throw lastError ?: IllegalStateException("Failed to download OpenCV SDK")
           }
-        } catch (e: Exception) {
-          // Surface the real cause in the build output — ci-errors.txt only
-          // carries filtered tails, so a silent retry storm hides everything.
-          println("OpenCV SDK download attempt ${attempt + 1} failed: ${e.javaClass.simpleName}: ${e.message}")
-          lastError = e
-          attempt++
-          if (attempt < 3) Thread.sleep(2000L * attempt)
-        }
-      }
-      if (!zipFile.exists()) {
-        throw lastError ?: IllegalStateException("Failed to download OpenCV SDK")
-      }
     }
-    if (!openCvSdkDir.asFile.resolve("sdk/native/jni/OpenCVConfig.cmake").exists()) {
+    if (!extractedConfig.exists()) {
+      // A partially extracted tree is stale — remove before re-extracting.
+      openCvSdkDir.asFile.deleteRecursively()
+      extractRoot.asFile.mkdirs()
       ZipFile(zipFile).use { zf ->
         val entries = zf.entries()
         while (entries.hasMoreElements()) {
           val entry = entries.nextElement()
-          val out = openCvThirdParty.asFile.resolve(entry.name)
+          val out = extractRoot.asFile.resolve(entry.name)
           if (entry.isDirectory) {
             out.mkdirs()
             continue
           }
-          if (!out.canonicalPath.startsWith(openCvThirdParty.asFile.canonicalPath)) {
+          if (!out.canonicalPath.startsWith(extractRoot.asFile.canonicalPath)) {
             continue // zip-slip guard
           }
           out.parentFile?.mkdirs()
@@ -91,7 +111,7 @@ tasks.register("downloadOpenCvSdk") {
         }
       }
     }
-    check(openCvJniDir.asFile.resolve("OpenCVConfig.cmake").exists()) { "OpenCV SDK unzip failed" }
+    check(extractedConfig.exists()) { "OpenCV SDK unzip failed: missing OpenCVConfig.cmake" }
   }
 }
 
@@ -192,7 +212,8 @@ dependencies {
   implementation(platform(libs.firebase.bom))
   // implementation(libs.accompanist.permissions)
   implementation(libs.androidx.activity.compose)
-  implementation(libs.androidx.camera.camera2)
+  // camera-core / camera-camera2 / camera-lifecycle are declared further
+  // down in this block — do not duplicate them here.
   // implementation(libs.androidx.camera.core)
   // implementation(libs.androidx.camera.lifecycle)
     implementation("com.google.code.gson:gson:2.10.1")
