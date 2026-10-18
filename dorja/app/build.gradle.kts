@@ -161,3 +161,4 @@ dependencies {
   "ksp"(libs.androidx.room.compiler)
   "ksp"(libs.moshi.kotlin.codegen)
 }
+// Build cache invalidation: 10/18/2026 14:48:10
