@@ -134,7 +134,7 @@ data class SweepSession(
      * Checks if the sweep is complete (reached end of range).
      */
     fun isComplete(): Boolean {
-        return progress >= 0.98f || state == SWEEP_COMPLETE || state == COMPLETED
+        return progress >= 0.98f || state == SweepCaptureState.SWEEP_COMPLETE || state == SweepCaptureState.COMPLETED
     }
     
     /**
@@ -142,7 +142,7 @@ data class SweepSession(
      */
     fun shouldPause(): Boolean {
         val timeSinceLastCapture = System.currentTimeMillis() - lastCaptureTime
-        return state == SWEEPING_IN_PROGRESS && timeSinceLastCapture > 1000L
+        return state == SweepCaptureState.SWEEPING_IN_PROGRESS && timeSinceLastCapture > 1000L
     }
     
     /**
@@ -150,7 +150,7 @@ data class SweepSession(
      */
     fun isTimedOut(): Boolean {
         val timeSinceLastCapture = System.currentTimeMillis() - lastCaptureTime
-        return state == PAUSED && timeSinceLastCapture > 10000L
+        return state == SweepCaptureState.PAUSED && timeSinceLastCapture > 10000L
     }
     
     /**
