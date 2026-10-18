@@ -1,4 +1,8 @@
 import com.google.gms.googleservices.GoogleServicesPlugin.MissingGoogleServicesStrategy
+import java.io.File
+import java.net.HttpURLConnection
+import java.net.URL
+import java.util.zip.ZipFile
 
 plugins {
   alias(libs.plugins.android.application)
@@ -30,16 +34,16 @@ tasks.register("downloadOpenCvSdk") {
     val zipFile = openCvZip.asFile
     val minZipSize = 300_000_000L // official 4.13.0 zip is ~318MB
     if (!zipFile.exists() || zipFile.length() < minZipSize) {
-      val url = java.net.URL(
+      val sourceUrl = URL(
         "https://github.com/opencv/opencv/releases/download/$openCvSdkVersion/opencv-$openCvSdkVersion-android-sdk.zip"
       )
-      val tmp = java.io.File(zipFile.absolutePath + ".tmp")
+      val tmp = File(zipFile.absolutePath + ".tmp")
       var attempt = 0
       var lastError: Exception? = null
       while (attempt < 3 && !zipFile.exists()) {
         try {
           tmp.outputStream().use { out ->
-            (url.openConnection() as java.net.HttpURLConnection).apply {
+            (sourceUrl.openConnection() as HttpURLConnection).apply {
               connectTimeout = 30_000
               readTimeout = 60_000
               instanceFollowRedirects = true
@@ -64,7 +68,7 @@ tasks.register("downloadOpenCvSdk") {
       }
     }
     if (!openCvSdkDir.asFile.resolve("sdk/native/jni/OpenCVConfig.cmake").exists()) {
-      java.util.zip.ZipFile(zipFile).use { zf ->
+      ZipFile(zipFile).use { zf ->
         val entries = zf.entries()
         while (entries.hasMoreElements()) {
           val entry = entries.nextElement()
@@ -268,4 +272,4 @@ afterEvaluate {
     dependsOn("downloadOpenCvSdk")
   }
 }
-// Build cache invalidation: 10/18/2026 14:48:10
+// Build cache invalidation: 10/18/2026 14:48:10
