@@ -10,7 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.aspectRatio
+import androidx.compose.foundation.layout.Column
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
@@ -73,13 +73,10 @@ fun CameraPreview(
     val cameraAspectRatio = remember(cameraManager, zoomCapabilities) {
         calculateCameraAspectRatio(cameraManager, zoomCapabilities)
     }
-
-    // Render the preview with proper aspect ratio
     Box(
         modifier = modifier
             .fillMaxWidth()
             .background(Color.Black)
-            .aspectRatio(cameraAspectRatio)
     ) {
         AndroidView(
             factory = { previewView },

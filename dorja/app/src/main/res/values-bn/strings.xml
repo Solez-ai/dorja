@@ -8,9 +8,17 @@
     <string name="sensor_unavailable">সেন্সর উপলব্ধ নয়</string>
     <string name="zoom_slider_label">জুম নিয়ন্ত্রণ</string>
     <string name="alignment_ring_label">সারিবদ্ধতা নির্দেশিকা</string>
-    <string name="frame_count_format">ফ্রেম %d of %d</string>
+    <string name="frame_count_format" formatted="false">ফ্রেম %1$d of %2$d</string>
     <string name="stitching_in_progress">প্যানোরামা তৈরি করছি...</string>
     <string name="stitching_complete">স্ক্যান সম্পন্ন!</string>
     <string name="error_camera_binding">ক্যামেরা অ্যাক্সেস করতে অক্ষম</string>
     <string name="error_stitching_failed">প্যানোরামা তৈরিতে ব্যর্থ</string>
+    <string name="handover_passport_subtitle">ডিজিটাল সম্পত্তি পাসপোর্ট</string>
+    <string name="document_title_placeholder">নথির শিরোনাম প্রবেশ করুন</string>
+    <string name="authority_placeholder">জারিকারী কর্তৃপক্ষ প্রবেশ করুন</string>
+    <string name="host_suite_subtitle">হোস্টের স্যুট</string>
+    <string name="rent_label">ভাড়া মূল্য (%s)</string>
+    <string name="price_label">বিক্রয় মূল্য (%s)</string>
+    <string name="verified_listing_docs_label">যাচাইকৃত নথিসমূহ</string>
+    <string name="no_docs_yet">এখনও কোন নথি নেই</string>
 </resources>

@@ -18,8 +18,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -61,13 +60,12 @@ fun ZoomSlider(
     onZoomChanged: (Float) -> Unit = {}
 ) {
     val context = LocalContext.current
-    var zoomCapabilities by remember { mutableFloatStateOf(1.0f) }
     var currentZoom by remember { mutableFloatStateOf(1.0f) }
     var minZoom by remember { mutableFloatStateOf(1.0f) }
     var maxZoom by remember { mutableFloatStateOf(2.0f) }
-    var isLoading by remember { mutableFloatStateOf(true) }
-    var isFixedZoom by remember { mutableFloatStateOf(false) }
-    var errorMessage by remember { mutableFloatStateOf<String?>(null) }
+    var isLoading by remember { mutableStateOf(true) }
+    var isFixedZoom by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
 
     // Initialize zoom capabilities on first render
     LaunchedEffect(cameraManager) {
@@ -84,7 +82,6 @@ fun ZoomSlider(
                     maxZoom = capabilities.maxZoomRatio
                     currentZoom = capabilities.defaultZoom
                     isFixedZoom = capabilities.minZoomRatio >= capabilities.maxZoomRatio
-                    zoomCapabilities = capabilities.minZoomRatio
                 } else {
                     errorMessage = "Invalid zoom capabilities detected"
                 }

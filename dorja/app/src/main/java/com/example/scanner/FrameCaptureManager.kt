@@ -15,7 +15,7 @@ class FrameCaptureManager(
     private var imageCapture: ImageCapture? = null
     private val frames = mutableListOf<FrameData>()
 
-    suspend fun captureFrame(): Boolean = withContext(Dispatchers.Main) {
+    suspend fun captureFrame(heading: Float = 0f): Boolean = withContext(Dispatchers.Main) {
         try {
             imageCapture?.takePicture(
                 ImageCapture.OutputFileOptions.Builder(
@@ -25,11 +25,12 @@ class FrameCaptureManager(
                 object : ImageCapture.OnImageSavedCallback {
                     override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
                         val path = outputFileResults.savedUri?.path ?: return
-                        frames.add(FrameData(path = path))
+                        frames.add(FrameData(path = path, heading = heading))
                     }
 
-                    override fun onError(exception: ImageCapture.OnError) {
-                        // Handle error
+                    override fun onError(exception: ImageCapture.ImageCaptureException) {
+                        // Handle error - log but don't crash
+                        android.util.Log.e("FrameCaptureManager", "Capture error: ${exception.message}")
                     }
                 }
             )

@@ -15,42 +15,48 @@ import com.example.scanner.SensorFusionManager
 
 @Composable
 fun RoomScannerScreen(
-    viewModel: ScannerViewModel,
-    cameraManager: CameraManager?,
-    sensorFusion: SensorFusionManager?,
-    onComplete: () -> Unit = {}
+    listingId: String,
+    onBack: () -> Unit = {},
+    onScanComplete: (String, String) -> Unit = { _, _ -> },
+    viewModel: ScannerViewModel? = null,
+    cameraManager: CameraManager? = null,
+    sensorFusion: SensorFusionManager? = null
 ) {
-    val captureState = viewModel.captureState.collectAsState()
-    val currentZoom = viewModel.currentZoom.collectAsState()
-    val alignLevel = viewModel.alignLevel.collectAsState()
-    val frameCount = viewModel.frameCount.collectAsState()
+    val vm = viewModel ?: ScannerViewModel()
+    val captureState = vm.captureState.collectAsState()
+    val currentZoom = vm.currentZoom.collectAsState()
+    val alignLevel = vm.alignLevel.collectAsState()
+    val frameCount = vm.frameCount.collectAsState()
 
     LaunchedEffect(sensorFusion) {
         sensorFusion?.start()
         sensorFusion?.onOrientationUpdate = { orientation, _ ->
-            viewModel.updateOrientation(orientation)
+            vm.updateOrientation(orientation)
         }
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
-            CameraPreview(cameraManager, modifier = Modifier.weight(1f))
+            CameraPreview(
+                modifier = Modifier.weight(1f),
+                cameraManager = cameraManager
+            )
 
             ARGuidanceRing(alignLevel.value, modifier = Modifier.align(Alignment.CenterHorizontally))
 
             FramePreviewRail(emptyList())
 
             ZoomSlider(cameraManager) { zoom ->
-                viewModel.updateZoom(zoom)
+                vm.updateZoom(zoom)
             }
 
             CaptureButton(
                 currentFrame = frameCount.value,
                 state = captureState.value,
                 onCapture = {
-                    viewModel.incrementFrameCount()
+                    vm.incrementFrameCount()
                     if (frameCount.value >= 12) {
-                        onComplete()
+                        onScanComplete(listingId, "scan_result")
                     }
                 },
                 modifier = Modifier

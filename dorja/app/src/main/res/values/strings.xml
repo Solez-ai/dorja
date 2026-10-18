@@ -8,9 +8,17 @@
     <string name="sensor_unavailable">Sensor unavailable</string>
     <string name="zoom_slider_label">Zoom Control</string>
     <string name="alignment_ring_label">Alignment Guidance</string>
-    <string name="frame_count_format">Frame %d of %d</string>
+    <string name="frame_count_format" formatted="false">Frame %1$d of %2$d</string>
     <string name="stitching_in_progress">Creating panorama...</string>
     <string name="stitching_complete">Scan complete!</string>
     <string name="error_camera_binding">Unable to access camera</string>
     <string name="error_stitching_failed">Failed to create panorama</string>
+    <string name="handover_passport_subtitle">Digital Property Passport</string>
+    <string name="document_title_placeholder">Enter document title</string>
+    <string name="authority_placeholder">Enter issuing authority</string>
+    <string name="host_suite_subtitle">Host\'s Suite</string>
+    <string name="rent_label">Rental Price (%s)</string>
+    <string name="price_label">Sale Price (%s)</string>
+    <string name="verified_listing_docs_label">Verified Documents</string>
+    <string name="no_docs_yet">No documents yet</string>
 </resources>
