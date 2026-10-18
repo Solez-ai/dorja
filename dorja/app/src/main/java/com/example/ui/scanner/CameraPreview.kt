@@ -17,6 +17,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.camera.core.ImageCapture
 import com.example.scanner.CameraManager
 import com.example.scanner.ZoomCapabilities
 import kotlinx.coroutines.launch
@@ -51,7 +52,9 @@ fun CameraPreview(
     modifier: Modifier = Modifier,
     cameraManager: CameraManager? = null,
     zoomCapabilities: ZoomCapabilities? = null,
-    onPreviewFrameAvailable: () -> Unit = {}
+    onPreviewFrameAvailable: () -> Unit = {},
+    imageCapture: ImageCapture? = null,
+    onManagerReady: ((CameraManager) -> Unit)? = null
 ) {
     val context = LocalContext.current
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
@@ -81,9 +84,10 @@ fun CameraPreview(
 
     // Bind camera when component mounts
     LaunchedEffect(activeCameraManager) {
-        val bound = activeCameraManager.bindCamera()
+        val bound = activeCameraManager.bindCamera(imageCapture)
         if (bound) {
             Log.d(TAG, "Camera successfully bound in CameraPreview")
+            onManagerReady?.invoke(activeCameraManager)
             onPreviewFrameAvailable()
         } else {
             Log.e(TAG, "Failed to bind camera in CameraPreview")
@@ -99,6 +103,7 @@ fun CameraPreview(
             }
         }
     }
+
 
     Box(
         modifier = modifier

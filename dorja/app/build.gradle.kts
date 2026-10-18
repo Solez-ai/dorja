@@ -9,6 +9,82 @@ plugins {
   alias(libs.plugins.google.services)
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// OpenCV Android SDK (native stitcher dependency)
+//────────────────────────────────────────────────────────────────────────────
+// The Maven org.opencv:opencv AAR does NOT contain the stitching module
+// (verified against the artifact: zero cv::Stitcher symbols in its native
+// lib). The official Android SDK does. It is downloaded once into the
+// third_party/ dir (git-ignored) and statically linked — only the modules
+// cv::Stitcher references end up in the APK, and per-ABI APK splits keep
+// installs small (no monolithic universal build).
+val openCvSdkVersion = "4.13.0"
+val openCvThirdParty = rootProject.layout.projectDirectory.dir("third_party")
+val openCvZip = openCvThirdParty.file("opencv-$openCvSdkVersion-android-sdk.zip")
+val openCvSdkDir = openCvThirdParty.dir("opencv-$openCvSdkVersion-android-sdk/OpenCV-android-sdk")
+val openCvJniDir = openCvSdkDir.dir("sdk/native/jni")
+
+tasks.register("downloadOpenCvSdk") {
+  outputs.upToDateWhen { openCvJniDir.asFile.resolve("OpenCVConfig.cmake").exists() }
+  doLast {
+    val zipFile = openCvZip.asFile
+    val minZipSize = 300_000_000L // official 4.13.0 zip is ~318MB
+    if (!zipFile.exists() || zipFile.length() < minZipSize) {
+      val url = java.net.URL(
+        "https://github.com/opencv/opencv/releases/download/$openCvSdkVersion/opencv-$openCvSdkVersion-android-sdk.zip"
+      )
+      val tmp = java.io.File(zipFile.absolutePath + ".tmp")
+      var attempt = 0
+      var lastError: Exception? = null
+      while (attempt < 3 && !zipFile.exists()) {
+        try {
+          tmp.outputStream().use { out ->
+            (url.openConnection() as java.net.HttpURLConnection).apply {
+              connectTimeout = 30_000
+              readTimeout = 60_000
+              instanceFollowRedirects = true
+            }.getInputStream().use { it.copyTo(out, 1 shl 20) }
+          }
+          if (tmp.length() >= minZipSize) {
+            tmp.renameTo(zipFile)
+          } else {
+            tmp.delete()
+            throw IllegalStateException(
+              "OpenCV SDK zip too small (${tmp.length()} bytes) — download truncated"
+            )
+          }
+        } catch (e: Exception) {
+          lastError = e
+          attempt++
+          if (attempt < 3) Thread.sleep(2000L * attempt)
+        }
+      }
+      if (!zipFile.exists()) {
+        throw lastError ?: IllegalStateException("Failed to download OpenCV SDK")
+      }
+    }
+    if (!openCvSdkDir.asFile.resolve("sdk/native/jni/OpenCVConfig.cmake").exists()) {
+      java.util.zip.ZipFile(zipFile).use { zf ->
+        val entries = zf.entries()
+        while (entries.hasMoreElements()) {
+          val entry = entries.nextElement()
+          val out = openCvThirdParty.asFile.resolve(entry.name)
+          if (entry.isDirectory) {
+            out.mkdirs()
+            continue
+          }
+          if (!out.canonicalPath.startsWith(openCvThirdParty.asFile.canonicalPath)) {
+            continue // zip-slip guard
+          }
+          out.parentFile?.mkdirs()
+          zf.getInputStream(entry).use { src -> out.outputStream().use { src.copyTo(it, 1 shl 20) } }
+        }
+      }
+    }
+    check(openCvJniDir.asFile.resolve("OpenCVConfig.cmake").exists()) { "OpenCV SDK unzip failed" }
+  }
+}
+
 android {
   namespace = "com.example"
   compileSdk = 36
@@ -20,7 +96,33 @@ android {
     versionCode = 1
     versionName = "1.0"
 
+    ndk {
+      // Size control: only the two phone ABIs. No x86/x86_64 (emulators only).
+      abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+    }
+    externalNativeBuild {
+      cmake {
+        arguments += listOf("-DOPENCV_SDK_DIR=${openCvJniDir.asFile.absolutePath.replace("\\", "/")}")
+      }
+    }
+
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+  }
+
+  externalNativeBuild {
+    cmake {
+      path = file("src/main/cpp/CMakeLists.txt")
+    }
+  }
+
+  splits {
+    abi {
+      // APK size: ship one small APK per ABI instead of one fat universal.
+      isEnable = true
+      reset()
+      include("arm64-v8a", "armeabi-v7a")
+      isUniversalApk = false
+    }
   }
 
   signingConfigs {
@@ -160,5 +262,10 @@ dependencies {
   debugImplementation(libs.androidx.compose.ui.tooling)
   "ksp"(libs.androidx.room.compiler)
   "ksp"(libs.moshi.kotlin.codegen)
+}// Native build must not configure before the OpenCV SDK is in place.
+afterEvaluate {
+  tasks.matching { it.name.startsWith("externalNativeBuild") }.configureEach {
+    dependsOn("downloadOpenCvSdk")
+  }
 }
-// Build cache invalidation: 10/18/2026 14:48:10
+// Build cache invalidation: 10/18/2026 14:48:10

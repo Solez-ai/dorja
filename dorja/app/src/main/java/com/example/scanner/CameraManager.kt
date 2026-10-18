@@ -7,16 +7,21 @@ import android.util.Log
 import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
+import androidx.camera.core.ImageCapture
+import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.lifecycle.LifecycleOwner
+import java.io.File
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import kotlin.coroutines.resume
 
 /**
  * Manages CameraX initialization, binding, unbinding, and zoom capability detection.
@@ -30,6 +35,7 @@ class CameraManager(
     private val previewView: PreviewView
 ) {
     private var camera: Camera? = null
+    private var imageCapture: ImageCapture? = null
     private val cameraExecutor: ExecutorService = Executors.newSingleThreadExecutor()
     private val androidCameraManager: AndroidCameraManager =
         context.getSystemService(Context.CAMERA_SERVICE) as AndroidCameraManager
@@ -161,13 +167,15 @@ class CameraManager(
     }
 
     /**
-     * Binds the camera with CameraX, initializing the preview use case.
+     * Binds the camera with CameraX, initializing the preview use case and —
+     * when [newImageCapture] is provided — an [ImageCapture] use case so the
+     * caller can take full-resolution JPEG frames (panorama capture).
      * Thread-safe: wraps all camera binding in Dispatchers.Main context.
      * Handles errors gracefully: logs failures and returns false on binding failure.
      *
      * @return true if camera bound successfully, false otherwise
      */
-    suspend fun bindCamera(): Boolean =
+    suspend fun bindCamera(newImageCapture: ImageCapture? = null): Boolean =
         withContext(Dispatchers.Main) {
             return@withContext try {
                 val cameraProviderFuture =
@@ -190,13 +198,24 @@ class CameraManager(
                         .requireLensFacing(CameraSelector.LENS_FACING_BACK)
                         .build()
 
-                // Bind and store reference
+                // Bind (preview + optional capture)
                 camera =
-                    cameraProvider.bindToLifecycle(
-                        lifecycleOwner,
-                        cameraSelector,
-                        preview
-                    )
+                    if (newImageCapture != null) {
+                        imageCapture = newImageCapture
+                        cameraProvider.bindToLifecycle(
+                            lifecycleOwner,
+                            cameraSelector,
+                            preview,
+                            newImageCapture
+                        )
+                    } else {
+                        imageCapture = null
+                        cameraProvider.bindToLifecycle(
+                            lifecycleOwner,
+                            cameraSelector,
+                            preview
+                        )
+                    }
 
                 Log.d(TAG, "Camera bound successfully")
                 true
@@ -208,8 +227,44 @@ class CameraManager(
         }
 
     /**
-     * Binds camera with ImageAnalysis for continuous frame processing (panorama sweep).
-     * Used by ContinuousCaptureManager to extract vertical strips from YUV frames.
+     * Takes one full-frame JPEG photo into [file] using the bound
+     * [ImageCapture] use case (see [bindCamera]).
+     *
+     * @return true if the frame was saved, false if not bound or capture failed
+     */
+    suspend fun takePhotoTo(file: File): Boolean =
+        withContext(Dispatchers.Default) {
+            val capture = imageCapture
+            if (capture == null) {
+                Log.w(TAG, "No ImageCapture bound; cannot take photo")
+                return@withContext false
+            }
+            suspendCancellableCoroutine { cont ->
+                try {
+                    val options = ImageCapture.OutputFileOptions.Builder(file).build()
+                    capture.takePicture(
+                        options,
+                        cameraExecutor,
+                        object : ImageCapture.OnImageSavedCallback {
+                            override fun onImageSaved(results: ImageCapture.OutputFileResults) {
+                                cont.resume(true)
+                            }
+
+                            override fun onError(exception: ImageCaptureException) {
+                                Log.e(TAG, "Capture failed: ${exception.message}", exception)
+                                cont.resume(false)
+                            }
+                        }
+                    )
+                } catch (e: Exception) {
+                    Log.e(TAG, "Capture threw: ${e.message}", e)
+                    cont.resume(false)
+                }
+            }
+        }
+
+    /**
+     * Binds camera with ImageAnalysis for continuous frame processing.
      * Thread-safe: wraps all camera binding in Dispatchers.Main context.
      *
      * @param imageAnalyzer ImageAnalysis use case for frame processing

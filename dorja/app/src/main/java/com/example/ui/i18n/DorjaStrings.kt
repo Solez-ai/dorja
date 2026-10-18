@@ -135,6 +135,22 @@ data class DorjaStrings(
             "detail_for_sale" to "For Sale",
             // ── Create listing ──
             // ── Scanner ──
+            "scan_title" to "360° Room Scan",
+            "scan_back" to "Back",
+            "scan_start" to "Start Scan",
+            "scan_start_hint" to "Stand at the room's center, hold the phone upright, then turn around in place. You will capture a full 360° ring — follow the amber marker."
+            ,"scan_point_guide" to "Turn until the amber marker reaches the reticle. Hold steady — the shutter fires itself.",
+            "scan_capture_now" to "Capture now",
+            "scan_hold_steady" to "Holding steady — capturing…",
+            "scan_stitching" to "Stitching your panorama…",
+            "scan_stitching_hint" to "Matching and blending 12 frames with OpenCV. This can take a minute or two.",
+            "scan_error_title" to "Scan failed",
+            "scan_error_generic" to "Something went wrong during the scan.",
+            "scan_error_capture" to "The camera could not capture a frame. Retry the scan.",
+            "scan_error_stitch" to "Couldn't stitch a panorama from these frames. Retake slowly, with clear overlap.",
+            "scan_error_sys" to "Saving the scan failed. Try again.",
+            "scan_retry" to "Retry",
+            "scan_frame_progress" to "Frame %1$d of %2$d",
             // ── Country picker ──
             "country_sheet_title" to "Change Country & Language",
             "country_sheet_subtitle" to "Choose your country to load market-specific evidence, law and language across DORJA.",

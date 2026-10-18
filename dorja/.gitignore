@@ -30,3 +30,6 @@ docs/*
 __pycache__/
 adapter*.safetensors
 checkpoints/
+
+# OpenCV Android SDK (auto-downloaded native dependency, 300MB+)
+/third_party/
