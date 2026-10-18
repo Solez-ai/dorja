@@ -263,8 +263,11 @@ dependencies {
   "ksp"(libs.androidx.room.compiler)
   "ksp"(libs.moshi.kotlin.codegen)
 }// Native build must not configure before the OpenCV SDK is in place.
+// Covers both `configureCMakeDebug[abi]` and `externalNativeBuild*` tasks.
 afterEvaluate {
-  tasks.matching { it.name.startsWith("externalNativeBuild") }.configureEach {
+  tasks.matching {
+    it.name.startsWith("externalNativeBuild") || it.name.contains("CMake")
+  }.configureEach {
     dependsOn("downloadOpenCvSdk")
   }
 }
