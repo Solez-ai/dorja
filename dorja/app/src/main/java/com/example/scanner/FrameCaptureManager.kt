@@ -2,6 +2,7 @@ package com.example.scanner
 
 import android.content.Context
 import androidx.camera.core.ImageCapture
+import androidx.camera.core.ImageCaptureException
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.lifecycle.LifecycleOwner
 import java.util.concurrent.Executors
@@ -29,7 +30,7 @@ class FrameCaptureManager(
                         frames.add(FrameData(path = path, heading = heading))
                     }
 
-                    override fun onError(exception: ImageCapture.ImageCaptureException) {
+                    override fun onError(exception: ImageCaptureException) {
                         // Handle error - log but don't crash
                         android.util.Log.e("FrameCaptureManager", "Capture error: ${exception.message}")
                     }

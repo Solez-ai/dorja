@@ -247,8 +247,8 @@ class CameraManager(
 
         try {
             val zoomState = boundCamera.cameraInfo.zoomState.value
-            val minZoom = (zoomState?.minZoom?.toFloat() ?: 1.0f)
-            val maxZoom = (zoomState?.maxZoom?.toFloat() ?: zoomRatio)
+            val minZoom = (zoomState?.minZoomRatio?.toFloat() ?: 1.0f)
+            val maxZoom = (zoomState?.maxZoomRatio?.toFloat() ?: zoomRatio)
             val clamped = zoomRatio.coerceIn(minZoom, maxZoom)
             boundCamera.cameraControl.setZoomRatio(clamped)
             Log.d(TAG, "Zoom ratio set to $clamped")
