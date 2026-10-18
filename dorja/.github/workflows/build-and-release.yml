@@ -14,6 +14,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # OpenCV Android SDK (~318MB zip / ~1.4GB unpacked) is fetched by the
+      # Gradle download task; cache it so only the first run pays for it.
+      - name: Cache OpenCV Android SDK
+        uses: actions/cache@v4
+        with:
+          path: dorja/third_party
+          key: opencv-android-sdk-4.13.0
+
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
@@ -57,7 +65,10 @@ jobs:
         run: cp .env.example .env || true
 
       - name: Build debug APK
-        run: ./gradlew assembleDebug
+        # Capture full Gradle output; on failure dump the real tail (the
+        # daemon stack spam hides the actual Caused-by lines otherwise).
+        run: |
+          ./gradlew assembleDebug --stacktrace --console=plain > gradle-output.txt 2>&1 || { tail -n 250 gradle-output.txt >&2; false; }
 
       - name: Run availability time-math tests
         # Filtered to the new pure-JVM suite: gated release, no flaky
