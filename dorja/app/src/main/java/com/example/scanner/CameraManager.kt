@@ -6,6 +6,7 @@ import android.hardware.camera2.CameraManager as AndroidCameraManager
 import android.util.Log
 import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
@@ -201,6 +202,55 @@ class CameraManager(
                 true
             } catch (e: Exception) {
                 Log.e(TAG, "Error binding camera: ${e.message}", e)
+                camera = null
+                false
+            }
+        }
+
+    /**
+     * Binds camera with ImageAnalysis for continuous frame processing (panorama sweep).
+     * Used by ContinuousCaptureManager to extract vertical strips from YUV frames.
+     * Thread-safe: wraps all camera binding in Dispatchers.Main context.
+     *
+     * @param imageAnalyzer ImageAnalysis use case for frame processing
+     * @return true if camera bound successfully with analysis, false otherwise
+     */
+    suspend fun bindCameraWithAnalysis(imageAnalyzer: ImageAnalysis): Boolean =
+        withContext(Dispatchers.Main) {
+            return@withContext try {
+                val cameraProviderFuture =
+                    ProcessCameraProvider.getInstance(context)
+
+                val cameraProvider = cameraProviderFuture.get()
+
+                // Unbind existing camera first
+                cameraProvider.unbindAll()
+
+                // Create preview use case
+                val preview =
+                    Preview.Builder()
+                        .build()
+                        .also { it.setSurfaceProvider(previewView.surfaceProvider) }
+
+                // Select back-facing camera
+                val cameraSelector =
+                    CameraSelector.Builder()
+                        .requireLensFacing(CameraSelector.LENS_FACING_BACK)
+                        .build()
+
+                // Bind preview AND ImageAnalysis
+                camera =
+                    cameraProvider.bindToLifecycle(
+                        lifecycleOwner,
+                        cameraSelector,
+                        preview,
+                        imageAnalyzer
+                    )
+
+                Log.d(TAG, "Camera bound successfully with ImageAnalysis")
+                true
+            } catch (e: Exception) {
+                Log.e(TAG, "Error binding camera with analysis: ${e.message}", e)
                 camera = null
                 false
             }

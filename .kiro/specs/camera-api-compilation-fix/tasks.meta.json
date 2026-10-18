@@ -1,0 +1,75 @@
+{
+  "pbtResults": {
+    "1. Write bug condition exploration test": {
+      "status": "passed",
+      "failingExample": "CI Build Compilation Errors (5 counterexamples found):\n\n1. FrameCaptureManager.kt:32:66 - Unresolved reference 'ImageCaptureException'\n   Code: `override fun onError(exception: ImageCapture.ImageCaptureException)`\n   \n2. FrameCaptureManager.kt:26-32 - Class not abstract and 'onError' overrides nothing\n   Cascading effect from incorrect exception type path\n   \n3. FrameCaptureManager.kt:34:95 - Unresolved reference 'message'\n   Code: `\"Capture error: ${exception.message}\"`\n   Cascading effect from incorrect exception type\n   \n4. CameraManager.kt:250:39 - Unresolved reference 'minZoom'\n   Code: `val minZoom = (zoomState?.minZoom?.toFloat() ?: 1.0f)`\n   \n5. CameraManager.kt:251:39 - Unresolved reference 'maxZoom'\n   Code: `val maxZoom = (zoomState?.maxZoom?.toFloat() ?: zoomRatio)`\n\nAll errors confirm hypothesized root causes: incorrect CameraX API references prevent compilation.",
+      "lastRunTimestamp": 1792314272545
+    }
+  },
+  "executionHistory": {
+    "1. Write bug condition exploration test": [
+      {
+        "executionId": "8da29bdb-a900-4e74-a453-694583a5809d",
+        "chatSessionId": "sess_fe444570-3f38-4fa3-89da-0bb8b632c3b4",
+        "timestamp": 1792314112896
+      },
+      {
+        "executionId": "8da29bdb-a900-4e74-a453-694583a5809d",
+        "chatSessionId": "sess_fe444570-3f38-4fa3-89da-0bb8b632c3b4",
+        "timestamp": 1792314123927
+      },
+      {
+        "executionId": "8da29bdb-a900-4e74-a453-694583a5809d",
+        "chatSessionId": "sess_fe444570-3f38-4fa3-89da-0bb8b632c3b4",
+        "timestamp": 1792314290510
+      }
+    ],
+    "2. Write preservation property tests (BEFORE implementing fix)": [
+      {
+        "executionId": "8da29bdb-a900-4e74-a453-694583a5809d",
+        "chatSessionId": "sess_fe444570-3f38-4fa3-89da-0bb8b632c3b4",
+        "timestamp": 1792314113279
+      },
+      {
+        "executionId": "8da29bdb-a900-4e74-a453-694583a5809d",
+        "chatSessionId": "sess_fe444570-3f38-4fa3-89da-0bb8b632c3b4",
+        "timestamp": 1792314295530
+      }
+    ],
+    "3.1 Fix FrameCaptureManager.kt - ImageCaptureException reference": [
+      {
+        "executionId": "8da29bdb-a900-4e74-a453-694583a5809d",
+        "chatSessionId": "sess_fe444570-3f38-4fa3-89da-0bb8b632c3b4",
+        "timestamp": 1792314113888
+      }
+    ],
+    "3.2 Fix CameraManager.kt - ZoomState property access": [
+      {
+        "executionId": "8da29bdb-a900-4e74-a453-694583a5809d",
+        "chatSessionId": "sess_fe444570-3f38-4fa3-89da-0bb8b632c3b4",
+        "timestamp": 1792314114174
+      }
+    ],
+    "3.3 Verify bug condition exploration test now passes": [
+      {
+        "executionId": "8da29bdb-a900-4e74-a453-694583a5809d",
+        "chatSessionId": "sess_fe444570-3f38-4fa3-89da-0bb8b632c3b4",
+        "timestamp": 1792314114350
+      }
+    ],
+    "3.4 Verify preservation tests still pass": [
+      {
+        "executionId": "8da29bdb-a900-4e74-a453-694583a5809d",
+        "chatSessionId": "sess_fe444570-3f38-4fa3-89da-0bb8b632c3b4",
+        "timestamp": 1792314114500
+      }
+    ],
+    "4. Checkpoint - Ensure all tests pass": [
+      {
+        "executionId": "8da29bdb-a900-4e74-a453-694583a5809d",
+        "chatSessionId": "sess_fe444570-3f38-4fa3-89da-0bb8b632c3b4",
+        "timestamp": 1792314114700
+      }
+    ]
+  }
+}
