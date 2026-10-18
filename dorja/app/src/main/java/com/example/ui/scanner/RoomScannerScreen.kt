@@ -32,48 +32,52 @@ fun RoomScannerScreen(
     val currentZoom = vm.currentZoom.collectAsState()
 
     // Initialize managers
-    var continuousCaptureManager by remember { mutableStateOf<ContinuousCaptureManager?>(null) }
     var motionAnalyzer by remember { mutableStateOf<MotionAnalyzer?>(null) }
-    var sweepConfig by remember { mutableStateOf(SweepConfig()) }
+    var sweepConfig by remember { mutableStateOf(SweepConfig(startHeading = 0f)) }
 
     LaunchedEffect(cameraManager, sensorFusion) {
         // Start sensor fusion
         sensorFusion?.start()
+        
+        // Initialize motion analyzer with config
+        val initialHeading = orientation.value.headingDeg
+        sweepConfig = SweepConfig(startHeading = initialHeading)
+        motionAnalyzer = MotionAnalyzer(sweepConfig)
+        
         sensorFusion?.onOrientationUpdate = { newOrientation, _ ->
             vm.updateOrientation(newOrientation)
             
             // Analyze motion
             motionAnalyzer?.let { analyzer ->
                 val analysis = analyzer.analyzeMotion(newOrientation)
-                vm.updateMotionVelocity(analysis.angularVelocity)
+                vm.updateMotionVelocity(analysis.velocity)
                 
                 // Update sweep state based on motion
                 when (sweepState.value) {
                     SweepCaptureState.READY_TO_START -> {
-                        if (analysis.angularVelocity > 5f) {
+                        if (analysis.velocity > 5f) {
                             vm.updateSweepState(SweepCaptureState.SWEEPING_IN_PROGRESS)
-                            continuousCaptureManager?.startContinuousCapture()
+                            // TODO: Start continuous capture once wired
                         }
                     }
                     SweepCaptureState.SWEEPING_IN_PROGRESS -> {
                         // Update progress
-                        val progress = sweepConfig.calculateProgress(newOrientation.heading)
+                        val progress = sweepConfig.calculateProgress(newOrientation.headingDeg)
                         vm.updateSweepProgress(progress)
                         
                         // Pause if motion is too erratic
-                        if (analysis.motionState == MotionState.ERRATIC || 
-                            analysis.motionState == MotionState.STATIONARY) {
+                        if (analysis.state == MotionState.ERRATIC || 
+                            analysis.state == MotionState.STATIONARY) {
                             vm.pauseSweep()
                         }
                         
                         // Complete if reached target angle
                         if (progress >= 1f) {
                             vm.completeSweep()
-                            continuousCaptureManager?.stopCapture()
                         }
                     }
                     SweepCaptureState.PAUSED -> {
-                        if (analysis.motionState == MotionState.SMOOTH) {
+                        if (analysis.state == MotionState.SMOOTH) {
                             vm.resumeSweep()
                         }
                     }
@@ -90,36 +94,10 @@ fun RoomScannerScreen(
                 }
             }
         }
-
-        // Initialize motion analyzer
-        motionAnalyzer = MotionAnalyzer()
-
-        // Initialize continuous capture manager
-        cameraManager?.let { cam ->
-            val config = SweepConfig(
-                sweepAngle = 120f, // Default 120° sweep
-                direction = SweepDirection.LEFT_TO_RIGHT
-            )
-            sweepConfig = config
-            vm.updateSweepDirection(config.direction)
-            
-            continuousCaptureManager = ContinuousCaptureManager(
-                context = context,
-                cameraManager = cam,
-                config = config,
-                onStripCaptured = { strip ->
-                    vm.incrementStripsCaptured()
-                },
-                onError = { error ->
-                    vm.setError(error)
-                }
-            )
-        }
     }
 
     DisposableEffect(Unit) {
         onDispose {
-            continuousCaptureManager?.stopCapture()
             sensorFusion?.stop()
         }
     }

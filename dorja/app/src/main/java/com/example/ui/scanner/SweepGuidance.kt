@@ -51,6 +51,7 @@ fun SweepGuidance(
         SweepCaptureState.READY_TO_START -> when (direction) {
             SweepDirection.LEFT_TO_RIGHT -> "Move phone slowly to the right →"
             SweepDirection.RIGHT_TO_LEFT -> "Move phone slowly to the left ←"
+            SweepDirection.AUTO_DETECT -> "Move phone slowly left or right"
         }
         SweepCaptureState.SWEEPING_IN_PROGRESS -> {
             when {
@@ -100,6 +101,7 @@ fun SweepGuidance(
                 imageVector = when (direction) {
                     SweepDirection.LEFT_TO_RIGHT -> Icons.AutoMirrored.Filled.ArrowForward
                     SweepDirection.RIGHT_TO_LEFT -> Icons.AutoMirrored.Filled.ArrowBack
+                    SweepDirection.AUTO_DETECT -> Icons.AutoMirrored.Filled.ArrowForward
                 },
                 contentDescription = null,
                 tint = progressColor,
@@ -218,6 +220,7 @@ private fun PreviewStripIndicator(
                 val x = when (direction) {
                     SweepDirection.LEFT_TO_RIGHT -> i * stripWidth
                     SweepDirection.RIGHT_TO_LEFT -> size.width - (i + 1) * stripWidth
+                    SweepDirection.AUTO_DETECT -> i * stripWidth
                 }
                 
                 drawRect(

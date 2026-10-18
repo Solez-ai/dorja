@@ -110,7 +110,7 @@ class ContinuousCaptureManager(
         if (diff < -180f) diff += 360f
         
         // Check if we've rotated enough for next strip
-        val absD iff = kotlin.math.abs(diff)
+        val absDiff = kotlin.math.abs(diff)
         return absDiff >= config.stripIntervalDegrees
     }
     
