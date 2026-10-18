@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">দর্জা হোমস্টেশন</string>
+    <string name="scanner_title">রুম স্ক্যানার</string>
+    <string name="capture_button_label">ফ্রেম ক্যাপচার করুন</string>
+    <string name="camera_binding_error">ক্যামেরা বাইন্ডিং ব্যর্থ</string>
+    <string name="retry_button">পুনরায় চেষ্টা করুন</string>
+    <string name="sensor_unavailable">সেন্সর উপলব্ধ নয়</string>
+    <string name="zoom_slider_label">জুম নিয়ন্ত্রণ</string>
+    <string name="alignment_ring_label">সারিবদ্ধতা নির্দেশিকা</string>
+    <string name="frame_count_format">ফ্রেম %d of %d</string>
+    <string name="stitching_in_progress">প্যানোরামা তৈরি করছি...</string>
+    <string name="stitching_complete">স্ক্যান সম্পন্ন!</string>
+    <string name="error_camera_binding">ক্যামেরা অ্যাক্সেস করতে অক্ষম</string>
+    <string name="error_stitching_failed">প্যানোরামা তৈরিতে ব্যর্থ</string>
+</resources>
