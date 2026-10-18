@@ -34,6 +34,7 @@ tasks.register("downloadOpenCvSdk") {
     val zipFile = openCvZip.asFile
     val minZipSize = 300_000_000L // official 4.13.0 zip is ~318MB
     if (!zipFile.exists() || zipFile.length() < minZipSize) {
+      zipFile.parentFile?.mkdirs() // download destination dir may not exist yet
       val sourceUrl = URL(
         "https://github.com/opencv/opencv/releases/download/$openCvSdkVersion/opencv-$openCvSdkVersion-android-sdk.zip"
       )
