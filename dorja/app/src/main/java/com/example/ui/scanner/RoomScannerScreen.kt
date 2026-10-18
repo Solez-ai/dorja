@@ -66,7 +66,7 @@ fun RoomScannerScreen(
                         vm.updateSweepProgress(progress)
                         
                         // Pause if motion is too erratic
-                        if (analysis.state == MotionState.ERRATIC || 
+                        if (analysis.state == MotionState.JERKY || 
                             analysis.state == MotionState.STATIONARY) {
                             vm.pauseSweep()
                         }
@@ -77,7 +77,7 @@ fun RoomScannerScreen(
                         }
                     }
                     SweepCaptureState.PAUSED -> {
-                        if (analysis.state == MotionState.SMOOTH) {
+                        if (analysis.state == MotionState.GOOD) {
                             vm.resumeSweep()
                         }
                     }

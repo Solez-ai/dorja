@@ -106,7 +106,7 @@ Overhaul scanner preview rendering, add AR guidance ring with haptic feedback, i
 
 ### AR Guidance Ring & Capture Flow
 
-- [~] **T1.6 Implement ScanGeometry module for rotation matrix and frame overlap calculations**
+- [ ] **T1.6 Implement ScanGeometry module for rotation matrix and frame overlap calculations**
   - Create `ScanGeometry.kt` with static/companion object functions
   - Implement `quaternionToRotationMatrix(q: Quaternion): FloatArray` — Convert quaternion to 3×3 rotation matrix (9 elements)
   - Implement `calculateFrameOverlap(h1: Float, h2: Float, heading_delta: Float): Float` — Symmetric overlap calculation (0–1 range), verify symmetry property
@@ -123,7 +123,7 @@ Overhaul scanner preview rendering, add AR guidance ring with haptic feedback, i
   - **Correctness Properties:** Property 3 (Frame Overlap Calculation), Property 4 (Stitching Output Validation), Property 7 (Target Generation Invariant)
   - **Notes:** Rotation math is error-prone; use quaternion library if available (e.g., Quaternion from Apache Commons). Add inline documentation for matrix operations.
 
-- [~] **T1.7 Build ARGuidanceRing Composable with color states and animations**
+- [ ] **T1.7 Build ARGuidanceRing Composable with color states and animations**
   - Create `ARGuidanceRing.kt` Composable rendering a filled circle with stroke on Canvas
   - Implement state machine: RED (poor overlap) → YELLOW (align needed) → GREEN (ready to capture)
   - Define visual specs: Diameter 120–180dp proportional to screen size, 3px stroke, 0.3 alpha fill
@@ -141,7 +141,7 @@ Overhaul scanner preview rendering, add AR guidance ring with haptic feedback, i
   - **Requirements:** 2.1–2.6
   - **Notes:** Animations should feel responsive, not sluggish. Use Compose's `animateValueAsState()` for smooth transitions. Test on 90fps devices (high-refresh).
 
-- [~] **T1.8 Implement haptic feedback system with pattern utilities**
+- [ ] **T1.8 Implement haptic feedback system with pattern utilities**
   - Create `HapticFeedback.kt` utility object with pattern functions
   - Implement `hapticSuccess()`: Dual pulse 50ms + 100ms pause + 50ms (SUCCESS pattern)
   - Implement `hapticCapture()`: Single pulse 100ms, medium strength (HEAVY_CLICK on Android 12+, vibrate(100) on earlier)
@@ -157,7 +157,7 @@ Overhaul scanner preview rendering, add AR guidance ring with haptic feedback, i
   - **Requirements:** 2.2, 2.3, 19.1–19.6
   - **Notes:** Haptic library `androidx.compose.foundation.hapticFeedback` can simplify this; use if available.
 
-- [~] **T1.9 Build FramePreviewRail Composable with thumbnail carousel**
+- [ ] **T1.9 Build FramePreviewRail Composable with thumbnail carousel**
   - Create `FramePreviewRail.kt` Composable using LazyRow for horizontal scrolling
   - Display captured frame thumbnails: 80px minimum height, 2px border, rounded 4dp corners
   - Implement auto-scroll: Keep current/latest frame visible in viewport
@@ -174,7 +174,7 @@ Overhaul scanner preview rendering, add AR guidance ring with haptic feedback, i
   - **Requirements:** 1.6, 2.1
   - **Notes:** Thumbnail generation from JPEG cache is I/O intensive; use coroutines to load off main thread. Consider caching BitmapFactory-decoded thumbnails in memory.
 
-- [~] **T1.10 Implement CaptureButton with shutter feedback and state management**
+- [ ] **T1.10 Implement CaptureButton with shutter feedback and state management**
   - Create `CaptureButton.kt` Composable with Material 3 Button or FAB styling
   - Implement capture trigger logic: On click, call `ScannerViewModel.captureFrame()`
   - Add visual feedback: Button scale animation on press (0.95 scale, 100ms)
@@ -194,7 +194,7 @@ Overhaul scanner preview rendering, add AR guidance ring with haptic feedback, i
 
 ### Stitching Pipeline & Error Recovery
 
-- [~] **T1.11 Implement StitchingEngine with timeout handling and memory management**
+- [ ] **T1.11 Implement StitchingEngine with timeout handling and memory management**
   - Create `StitchingEngine.kt` class handling 6–12 frame stitching on background thread
   - Implement frame loading pipeline: Load JPEG frames from cache, decode to Bitmap (background thread)
   - Implement coarse alignment: Use ScanGeometry overlap calculations to determine frame placement
@@ -217,7 +217,7 @@ Overhaul scanner preview rendering, add AR guidance ring with haptic feedback, i
   - **Correctness Properties:** Property 4 (Stitching Output Validation)
   - **Notes:** Stitching is computationally expensive; profile on budget devices (Motorola G20) to establish realistic timeouts. Use Canvas or native graphics library if available.
 
-- [~] **T1.12 Build FrameCaptureManager handling camera binding and frame I/O**
+- [ ] **T1.12 Build FrameCaptureManager handling camera binding and frame I/O**
   - Create `FrameCaptureManager.kt` for CameraX image capture pipeline
   - Implement image capture: `captureImage()` → JPEG format, quality ≥ 95%, save to app cache
   - Implement frame naming: `/cache/scan_<sessionId>_frame_<index>_<timestamp>.jpg`
@@ -233,7 +233,7 @@ Overhaul scanner preview rendering, add AR guidance ring with haptic feedback, i
   - **Requirements:** 3.1, 3.3, 3.8, 14.1–14.4
   - **Notes:** CameraX ImageCapture use case is async; handle callbacks properly. Test on devices with file I/O constraints (USB 2.0 write speed).
 
-- [~] **T1.13 Implement ScannerViewModel state management with Flow/StateFlow**
+- [ ] **T1.13 Implement ScannerViewModel state management with Flow/StateFlow**
   - Create `ScannerViewModel.kt` extending ViewModel, integrating all scanner components
   - Define state flows:
     - `_captureState: MutableStateFlow<CaptureState>`
@@ -258,7 +258,7 @@ Overhaul scanner preview rendering, add AR guidance ring with haptic feedback, i
   - **Requirements:** All scanner requirements (1–6, 13)
   - **Notes:** Use `viewModelScope.launch()` for all async operations. Test state recovery on app restart.
 
-- [~] **T1.14 Build error recovery UI components (CameraBindingError, StitchingError, etc.)**
+- [ ] **T1.14 Build error recovery UI components (CameraBindingError, StitchingError, etc.)**
   - Create `ErrorRecoveryUI.kt` with Composables for each error type:
     - `CameraBindingErrorScreen()`: "Camera unavailable" with retry/settings/back buttons
     - `StitchingErrorScreen()`: "Stitching failed" with retry/recapture buttons, estimated time
@@ -277,7 +277,7 @@ Overhaul scanner preview rendering, add AR guidance ring with haptic feedback, i
   - **Requirements:** 14.1–14.4, 20.1–20.5
   - **Notes:** Error messages should be user-friendly, not technical jargon. Test on actual failure scenarios.
 
-- [~] **T1.15 Integrate all scanner components into RoomScannerScreen Composable**
+- [ ] **T1.15 Integrate all scanner components into RoomScannerScreen Composable**
   - Create `RoomScannerScreen.kt` main screen Composable combining all components:
     - CameraPreview (T1.3) as background/fullscreen
     - ARGuidanceOverlay (T1.7) centered on preview
@@ -308,7 +308,7 @@ Complete AI assistant graceful disable, financial calculator, handover passport,
 
 ### AI Assistant & Settings
 
-- [~] **T2.1 Implement graceful AI feature flag with Cactus SDK try-catch loading**
+- [ ] **T2.1 Implement graceful AI feature flag with Cactus SDK try-catch loading**
   - Create `AIAssistant.kt` wrapper class with safe class loading
   - Wrap Cactus SDK class load in try-catch: If available, load and enable; if unavailable (commented-out or removed), set `isAvailable = false`
   - Implement feature flag logic: Check `isAvailable` before calling AI model
@@ -324,7 +324,7 @@ Complete AI assistant graceful disable, financial calculator, handover passport,
   - **Correctness Properties:** Property 9 (AI Feature Graceful Disable)
   - **Notes:** Don't crash if SDK is missing; this is a critical requirement for Rome.
 
-- [~] **T2.2 Update build.gradle.kts and remove Android 7–10 support**
+- [ ] **T2.2 Update build.gradle.kts and remove Android 7–10 support**
   - Update `minSdk = 30` (Android 11) in app/build.gradle.kts
   - Verify `targetSdk = 36` (Android 14)
   - Remove any Android 7–10 compatibility shims/fallbacks from codebase
@@ -342,7 +342,7 @@ Complete AI assistant graceful disable, financial calculator, handover passport,
 
 ### Financial Calculator
 
-- [~] **T2.3 Implement FinancialCalculator business logic with real-time amortization**
+- [ ] **T2.3 Implement FinancialCalculator business logic with real-time amortization**
   - Create `FinancialCalculator.kt` class with computation functions
   - Implement `calculateMonthlyPayment(principal, monthlyRate, numPayments)`: Standard amortization formula P * [r(1+r)^n] / [(1+r)^n - 1]
   - Implement `calculateTotalInterest(monthlyPayment, numPayments, principal): Double`
@@ -359,7 +359,7 @@ Complete AI assistant graceful disable, financial calculator, handover passport,
   - **Correctness Properties:** Property 10 (Financial Calculator Correctness)
   - **Notes:** Use IEEE 754 Double; acceptable precision loss for financial app. Verify against online calculators.
 
-- [~] **T2.4 Build CalculatorScreen Composable with input fields and real-time results**
+- [ ] **T2.4 Build CalculatorScreen Composable with input fields and real-time results**
   - Create `CalculatorScreen.kt` Composable with Material 3 TextField components
   - Input fields: Property Price, Down Payment, Interest Rate, Loan Term (years), Monthly Rent
   - Implement real-time computation: On each text change, call `FinancialCalculator`, update results
@@ -379,7 +379,7 @@ Complete AI assistant graceful disable, financial calculator, handover passport,
   - **Requirements:** 8.1–8.8
   - **Notes:** Use Material 3 `TextField` for styling. Implement calculation history with Room DAO. Chart can be simple (text table or bar chart via third-party library).
 
-- [~] **T2.5 Add CalculatorViewModel and Room DAO for calculation history**
+- [ ] **T2.5 Add CalculatorViewModel and Room DAO for calculation history**
   - Create `CalculatorViewModel.kt` extending ViewModel
   - Define state flows: `_inputs`, `_results`, `_history`, `_selectedCalculation`
   - Implement `saveCalculation()`: Create `FinancialCalculation` entity, insert via DAO
@@ -398,7 +398,7 @@ Complete AI assistant graceful disable, financial calculator, handover passport,
 
 ### Handover Passport
 
-- [~] **T2.6 Design and implement HandoverPassport data models with encryption**
+- [ ] **T2.6 Design and implement HandoverPassport data models with encryption**
   - Create `HandoverPassport.kt` Room entity: id, propertyId, sellerId, buyerId, createdAt, status
   - Create `Promise.kt` Room entity: id, passportId, description, targetDate, status (PENDING/IN_PROGRESS/COMPLETED/OVERDUE/FAILED), createdAt
   - Create `VaultDocument.kt` Room entity: id, passportId, encryptedBytes, sha256Hash, uploadedBy, uploadedAt
@@ -414,7 +414,7 @@ Complete AI assistant graceful disable, financial calculator, handover passport,
   - **Correctness Properties:** Property 11 (Handover Passport Immutability)
   - **Notes:** Use `AndroidKeyStore` for secure key management. Test hash verification after document tampering simulation.
 
-- [~] **T2.7 Implement PassportManager business logic for promise tracking and document vault**
+- [ ] **T2.7 Implement PassportManager business logic for promise tracking and document vault**
   - Create `PassportManager.kt` class
   - Implement `createPassport(propertyId, sellerId, buyerId)`: Generate UUID, create entity, insert via DAO
   - Implement `addPromise(passportId, description, targetDate)`: Create Promise entity, insert
@@ -431,7 +431,7 @@ Complete AI assistant graceful disable, financial calculator, handover passport,
   - **Requirements:** 9.1–9.9
   - **Notes:** PDF export is complex; consider using a third-party library. Hash verification is critical for tampering detection.
 
-- [~] **T2.8 Build HandoverPassportScreen Composable with promises and document display**
+- [ ] **T2.8 Build HandoverPassportScreen Composable with promises and document display**
   - Create `HandoverPassportScreen.kt` Composable
   - Display passport header: Property ID, buyer/seller info, created date
   - Display promises section: Scrollable list of promises with status badges (PENDING=yellow, COMPLETED=green, OVERDUE=red)
@@ -454,7 +454,7 @@ Complete AI assistant graceful disable, financial calculator, handover passport,
 
 ### Chat System
 
-- [~] **T2.9 Design and implement ChatMessage data models and rich text support**
+- [ ] **T2.9 Design and implement ChatMessage data models and rich text support**
   - Create `ChatMessage.kt` Room entity: id, threadId, senderId, content, richTextFormat (Markdown), mediaAttachments (list of file IDs), deliveryStatus, createdAt, seenAt
   - Create `ChatAttachment.kt` Room entity: id, messageId, filePath, mimeType, fileSize, uploadedAt
   - Create `ChatThread.kt` Room entity: id, property Id, sellerId, buyerId, createdAt, lastMessageAt
@@ -469,7 +469,7 @@ Complete AI assistant graceful disable, financial calculator, handover passport,
   - **Requirements:** 10.2, 10.5, 10.8
   - **Notes:** Use Markwon or similar library for Markdown rendering. Implement proper entity relations with @Relation annotations.
 
-- [~] **T2.10 Implement ChatService with message persistence and delivery tracking**
+- [ ] **T2.10 Implement ChatService with message persistence and delivery tracking**
   - Create `ChatService.kt` class
   - Implement `sendMessage(threadId, senderId, content, attachments)`: Create message with SENDING status, persist to DB, simulate send (mark as SENT after 1s, SEEN after 5s for demo)
   - Implement `updateDeliveryStatus(messageId, status)`: Update message status, emit notification
@@ -485,7 +485,7 @@ Complete AI assistant graceful disable, financial calculator, handover passport,
   - **Correctness Properties:** Property 12 (Chat Message Delivery Status)
   - **Notes:** For demo, implement local-only chat (no backend). Real implementation would sync with backend API.
 
-- [~] **T2.11 Build ChatScreen Composable with message list and input field**
+- [ ] **T2.11 Build ChatScreen Composable with message list and input field**
   - Create `ChatScreen.kt` Composable
   - Display message history: Scrollable column of messages with sender, timestamp, content (rendered Markdown), status icon
   - Implement message bubbles: Sent messages (right-aligned, blue), received messages (left-aligned, gray)
@@ -504,7 +504,7 @@ Complete AI assistant graceful disable, financial calculator, handover passport,
   - **Requirements:** 10.1–10.8
   - **Notes:** Use `LazyColumn` for efficient message list scrolling. Implement auto-scroll to latest message.
 
-- [~] **T2.12 Add ChatViewModel and notification integration**
+- [ ] **T2.12 Add ChatViewModel and notification integration**
   - Create `ChatViewModel.kt` extending ViewModel
   - Define state flows: `_messages`, `_threads`, `_userIsTyping`, `_newMessageNotification`
   - Implement `sendMessage()`, `attachImage()`, `setUserTyping()`
@@ -522,7 +522,7 @@ Complete AI assistant graceful disable, financial calculator, handover passport,
 
 ### Relocation Mode
 
-- [~] **T2.13 Create relocation data models and country registry**
+- [ ] **T2.13 Create relocation data models and country registry**
   - Create `RelocationCountry.kt` data class: name, code (ISO 3166), visaTypes, propertyRegulations, taxInfo, marketData, languageGuides
   - Create `VisaType.kt` data class: type, duration, requirements, restrictions, restrictions_for_foreigners
   - Create `MarketData.kt` data class: medianPrice, priceTrends (list), avgRentalYield, popularAreas (list)
@@ -538,7 +538,7 @@ Complete AI assistant graceful disable, financial calculator, handover passport,
   - **Requirements:** 11.1–11.7
   - **Notes:** Start with mock data; real app would sync from backend API. Include links to official government resources.
 
-- [~] **T2.14 Implement RelocationMode toggle and country selector UI**
+- [ ] **T2.14 Implement RelocationMode toggle and country selector UI**
   - Create `RelocationModeScreen.kt` Composable
   - Add toggle in Settings: "Enable Relocation Mode" (default OFF)
   - Display country selector: Dropdown/list of supported countries
@@ -569,7 +569,7 @@ Implement comprehensive unit and integration tests, verify device compatibility,
 
 ### Unit Tests for Scanner & Geometry
 
-- [~] **T3.1 Write property-based tests for ScanGeometry using fast-check**
+- [ ] **T3.1 Write property-based tests for ScanGeometry using fast-check**
   - Create `app/src/test/java/com/example/scanner/ScanGeometryPropertyTest.kt`
   - Test `quaternionToRotationMatrix()`: Generate 1000+ random quaternions, verify output is valid 3×3 orthogonal matrix (det = 1, rows/cols orthogonal)
   - Test `calculateFrameOverlap()`: Generate 1000+ random heading pairs, verify symmetry property (overlap(h1, h2) == overlap(h2, h1)), range ∈ [0, 1]
@@ -587,7 +587,7 @@ Implement comprehensive unit and integration tests, verify device compatibility,
   - **Correctness Properties:** Property 1–7 (Preview, Zoom, Overlap, Output, Sensor fusion, Fallback, Target)
   - **Notes:** Install fast-check library in build.gradle.kts. Document Arbitrary implementations for future test additions.
 
-- [~] **T3.2 Write unit tests for FinancialCalculator and SensorFusion**
+- [ ] **T3.2 Write unit tests for FinancialCalculator and SensorFusion**
   - Create `app/src/test/java/com/example/scanner/FinancialCalculatorTest.kt`
   - Test amortization formula: Fixed scenarios (standard mortgage: $300k, 20% down, 6% rate, 30 years; verify monthly payment ≈ $1,079)
   - Test edge cases: Zero interest (payment = principal / months), large principal (>$1M), short term (5 years)
@@ -605,7 +605,7 @@ Implement comprehensive unit and integration tests, verify device compatibility,
   - **Correctness Properties:** Property 5, 6, 10
   - **Notes:** Use mock objects for SensorManager. Document test scenarios and expected outcomes.
 
-- [~] **T3.3 Write integration tests for Scanner flow on Firebase Test Lab**
+- [ ] **T3.3 Write integration tests for Scanner flow on Firebase Test Lab**
   - Create `app/src/androidTest/java/com/example/scanner/ScannerFlowIntegrationTest.kt`
   - Test scenario 1: Camera binding → preview starts → frame captured → frame cached
   - Test scenario 2: 12 frames captured → stitching begins → progress updates → panorama generated
@@ -624,7 +624,7 @@ Implement comprehensive unit and integration tests, verify device compatibility,
   - **Requirements:** 16.1–16.5
   - **Notes:** Firebase Test Lab requires GCP credentials; set up in GitHub Actions secrets. Document test matrix in CI config.
 
-- [~] **T3.4 Write accessibility tests (TalkBack, contrast, touch targets)**
+- [ ] **T3.4 Write accessibility tests (TalkBack, contrast, touch targets)**
   - Create accessibility test file: `app/src/androidTest/java/com/example/accessibility/AccessibilityTest.kt`
   - Test all touch targets: Measure all interactive elements (buttons, sliders, text fields), verify >= 48×48 dp
   - Test contrast ratios: Sample colors from UI, compute contrast ratios, verify >= 4.5:1 for normal text, >= 3:1 for large
@@ -644,7 +644,7 @@ Implement comprehensive unit and integration tests, verify device compatibility,
 
 ### Device Compatibility Testing
 
-- [~] **T3.5 Execute device compatibility testing on reference matrix**
+- [ ] **T3.5 Execute device compatibility testing on reference matrix**
   - Test on 5+ reference devices: Pixel 5 (Android 14), Samsung S21 (Android 13), OnePlus 9 (Android 12), Xiaomi Mi 11 (Android 12, no gyro), Motorola G20 (Android 11, no gyro)
   - For each device, test:
     - Camera preview: Aspect ratio correct, unzoomed display, no lag
@@ -663,7 +663,7 @@ Implement comprehensive unit and integration tests, verify device compatibility,
   - **Requirements:** 17.1–17.4
   - **Notes:** Borrow devices from community if needed. Document device screen sizes, camera specs, sensor config for judges.
 
-- [~] **T3.6 Document device compatibility matrix and create .md file**
+- [ ] **T3.6 Document device compatibility matrix and create .md file**
   - Create `.kiro/device-compat-matrix.md` with table format
   - Columns: Device model, Android version, Screen size, Camera zoom range, Gyroscope, Test result, Known issues, Tested date
   - Rows: Include all 5+ reference devices
@@ -682,7 +682,7 @@ Implement comprehensive unit and integration tests, verify device compatibility,
 
 ### Localization
 
-- [~] **T3.7 Implement Bangla and English string resources**
+- [ ] **T3.7 Implement Bangla and English string resources**
   - Create `res/values/strings.xml` (English) and `res/values-bn/strings.xml` (Bangla)
   - Extract all user-facing strings from Composables: UI labels, button texts, error messages, guidance text
   - Translate strings to Bangla (hire native speaker for accuracy)
@@ -702,7 +702,7 @@ Implement comprehensive unit and integration tests, verify device compatibility,
 
 ### Documentation
 
-- [~] **T3.8 Create Rome submission readiness checklist**
+- [ ] **T3.8 Create Rome submission readiness checklist**
   - Create `.kiro/rome-submission-checklist.md` with sections:
     - **Code Quality**: All requirements implemented (25/25), no TODOs, no crashes in manual QA
     - **Testing**: Unit tests >= 80% coverage, integration tests pass on Firebase Test Lab, device matrix tested
@@ -724,7 +724,7 @@ Implement comprehensive unit and integration tests, verify device compatibility,
   - **Requirements:** 23.1–23.3
   - **Notes:** This is the master gate before Rome; must be 100% complete.
 
-- [~] **T3.9 Create Privacy & Security audit report**
+- [ ] **T3.9 Create Privacy & Security audit report**
   - Create `.kiro/privacy-security-audit.md`
   - Section 1: Data at Rest
     - Verify all sensitive data encrypted via Android KeyStore (panoramas, documents, chat, promises)
@@ -754,7 +754,7 @@ Implement comprehensive unit and integration tests, verify device compatibility,
   - **Requirements:** 25.1–25.5
   - **Notes:** Privacy is critical for competition; be thorough.
 
-- [~] **T3.10 Update README and prepare release notes for Rome**
+- [ ] **T3.10 Update README and prepare release notes for Rome**
   - Update `README.md` main sections:
     - Feature overview: Scanner, AI assistant, calculator, handover passport, chat, relocation
     - Requirements: Android 11+, camera, internet (for some features)
@@ -790,7 +790,7 @@ Execute final QA pass, performance profiling, and prepare submission to Rome wit
 
 ### Final QA & Performance
 
-- [~] **T4.1 Execute comprehensive final QA test plan**
+- [ ] **T4.1 Execute comprehensive final QA test plan**
   - Create `QA_TEST_PLAN.md` in project root
   - Test on 3 reference devices (Pixel 5, Samsung S21, OnePlus 9) for 30 min continuous use
   - Test scenarios:
@@ -813,7 +813,7 @@ Execute final QA pass, performance profiling, and prepare submission to Rome wit
   - **Requirements:** 24.1–24.4
   - **Notes:** Document environment: Device OS version, screen brightness, WiFi/cellular signal strength. Retest any failing scenarios before submission.
 
-- [~] **T4.2 Measure and optimize performance metrics**
+- [ ] **T4.2 Measure and optimize performance metrics**
   - Cold start time: Measure from tap app icon to ScannerScreen preview ready (<3s target)
     - Use `adb shell am start-profiling` or Android Profiler
     - Optimize if needed: Lazy-load features, reduce init overhead
@@ -840,7 +840,7 @@ Execute final QA pass, performance profiling, and prepare submission to Rome wit
   - **Requirements:** 24.2–24.4
   - **Notes:** Performance profiling is time-consuming; prioritize high-impact optimizations (stitching, startup).
 
-- [~] **T4.3 Build release APK and upload to GitHub Releases**
+- [ ] **T4.3 Build release APK and upload to GitHub Releases**
   - Configure release build: Update version code/name (e.g., 1.0.0-rome)
   - Configure signing: Add keystore (or use CI signing)
   - Build release APK via CI: Push tag to main branch, GitHub Actions builds + signs APK
@@ -856,7 +856,7 @@ Execute final QA pass, performance profiling, and prepare submission to Rome wit
   - **Requirements:** 12.1–12.7, 23.2, 24.1
   - **Notes:** Ensure signing key is secure; don't commit to repo. GitHub Actions should handle signing in secrets.
 
-- [~] **T4.4 Verify CI/CD pipeline and gate checks**
+- [ ] **T4.4 Verify CI/CD pipeline and gate checks**
   - Verify GitHub Actions workflows execute on every push:
     - Build workflow: `gradle build`, runs on Ubuntu latest with Android 14 emulator
     - Test workflow: `gradle test`, runs unit tests, generates coverage report
@@ -877,7 +877,7 @@ Execute final QA pass, performance profiling, and prepare submission to Rome wit
 
 ### Pre-Submission Gate
 
-- [~] **T4.5 Complete and verify Rome submission readiness checklist**
+- [ ] **T4.5 Complete and verify Rome submission readiness checklist**
   - Go through `.kiro/rome-submission-checklist.md` item by item
   - Verify all requirements implemented: 25/25 requirements have implementation code, unit tests, manual testing
   - Verify all features complete: Scanner ✓, AI (graceful) ✓, Calculator ✓, Passport ✓, Chat ✓, Relocation ✓
@@ -897,7 +897,7 @@ Execute final QA pass, performance profiling, and prepare submission to Rome wit
   - **Requirements:** 23.1–23.3
   - **Notes:** This is the go/no-go gate; if any item fails, fix before Rome submission.
 
-- [~] **T4.6 Prepare submission package and technical documentation for judges**
+- [ ] **T4.6 Prepare submission package and technical documentation for judges**
   - Create submission folder: `submission-rome-2026/`
   - Include:
     - Release APK (from GitHub Releases)
@@ -919,7 +919,7 @@ Execute final QA pass, performance profiling, and prepare submission to Rome wit
   - **Requirements:** 23.1–23.3
   - **Notes:** Professional presentation matters for judges; make documentation clear and accessible.
 
-- [~] **T4.7 Communicate Rome submission to organizers and team**
+- [ ] **T4.7 Communicate Rome submission to organizers and team**
   - Send submission package to Rome organizers (FIRSO 2026 committee)
   - Include APK download link, GitHub repo link, documentation
   - Provide technical support contact info: Email, phone (if available)
