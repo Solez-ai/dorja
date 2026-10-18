@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.camera.core.ImageCapture
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.lifecycle.LifecycleOwner
+import java.util.concurrent.Executors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -21,7 +22,7 @@ class FrameCaptureManager(
                 ImageCapture.OutputFileOptions.Builder(
                     context.cacheDir
                 ).build(),
-                Dispatchers.IO.asExecutor(),
+                Executors.newSingleThreadExecutor(),
                 object : ImageCapture.OnImageSavedCallback {
                     override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
                         val path = outputFileResults.savedUri?.path ?: return

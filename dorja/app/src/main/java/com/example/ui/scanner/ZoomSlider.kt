@@ -19,6 +19,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -155,7 +157,6 @@ fun ZoomSlider(
                     }
             )
         } else {
-            // Active slider
             Slider(
                 value = currentZoom,
                 onValueChange = { newValue ->
@@ -181,8 +182,7 @@ fun ZoomSlider(
                     }
                 },
                 valueRange = minZoom..maxZoom,
-                steps =
-                    ((maxZoom - minZoom) * 10).toInt(), // 0.1x step increments
+                steps = ((maxZoom - minZoom) * 10).toInt(),
                 modifier =
                     Modifier
                         .fillMaxWidth()
@@ -192,13 +192,7 @@ fun ZoomSlider(
                                     "range ${String.format("%.1fx", minZoom)} to ${String.format("%.1fx", maxZoom)}, " +
                                     "step size 0.1x. Adjust slider left to zoom out, right to zoom in"
                         },
-                colors = SliderDefaults.colors(),
-                thumb = {
-                    // Use Material 3 default slider thumb
-                },
-                track = {
-                    // Use Material 3 default slider track
-                }
+                colors = SliderDefaults.colors()
             )
 
             // Min/max zoom labels
