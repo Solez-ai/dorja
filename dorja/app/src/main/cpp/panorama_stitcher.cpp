@@ -93,17 +93,18 @@ Java_com_example_scanner_OpenCvPanoramaStitcher_nativeStitch(
         return nullptr;
     }
 
-    cv::Stitcher stitcher = cv::Stitcher::create(cv::Stitcher::PANORAMA);
+    // create() returns Ptr<Stitcher> — hold it and call through the pointer.
+    cv::Ptr<cv::Stitcher> stitcher = cv::Stitcher::create(cv::Stitcher::PANORAMA);
     // Same settings block as the original JNI (values -1 = internal defaults).
-    stitcher.setRegistrationResol(-1);
-    stitcher.setSeamEstimationResol(-1);
-    stitcher.setCompositingResol(-1);
-    stitcher.setPanoConfidenceThresh(-1);
-    stitcher.setWaveCorrection(true);
-    stitcher.setWaveCorrectKind(cv::detail::WAVE_CORRECT_HORIZ);
+    stitcher->setRegistrationResol(-1);
+    stitcher->setSeamEstimationResol(-1);
+    stitcher->setCompositingResol(-1);
+    stitcher->setPanoConfidenceThresh(-1);
+    stitcher->setWaveCorrection(true);
+    stitcher->setWaveCorrectKind(cv::detail::WAVE_CORRECT_HORIZ);
 
     cv::Mat result;
-    cv::Stitcher::Status status = stitcher.stitch(imgVec, result);
+    cv::Stitcher::Status status = stitcher->stitch(imgVec, result);
     if (status != cv::Stitcher::OK) {
         LOGE("Stitcher failed with status %d", static_cast<int>(status));
         return nullptr;
