@@ -120,6 +120,36 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: gradle assembleRelease --no-daemon --stacktrace
 
+      - name: Replace APKs in the latest release
+        # Keep the release a rolling snapshot: every push to main overwrites
+        # the per-ABI APKs, so the website's download links always point at
+        # the newest files under stable names.
+        if: success()
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Latest Build
+          make_latest: true
+          files: dorja/app/build/outputs/apk/debug/*-debug.apk
+
+      - name: Remove stale universal APKs from the latest release
+        # app-debug.apk / app-release.apk are pre-ABI-split legacy assets;
+        # nothing on a normal run overwrites them, so delete them explicitly
+        # whenever the release exists.
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          asset_ids=$(gh api "repos/${{ github.repository }}/releases/tags/latest" --jq '.assets[] | select(.name == "app-debug.apk" or .name == "app-release.apk") | .id' || true)
+          if [ -n "$asset_ids" ]; then
+            for id in $asset_ids; do
+              gh api -X DELETE "repos/${{ github.repository }}/releases/assets/$id"
+              echo "Deleted stale release asset $id"
+            done
+          else
+            echo "No stale universal APKs on the latest release."
+          fi
+
       - name: Upload debug APK artifact
         if: success()
         uses: actions/upload-artifact@v4
@@ -137,20 +167,11 @@ jobs:
           path: dorja/app/build/outputs/apk/release/*.apk
           retention-days: 14
 
-      - name: Create GitHub Release
+      - name: Publish release APKs to the latest release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: latest
           name: Latest Build
           make_latest: true
-          files: |
-            dorja/app/build/outputs/apk/debug/*-debug.apk
-            dorja/app/build/outputs/apk/release/*.apk
-          body: |
-            Latest development build from main.
-
-            Per-ABI APKs (keep installs small):
-            - app-arm64-v8a-debug.apk — modern phones (install this one)
-            - app-armeabi-v7a-debug.apk — older 32-bit phones
-
-            The debug APKs work without signing keys.
+          files: dorja/app/build/outputs/apk/release/*.apk
+          body: "Latest development build from main — streamed to the Dorja website's download section."

@@ -24,13 +24,13 @@ import {
   X,
 } from "lucide-react";
 import { publicUrl } from "@/lib/assets";
+import ApkDownloadSection from "@/components/ApkDownloadSection";
 
 const logo = publicUrl("dorja-assets/dorja-logo.png");
 const orbitMark = publicUrl("dorja-assets/dorja-orbit-mark.png");
 const heroEditorial = publicUrl("dorja-assets/hero-editorial.jpg");
 const featureCollage = publicUrl("dorja-assets/feature-collage.jpg");
 const detailSurface = publicUrl("dorja-assets/detail-surface.jpg");
-const alphaBetaUrl = "https://github.com/Solez-ai/dorja/releases/download/latest/app-release.apk";
 const screens = {
   welcome: publicUrl("dorja-assets/welcome.jpg"),
   listing: publicUrl("dorja-assets/listing.png"),
@@ -196,6 +196,7 @@ export default function Home() {
         </a>
 
         <nav className="desktop-nav" aria-label="Main navigation">
+          <a href="#download">Get the app</a>
           <a href="#why-dorja">Why Dorja</a>
           <a href="#features">Trust system</a>
           <a href="#experience">App experience</a>
@@ -203,9 +204,9 @@ export default function Home() {
           <a href="#journey">How it works</a>
         </nav>
 
-        <a className="header-cta" href={alphaBetaUrl} target="_blank" rel="noopener noreferrer">
-          Try the alpha / beta <ArrowUpRightIcon />
-        </a>
+          <a href="#download" className="header-cta">
+            Get the app <ArrowUpRightIcon />
+          </a>
 
         <button
           className="menu-trigger"
@@ -223,7 +224,7 @@ export default function Home() {
             <a href="#experience" onClick={closeMenu}>App experience</a>
             <a href="#whats-new" onClick={closeMenu}>What's new</a>
             <a href="#journey" onClick={closeMenu}>How it works</a>
-            <a className="mobile-nav-cta" href={alphaBetaUrl} target="_blank" rel="noopener noreferrer" onClick={closeMenu}>Try the alpha / beta <ArrowRight size={17} /></a>
+            <a className="mobile-nav-cta" href="#download" onClick={closeMenu}>Get the app <ArrowRight size={17} /></a>
           </nav>
         )}
       </header>
@@ -251,7 +252,7 @@ export default function Home() {
             </p>
             <div className="hero-actions">
               <a className="button-primary" href="#why-dorja">See what Dorja solves <ArrowDownRight size={19} /></a>
-              <a className="text-action" href={alphaBetaUrl} target="_blank" rel="noopener noreferrer">Try the alpha / beta <ArrowRight size={17} /></a>
+              <a className="text-action" href="#download">Try the alpha / beta <ArrowRight size={17} /></a>
             </div>
           </div>
 
@@ -389,7 +390,7 @@ export default function Home() {
                 verification and language coverage from the ground up.
               </p>
             </div>
-            <a className="whats-new-cta" href={alphaBetaUrl} target="_blank" rel="noopener noreferrer">
+            <a className="whats-new-cta" href="#download">
               Get the latest build <ArrowRight size={17} />
             </a>
           </div>
@@ -412,9 +413,11 @@ export default function Home() {
           </div>
         </section>
 
+        <ApkDownloadSection revealClass={revealClass} />
+
         <section className={`journey-section section-pad ${revealClass("journey")}`} data-reveal="journey" id="journey" aria-labelledby="journey-heading">
           <div className="journey-lead">
-            <div className="section-rail"><span>05</span><span>THE JOURNEY</span></div>
+            <div className="section-rail"><span>06</span><span>THE JOURNEY</span></div>
             <p className="section-kicker">From search to keys</p>
             <h2 id="journey-heading">One journey.<br /><em>Fewer blind spots.</em></h2>
             <button
@@ -444,7 +447,7 @@ export default function Home() {
             <p className="section-kicker">Property trust, made more human</p>
             <h2 id="closing-heading">A door should open<br />with <em>confidence.</em></h2>
             <div className="closing-actions">
-              <a href={alphaBetaUrl} className="button-light" target="_blank" rel="noopener noreferrer">Try the alpha / beta <ArrowRight size={19} /></a>
+              <a href="#download" className="button-light">Try the alpha / beta <ArrowRight size={19} /></a>
               <a href="#top" className="closing-text-action">Back to top <ArrowRight size={17} /></a>
             </div>
           </div>

@@ -324,3 +324,52 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--ember); outline
 input, textarea, [contenteditable="true"] { cursor: text; }
 @media (pointer: coarse) { .site-shell a, .site-shell button { cursor: pointer; } }
 /* End cursor pack adaptation. */
+
+/* APK download section: the release stream step — dark ink field, per-arch cards borrowing the what's-new grid rhythm. */
+.apk-download-section { background: var(--ink-deep); color: #f8f5ef; }
+.apk-download-section .section-rail { color: #83d7d0; }
+.apk-download-section .section-rail span:first-child { color: #ed9e71; }
+.apk-download-head h2 { margin: 0 0 19px; font: 800 clamp(41px, 5vw, 70px)/1.04 var(--font-display); letter-spacing: -.06em; }
+.apk-download-sub { max-width: 520px; margin: 0; color: #b9c9d4; font-size: 14px; line-height: 1.75; }
+.apk-download-meta { display: inline-flex; align-items: center; gap: 8px; margin-top: 18px; padding: 9px 12px; border: 1px solid rgba(255,255,255,.2); color: #dfe8ee; font: 600 10px/1 var(--font-display); letter-spacing: .12em; text-transform: uppercase; }
+.apk-download-group { margin-top: 64px; }
+.apk-download-group-head { display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; margin-bottom: 24px; }
+.apk-download-badge { padding: 6px 9px; border: 1px solid rgba(237,158,111,.55); color: #ed9e71; font: 800 9px/1 var(--font-display); letter-spacing: .16em; }
+.apk-download-group-head h3 { margin: 0; font: 700 20px/1 var(--font-display); letter-spacing: -.03em; }
+.apk-download-group-head p { margin: 0; color: #9db3c0; font-size: 12px; }
+.apk-download-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 0; border-top: 1px solid rgba(255,255,255,.2); border-left: 1px solid rgba(255,255,255,.2); }
+.apk-card { display: flex; flex-direction: column; gap: 7px; padding: 27px 29px 24px; border-right: 1px solid rgba(255,255,255,.2); border-bottom: 1px solid rgba(255,255,255,.2); color: inherit; text-decoration: none; transition: background .22s ease, transform .22s cubic-bezier(.23,1,.32,1); }
+.apk-card:hover { background: rgba(29,163,162,.14); transform: translateY(-3px); }
+.apk-card--recommended { background: rgba(29,163,162,.1); box-shadow: inset 0 0 0 1px rgba(128,215,208,.45); }
+.apk-card-top { display: flex; justify-content: space-between; align-items: center; color: #7ad2cd; margin-bottom: 12px; gap: 10px; }
+.apk-card-flag { padding: 5px 8px; border: 1px solid rgba(237,158,111,.45); color: #ed9e71; font: 800 8px/1 var(--font-display); letter-spacing: .16em; white-space: nowrap; }
+.apk-card-flag--you { display: inline-flex; align-items: center; gap: 6px; background: var(--ember); border-color: transparent; color: #fff; }
+.apk-card-arch { display: inline-flex; align-items: center; gap: 8px; color: #9fe4dd; font: 800 12px/1 monospace; letter-spacing: .1em; text-transform: uppercase; }
+.apk-card-name { color: #fff; font: 700 17px/1.2 var(--font-display); letter-spacing: -.02em; overflow-wrap: anywhere; }
+.apk-card-abi-label { color: #b9c9d4; font-size: 12px; }
+.apk-card-facts { display: grid; gap: 6px; margin: 10px 0 6px; }
+.apk-card-facts > div { display: flex; justify-content: space-between; gap: 14px; }
+.apk-card-facts dt { color: #7d92a0; font: 600 9px/1.4 var(--font-display); letter-spacing: .14em; text-transform: uppercase; }
+.apk-card-facts dd { margin: 0; color: #dfe8ee; font: 600 11px/1.4 monospace; overflow: hidden; text-overflow: ellipsis; }
+.apk-card-download { display: inline-flex; align-items: center; gap: 9px; margin-top: auto; align-self: flex-start; padding: 13px 16px; background: var(--ember); color: #fff; font: 800 11px/1 var(--font-display); letter-spacing: .04em; transition: background .18s ease; }
+.apk-card:hover .apk-card-download { background: var(--teal); }
+.apk-install-guide { margin-top: 64px; padding: 30px 32px; border: 1px solid rgba(255,255,255,.2); background: rgba(255,255,255,.04); }
+.apk-install-guide-head { display: inline-flex; align-items: center; gap: 10px; margin-bottom: 18px; color: #7ad2cd; font: 800 11px/1 var(--font-display); letter-spacing: .14em; text-transform: uppercase; }
+.apk-install-steps { margin: 0; padding: 0; list-style: none; counter-reset: apk-step; display: grid; gap: 12px; max-width: 720px; }
+.apk-install-steps li { counter-increment: apk-step; position: relative; display: flex; align-items: flex-start; gap: 11px; color: #dfe8ee; font: 500 13px/1.65 var(--font-display); }
+.apk-install-steps li::before { content: "0" counter(apk-step); flex: 0 0 auto; margin-top: 2px; color: #ed9e71; font: 800 10px/1.6 var(--font-display); letter-spacing: .08em; }
+.apk-install-steps svg { flex: 0 0 auto; margin-top: 3px; color: #68d2cb; }
+.apk-install-note { display: flex; align-items: flex-start; gap: 10px; margin: 20px 0 0; padding-top: 18px; border-top: 1px solid rgba(255,255,255,.16); color: #b9c9d4; font-size: 12px; line-height: 1.7; }
+.apk-install-note svg { flex: 0 0 auto; margin-top: 3px; color: #ed9e71; }
+.apk-install-link { display: inline-flex; align-items: center; gap: 8px; margin-top: 20px; color: #e6fbf6; border-bottom: 1px solid rgba(230,251,246,.5); padding-bottom: 5px; font: 800 11px/1 var(--font-display); letter-spacing: .04em; }
+.apk-install-link:hover { border-color: #fff; }
+.apk-download-status { display: flex; align-items: center; gap: 10px; margin-top: 40px; color: #b9c9d4; font: 600 13px/1.5 var(--font-display); }
+.apk-download-status--error { color: #f3b79b; }
+@media (max-width: 700px) {
+  .apk-download-group { margin-top: 44px; }
+  .apk-card { padding: 22px 20px; }
+  .apk-install-guide { margin-top: 44px; padding: 22px 20px; }
+}
+@media (prefers-reduced-motion: reduce) { .apk-card { transition: none !important; } }
+
+/* End APK download section pass. */
