@@ -47,11 +47,12 @@ tasks.register("downloadOpenCvSdk") {
       zipFile.parentFile?.mkdirs() // download destination dir may not exist yet
       val sourceUrl = URL(
         "https://github.com/opencv/opencv/releases/download/$openCvSdkVersion/opencv-$openCvSdkVersion-android-sdk.zip"
-      )          val retry = File(zipFile.absolutePath + ".tmp")
-          var attempt = 0
-          var lastError: Exception? = null
-          while (attempt < 3 && !zipFile.exists()) {
-            try {
+      )
+      val retry = File(zipFile.absolutePath + ".tmp")
+      var attempt = 0
+      var lastError: Exception? = null
+      while (attempt < 3 && !zipFile.exists()) {
+        try {
               retry.outputStream().use { out ->
                 val conn = (sourceUrl.openConnection() as HttpURLConnection).apply {
                   connectTimeout = 30_000
