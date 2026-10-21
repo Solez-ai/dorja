@@ -59,7 +59,6 @@ import androidx.compose.material.icons.filled.CompassCalibration
 import androidx.compose.material.icons.filled.PanoramaFishEye
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.ScreenRotation
-import androidx.compose.material.icons.filled.ThreeSixty
 import androidx.compose.material.icons.filled.ViewInAr
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -660,7 +659,7 @@ fun PanoramaViewerScreen(
                                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Default.ThreeSixty,
+                                        imageVector = Icons.Default.ViewInAr,
                                         contentDescription = null,
                                         tint = if (selected) Color(0xFF0A1410) else Color.White,
                                         modifier = Modifier.size(14.dp),
@@ -821,7 +820,6 @@ private fun EmptyScanState(onBack: () -> Unit) {
         DorjaButton(
             text = "Go Back",
             onClick = onBack,
-            backgroundColor = Accent,
             modifier = Modifier.widthIn(min = 160.dp),
         )
     }

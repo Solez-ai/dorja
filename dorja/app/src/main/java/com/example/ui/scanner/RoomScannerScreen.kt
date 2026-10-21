@@ -69,7 +69,7 @@ import androidx.compose.material.icons.filled.CenterFocusStrong
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.ThreeSixty
+import androidx.compose.material.icons.filled.ViewInAr
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -638,7 +638,7 @@ private fun HorizonGuidedScannerContent(
                             horizontalArrangement = Arrangement.spacedBy(6.dp),
                         ) {
                             Icon(
-                                imageVector = Icons.Default.ThreeSixty,
+                                imageVector = Icons.Default.ViewInAr,
                                 contentDescription = null,
                                 tint = Color(0xFF4FC3F7),
                                 modifier = Modifier.size(16.dp),
@@ -1111,7 +1111,7 @@ private fun StitchingProgressDialog(
                 verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
                 Icon(
-                    imageVector = Icons.Default.ThreeSixty,
+                    imageVector = Icons.Default.ViewInAr,
                     contentDescription = null,
                     tint = Color(0xFF4FC3F7),
                     modifier = Modifier.size(40.dp),
