@@ -163,6 +163,7 @@ import com.example.ui.components.DorjaOutlinedButton
 import com.example.ui.components.EvidenceBadge
 import com.example.ui.components.GovernmentSourceCard
 import com.example.ui.floorplan.FloorPlanMakerOverlay
+import com.example.ui.scanner.HorizonRoomScannerModal
 import com.example.ui.theme.DorjaFontFamily
 import com.example.ui.theme.DorjaColors
 import com.example.ui.util.Formatters
@@ -253,7 +254,8 @@ fun CreateListingScreen(
         mutableStateListOf<RoomItem>()
     }
 
-    var createdListingId by remember { mutableStateOf<String?>(null) }
+    var createdListingId by remember { mutableStateOf<String?>(editListingId) }
+    var activeScanRoomIndex by remember { mutableStateOf<Int?>(null) }
 
     var showAddRoomDialog by remember { mutableStateOf(false) }
     var newRoomType by remember { mutableStateOf("BEDROOM") }
@@ -1880,17 +1882,52 @@ fun CreateListingScreen(
                     Spacer(modifier = Modifier.height(10.dp))
 
                     DorjaButton(
-                        text = "Scan Rooms",
+                        text = "Scan Rooms (Horizon 360°)",
                         onClick = {
                             val lid = createdListingId
                             if (lid != null && onScanRooms != null) {
                                 onScanRooms(lid)
+                            } else {
+                                if (customRooms.isEmpty()) {
+                                    customRooms.add(
+                                        RoomItem(
+                                            id = "r_" + UUID.randomUUID().toString().take(8),
+                                            listingId = "pending",
+                                            roomType = "LIVING_ROOM",
+                                            displayName = "Living Room",
+                                            dimensions = "16x14 ft",
+                                            has3DScan = false,
+                                            description = "Main living room"
+                                        )
+                                    )
+                                }
+                                val firstUnscanned = customRooms.indexOfFirst { !it.has3DScan }
+                                activeScanRoomIndex = if (firstUnscanned >= 0) firstUnscanned else 0
                             }
                         },
                         icon = Icons.Default.ViewInAr,
                         modifier = Modifier.fillMaxWidth(),
                         testTag = "scan_rooms_button"
                     )
+
+                    activeScanRoomIndex?.let { scanIdx ->
+                        val targetRoom = customRooms.getOrNull(scanIdx)
+                        if (targetRoom != null) {
+                            HorizonRoomScannerModal(
+                                roomName = targetRoom.displayName,
+                                onCompleted = { panoramaJson ->
+                                    customRooms[scanIdx] = targetRoom.copy(
+                                        has3DScan = true,
+                                        panoramaData = panoramaJson
+                                    )
+                                    activeScanRoomIndex = null
+                                },
+                                onDismiss = { activeScanRoomIndex = null }
+                            )
+                        } else {
+                            activeScanRoomIndex = null
+                        }
+                    }
 
                     Spacer(modifier = Modifier.height(8.dp))
 
@@ -1907,15 +1944,17 @@ fun CreateListingScreen(
                             ) {
                                 Icon(Icons.Default.ViewInAr, contentDescription = null, tint = Color(0xFF00BCD4), modifier = Modifier.size(28.dp))
                                 Spacer(modifier = Modifier.height(6.dp))
-                                Text("Add rooms first, then scan", fontWeight = FontWeight.Bold, color = DorjaColors.Ink950)
-                                Text("3D panoramas are captured per-room. Add rooms above first.", style = MaterialTheme.typography.bodySmall, color = DorjaColors.Gray700)
+                                Text("Tap Scan Rooms above or add rooms first", fontWeight = FontWeight.Bold, color = DorjaColors.Ink950)
+                                Text("360° Horizon panoramas are captured per-room.", style = MaterialTheme.typography.bodySmall, color = DorjaColors.Gray700)
                             }
                         }
                     } else {
                         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            customRooms.forEach { room ->
+                            customRooms.forEachIndexed { roomIndex, room ->
                                 Surface(
-                                    modifier = Modifier.fillMaxWidth(),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { activeScanRoomIndex = roomIndex },
                                     shape = RoundedCornerShape(10.dp),
                                     color = if (room.has3DScan) Color(0xFF00BCD4).copy(alpha = 0.08f) else DorjaColors.White,
                                     border = BorderStroke(1.dp, if (room.has3DScan) Color(0xFF00BCD4) else DorjaColors.BentoCardBorder)
