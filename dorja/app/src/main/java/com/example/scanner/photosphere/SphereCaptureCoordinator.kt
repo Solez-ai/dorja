@@ -29,7 +29,7 @@ data class CapturedFrame(
 }
 
 data class SphereCaptureSessionState(
-    val scope: SphereCaptureScope = SphereCaptureScope.Ring,
+    val scope: SphereCaptureScope = SphereCaptureScope.FullSphere,
     val targets: List<SphereTarget> = emptyList(),
     val capturedFrames: List<CapturedFrame> = emptyList(),
     val activeTargetId: Int? = null,
@@ -57,7 +57,7 @@ data class SphereCaptureSessionState(
 class SphereCaptureCoordinator(
     fieldOfView: FieldOfView = FieldOfView.TYPICAL_PORTRAIT,
     private val overlapFraction: Float = SphereTargetGrid.DEFAULT_OVERLAP_FRACTION,
-    defaultScope: SphereCaptureScope = SphereCaptureScope.Ring,
+    defaultScope: SphereCaptureScope = SphereCaptureScope.FullSphere,
     thresholdDegrees: Float = AlignmentGate.DEFAULT_THRESHOLD_DEGREES,
     requiredDwellMillis: Long = AlignmentGate.DEFAULT_DWELL_MILLIS,
     private val clock: () -> Long = System::currentTimeMillis,

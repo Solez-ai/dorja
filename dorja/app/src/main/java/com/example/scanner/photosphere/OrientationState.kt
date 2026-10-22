@@ -21,6 +21,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 fun rememberOrientationTracker(
     samplingPeriodUs: Int = SensorManager.SENSOR_DELAY_GAME,
     reference: OrientationReference = OrientationReference.Camera,
+    fixedDisplayRotation: Int? = null,
 ): OrientationTracker {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -29,7 +30,9 @@ fun rememberOrientationTracker(
     }
 
     val configuration = LocalConfiguration.current
-    val displayRotation = remember(context, configuration) { context.currentDisplayRotation() }
+    val displayRotation = remember(context, configuration, fixedDisplayRotation) {
+        fixedDisplayRotation ?: context.currentDisplayRotation()
+    }
     SideEffect { tracker.displayRotation = displayRotation }
 
     DisposableEffect(lifecycleOwner, tracker) {

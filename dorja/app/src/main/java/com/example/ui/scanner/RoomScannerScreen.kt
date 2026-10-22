@@ -333,15 +333,18 @@ private fun HorizonGuidedScannerContent(
         resolveSphereCaptureProfile(context, deviceProfile, boundCameraId)
     }
 
-    val orientationTracker = rememberOrientationTracker()
+    val orientationTracker = rememberOrientationTracker(
+        fixedDisplayRotation = android.view.Surface.ROTATION_0,
+    )
     val orientation by orientationTracker.orientation.collectAsState()
     val captureFeedback = rememberCaptureFeedback()
 
-    // Coordinator defaults to SphereCaptureScope.Ring (Horizon 360° Ring mode)
+    // Coordinator defaults to SphereCaptureScope.FullSphere (guides horizon ring first,
+    // then upper ceiling ring and lower floor ring so the entire 360° × 180° sphere is captured)
     val coordinator = remember(selectedRoomIndex) {
         SphereCaptureCoordinator(
             fieldOfView = optics.fieldOfView,
-            defaultScope = SphereCaptureScope.Ring,
+            defaultScope = SphereCaptureScope.FullSphere,
         )
     }
     LaunchedEffect(optics.fieldOfView) {
@@ -622,15 +625,24 @@ private fun HorizonGuidedScannerContent(
                     )
                 }
 
-                // Horizon 360° Mode Pill + Progress Counter
+                // 360° Sphere / Horizon Mode Toggle Pill + Progress Counter
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
+                    val canSwitchScope = sessionState.capturedFrames.isEmpty() && !isStitching
                     Surface(
                         shape = RoundedCornerShape(20.dp),
                         color = Color(0xFF4FC3F7).copy(alpha = 0.2f),
                         border = BorderStroke(1.dp, Color(0xFF4FC3F7).copy(alpha = 0.65f)),
+                        modifier = Modifier.clickable(enabled = canSwitchScope) {
+                            val nextScope = if (sessionState.scope == SphereCaptureScope.FullSphere) {
+                                SphereCaptureScope.Ring
+                            } else {
+                                SphereCaptureScope.FullSphere
+                            }
+                            coordinator.setScope(nextScope)
+                        },
                     ) {
                         Row(
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
@@ -644,7 +656,11 @@ private fun HorizonGuidedScannerContent(
                                 modifier = Modifier.size(16.dp),
                             )
                             Text(
-                                text = "HORIZON 360°",
+                                text = if (sessionState.scope == SphereCaptureScope.FullSphere) {
+                                    "FULL 360° SPHERE"
+                                } else {
+                                    "HORIZON 360°"
+                                },
                                 color = Color.White,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
@@ -788,18 +804,27 @@ private fun HorizonGuidedScannerContent(
                 }
             }
 
-            // Live step-by-step Horizon guidance pill
+            // Live step-by-step 360° Sphere guidance pill (guides Horizon -> Upper/Ceiling -> Lower/Floor)
+            val activeElevation = sessionState.activeTarget?.elevationDegrees ?: 0f
             val guidanceText = when {
                 !orientation.hasFix ->
-                    "Initializing gyroscope sensor… Hold phone upright."
+                    "Initializing gyroscope sensor… Hold phone upright in portrait."
                 sessionState.isComplete ->
-                    "Full 360° Horizon Ring captured! Completing stitch…"
+                    "Full 360° Sphere captured! Completing stitch…"
                 sessionState.alignment.isWithinThreshold ->
                     "Hold steady… (${(sessionState.alignment.dwellProgress * 100).roundToInt()}%)"
                 sessionState.capturedFrames.isEmpty() ->
                     "Stand in the center of $roomTitle. Align the center ring with the glowing blue dot on the horizon."
+                activeElevation >= 65f ->
+                    "Tilt straight UP to the ceiling dot (${sessionState.capturedFrames.size} of ${sessionState.targets.size} captured)"
+                activeElevation <= -65f ->
+                    "Tilt straight DOWN to the floor dot (${sessionState.capturedFrames.size} of ${sessionState.targets.size} captured)"
+                activeElevation > 12f ->
+                    "Tilt UP to capture the upper wall & ceiling ring (${sessionState.capturedFrames.size} of ${sessionState.targets.size} captured)"
+                activeElevation < -12f ->
+                    "Tilt DOWN to capture the lower wall & floor ring (${sessionState.capturedFrames.size} of ${sessionState.targets.size} captured)"
                 else ->
-                    "Rotate smoothly along the horizon to the next blue dot (${sessionState.capturedFrames.size} of ${sessionState.targets.size} captured)"
+                    "Pan smoothly along the horizon to the next blue dot (${sessionState.capturedFrames.size} of ${sessionState.targets.size} captured)"
             }
 
             Surface(
@@ -988,6 +1013,7 @@ private fun HorizonCameraPreview(
 
             val previewBuilder = Preview.Builder()
                 .setTargetAspectRatio(AspectRatio.RATIO_4_3)
+                .setTargetRotation(android.view.Surface.ROTATION_0)
             val previewExtender = Camera2Interop.Extender(previewBuilder)
             applySphereCaptureOptions(previewExtender, captureProfile)
 
@@ -1026,6 +1052,7 @@ private fun HorizonCameraPreview(
             val imageCaptureBuilder = ImageCapture.Builder()
                 .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
                 .setTargetAspectRatio(AspectRatio.RATIO_4_3)
+                .setTargetRotation(android.view.Surface.ROTATION_0)
                 .setJpegQuality(92)
             val captureExtender = Camera2Interop.Extender(imageCaptureBuilder)
             applySphereCaptureOptions(captureExtender, captureProfile)
@@ -1117,17 +1144,17 @@ private fun StitchingProgressDialog(
                     modifier = Modifier.size(40.dp),
                 )
                 Text(
-                    text = "Stitching 360° Horizon Panorama",
+                    text = "Stitching 360° Photo Sphere",
                     color = Color.White,
                     fontSize = 17.sp,
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center,
                 )
                 val stageText = when {
-                    progress < 0.20f -> "Decoding $frameCount horizon frames & locking lens intrinsics…"
-                    progress < 0.30f -> "Balancing exposure gains & refining spherical poses…"
-                    progress < 0.92f -> "Projecting seamless 360° equirectangular sphere…"
-                    else -> "Writing GPano 360° metadata for $roomTitle…"
+                    progress < 0.18f -> "Decoding $frameCount upright frames & locking lens intrinsics…"
+                    progress < 0.38f -> "Balancing exposure & solving sharp graph-cut seams…"
+                    progress < 0.90f -> "Projecting full 360° × 180° equirectangular sphere…"
+                    else -> "Sharpening room details & writing GPano 360° metadata for $roomTitle…"
                 }
                 Text(
                     text = stageText,

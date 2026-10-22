@@ -46,7 +46,7 @@ object SphereTargetGrid {
     fun generate(
         fieldOfView: FieldOfView = FieldOfView.TYPICAL_PORTRAIT,
         overlapFraction: Float = DEFAULT_OVERLAP_FRACTION,
-        scope: SphereCaptureScope = SphereCaptureScope.Ring,
+        scope: SphereCaptureScope = SphereCaptureScope.FullSphere,
     ): List<SphereTarget> {
         val horizontalFov = fieldOfView.horizontalDegrees.coerceIn(MIN_FOV_DEGREES, MAX_FOV_DEGREES)
         val verticalFov = fieldOfView.verticalDegrees.coerceIn(MIN_FOV_DEGREES, MAX_FOV_DEGREES)

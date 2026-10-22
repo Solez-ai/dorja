@@ -288,6 +288,15 @@ fun PanoramaViewerScreen(
     var gyroBaseYaw by remember { mutableStateOf<Float?>(null) }
     var gyroBasePitch by remember { mutableStateOf<Float?>(null) }
 
+    // Whenever screen orientation changes (e.g. user tilts from portrait to landscape),
+    // re-anchor the gyroscope baseline so the panorama view stays straight and level.
+    LaunchedEffect(configuration.orientation) {
+        gyroBaseYaw = null
+        gyroBasePitch = null
+        gyroYawDeg = 0f
+        gyroPitchDeg = 0f
+    }
+
     // Gyroscope tracking (TYPE_GAME_ROTATION_VECTOR preferred)
     DisposableEffect(gyroEnabled) {
         if (!gyroEnabled) return@DisposableEffect onDispose {}
@@ -327,13 +336,12 @@ fun PanoramaViewerScreen(
         onDispose { sm.unregisterListener(listener) }
     }
 
-    // Clamp pitch so the view stays comfortably inside the captured latitude band in Normal mode
-    // while allowing full sphere exploration in Fisheye mode
+    // Allow full vertical exploration across the 360° sphere in both Normal and Fisheye modes
     val maxPitchDeg = remember(effectiveLatSpanDeg, isFisheyeEnabled) {
         if (isFisheyeEnabled) {
-            75f
+            82f
         } else {
-            max(18f, effectiveLatSpanDeg * 0.5f - 8f).coerceAtMost(85f)
+            max(28f, effectiveLatSpanDeg * 0.5f - 5f).coerceAtMost(85f)
         }
     }
 
@@ -1124,18 +1132,23 @@ private class PhotoSphereGlRenderer : GLSurfaceView.Renderer {
 
                 if (v >= 0.0 && v <= 1.0) {
                     vec4 texColor = texture2D(uTexture, vec2(u, clamp(v, 0.001, 0.999)));
-                    // Subtle feather at horizon band boundaries when viewing in wide Fisheye mode
-                    float edgeDist = min(v, 1.0 - v);
-                    float edgeFade = smoothstep(0.0, 0.025, edgeDist);
-                    vec3 ambient = mix(vec3(0.05, 0.07, 0.10), texColor.rgb * 0.35, 0.5);
-                    gl_FragColor = vec4(mix(ambient, texColor.rgb, edgeFade), 1.0);
+                    if (uLatSpanRad >= 3.05) {
+                        // Full 360° × 180° sphere: render directly with zero darkening at zenith/nadir
+                        gl_FragColor = vec4(texColor.rgb, 1.0);
+                    } else {
+                        // Partial horizon strip: subtle feather at band boundaries
+                        float edgeDist = min(v, 1.0 - v);
+                        float edgeFade = smoothstep(0.0, 0.025, edgeDist);
+                        vec3 ambient = mix(vec3(0.08, 0.10, 0.14), texColor.rgb * 0.65, 0.7);
+                        gl_FragColor = vec4(mix(ambient, texColor.rgb, edgeFade), 1.0);
+                    }
                 } else {
                     float over = v < 0.0 ? -v : (v - 1.0);
                     float clampedV = clamp(v, 0.002, 0.998);
                     vec3 edgeSample = texture2D(uTexture, vec2(u, clampedV)).rgb;
-                    float fade = exp(-over * 7.5);
-                    vec3 studioCap = v < 0.0 ? vec3(0.07, 0.09, 0.13) : vec3(0.04, 0.05, 0.08);
-                    gl_FragColor = vec4(mix(studioCap, edgeSample * 0.45, fade), 1.0);
+                    float fade = exp(-over * 4.5);
+                    vec3 studioCap = mix(vec3(0.10, 0.12, 0.16), edgeSample * 0.65, 0.6);
+                    gl_FragColor = vec4(mix(studioCap, edgeSample, fade), 1.0);
                 }
             }
         """
