@@ -27,14 +27,14 @@ data class SphereDeviceProfile(
             return if (isLowRam) {
                 SphereDeviceProfile(
                     preferWidestCamera = false,
-                    stitchFrameMaxEdgePx = 1280,
-                    stitchCanvasWidthPx = 3072,
-                    stitchCanvasHeightPx = 1536,
+                    stitchFrameMaxEdgePx = 1536,
+                    stitchCanvasWidthPx = 4096,
+                    stitchCanvasHeightPx = 2048,
                 )
             } else {
                 SphereDeviceProfile(
                     preferWidestCamera = false,
-                    stitchFrameMaxEdgePx = 1600,
+                    stitchFrameMaxEdgePx = 2048,
                     stitchCanvasWidthPx = 4096,
                     stitchCanvasHeightPx = 2048,
                 )

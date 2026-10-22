@@ -1050,10 +1050,11 @@ private fun HorizonCameraPreview(
             }
 
             val imageCaptureBuilder = ImageCapture.Builder()
-                .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
+                .setCaptureMode(ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
+                .setFlashMode(ImageCapture.FLASH_MODE_OFF)
                 .setTargetAspectRatio(AspectRatio.RATIO_4_3)
                 .setTargetRotation(android.view.Surface.ROTATION_0)
-                .setJpegQuality(92)
+                .setJpegQuality(95)
             val captureExtender = Camera2Interop.Extender(imageCaptureBuilder)
             applySphereCaptureOptions(captureExtender, captureProfile)
             applyStillImageOptions(captureExtender, captureProfile)
@@ -1151,9 +1152,9 @@ private fun StitchingProgressDialog(
                     textAlign = TextAlign.Center,
                 )
                 val stageText = when {
-                    progress < 0.18f -> "Decoding $frameCount upright frames & locking lens intrinsics…"
-                    progress < 0.38f -> "Balancing exposure & solving sharp graph-cut seams…"
-                    progress < 0.90f -> "Projecting full 360° × 180° equirectangular sphere…"
+                    progress < 0.20f -> "Decoding $frameCount high-res frames & locking lens intrinsics…"
+                    progress < 0.35f -> "Balancing exposure & building Laplacian frequency pyramids…"
+                    progress < 0.90f -> "Blending multi-band 360° × 180° equirectangular sphere…"
                     else -> "Sharpening room details & writing GPano 360° metadata for $roomTitle…"
                 }
                 Text(

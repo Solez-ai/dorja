@@ -207,7 +207,8 @@ internal fun featherWeight(
     val down = 1.0 - abs(idealRow - centreY) / centreY
     if (down <= 0.0) return 0.0
     val linear = across * down
-    return linear * linear * linear
+    val w2 = linear * linear
+    return w2 * w2 * linear
 }
 
 object Equirectangular {
