@@ -33,17 +33,13 @@ data class StitchResult(
  * matching `360-photo-app`'s default pipeline (`MultibandBlender` + `EquirectangularRenderer` +
  * `ExposureCompensation` + masked `UnsharpMask`).
  *
- * Why this produces clean, crystal-clear panoramas without any blocky/pixelated artifacts:
- * 1. Decodes each captured still at high resolution (`stitchFrameMaxEdgePx = 2048`) in its exact
- *    upright portrait orientation (`decodeUprightBitmap` + `correctFovOrientation`).
- * 2. Balances per-frame brightness with `ExposureCompensation.solveGains`.
- * 3. Renders via **Burt–Adelson Laplacian Pyramid Multi-Band Blending**
- *    ([MultibandEquirectangularRenderer]): high frequencies (text, clock hands, furniture edges)
- *    are blended across a tight transition at the center-dominance boundary while low frequencies
- *    (wall illumination & color gradients) blend smoothly across the overlap — **zero coarse
- *    label-grid stair-step blocks (`11×11` pixelation) and zero ghosting**.
- * 4. Applies a masked Unsharp Mask pass and smooth zenith/nadir spherical cap synthesis so
- *    looking straight up or down in Normal or Fisheye mode never shows black voids.
+ * Memory-safe architecture (preventing 33 MB OOMs on 256 MB heap devices):
+ * 1. Reads captured frames from temp files on disk (or fallback bytes) at `1280px` / `1024px` max edge.
+ * 2. Renders via [MultibandEquirectangularRenderer] with on-the-fly coarse frame downsampling and
+ *    64-row banded level-0 reconstruction.
+ * 3. Releases the decoded `frames` arrays as soon as `MultibandEquirectangularRenderer.renderFullSphere`
+ *    completes, BEFORE running the 3-row rolling-buffer Unsharp Mask (`3 × 4096` ints = 48 KB instead
+ *    of a 33.5 MB `pixels.copyOf()`) and BEFORE allocating the output `Bitmap` for JPEG encoding.
  */
 class PhotoSphereStitcher(
     private val dispatcher: CoroutineDispatcher = Dispatchers.Default,
@@ -82,7 +78,7 @@ class PhotoSphereStitcher(
         for ((index, captured) in frames.withIndex()) {
             coroutineContext.ensureActive()
             val bitmap = decodeUprightBitmap(
-                bytes = captured.imageBytes,
+                captured = captured,
                 maxEdgePx = deviceProfile.stitchFrameMaxEdgePx,
                 fallbackRotationDegrees = optics.portraitRotationDegrees,
             ) ?: continue
@@ -110,8 +106,6 @@ class PhotoSphereStitcher(
                 FieldOfView(horizontalFov, verticalFov)
             }
 
-            // Use pinhole intrinsics by default (matching 360-photo-app's distortionEnabled = false
-            // default, since OEM LENS_DISTORTION tables often over-warp frame borders).
             val intrinsics = FrameIntrinsics.fromFieldOfView(
                 widthPx = w,
                 heightPx = h,
@@ -143,12 +137,13 @@ class PhotoSphereStitcher(
             onProgress(0.03f + 0.17f * ((index + 1).toFloat() / frames.size))
         }
 
-        require(decoded.isNotEmpty()) { "Failed to decode captured frames." }
+        val decodedCount = decoded.size
+        require(decodedCount > 0) { "Failed to decode captured frames." }
 
         // 1. Solve global exposure gain compensation across overlapping frame pairs
         val overlapPairs = ArrayList<Pair<Int, Int>>()
-        for (i in 0 until decoded.size) {
-            for (j in i + 1 until decoded.size) {
+        for (i in 0 until decodedCount) {
+            for (j in i + 1 until decodedCount) {
                 if (angularOverlap(
                         decoded[i].basis,
                         decoded[j].basis,
@@ -161,7 +156,7 @@ class PhotoSphereStitcher(
             }
         }
         val gains = ExposureCompensation.solveGains(
-            meanLuma = DoubleArray(decoded.size) { decoded[it].meanLuma },
+            meanLuma = DoubleArray(decodedCount) { decoded[it].meanLuma },
             edges = overlapPairs,
         )
 
@@ -174,7 +169,11 @@ class PhotoSphereStitcher(
         val latitudeSpanDegrees = 180f
         val centerLatitudeDegrees = 0f
 
-        val frameInputs = decoded.mapIndexed { idx, frame ->
+        val fallbackBackdrop = computeNeutralBackdropColor(decoded, gains)
+
+        val frameInputs = ArrayList<MultibandEquirectangularRenderer.FrameInput>(decodedCount)
+        for (idx in 0 until decodedCount) {
+            val frame = decoded[idx]
             val footprint = FrameFootprint.compute(
                 basis = frame.basis,
                 intrinsics = frame.intrinsics,
@@ -187,23 +186,25 @@ class PhotoSphereStitcher(
                 latitudeSpanDegrees = latitudeSpanDegrees,
                 centerLatitudeDegrees = centerLatitudeDegrees,
             )
-            MultibandEquirectangularRenderer.FrameInput(
-                pixels = frame.pixels,
-                width = frame.width,
-                height = frame.height,
-                basis = frame.basis,
-                intrinsics = frame.intrinsics,
-                footprint = footprint,
-                gain = gains.getOrElse(idx) { 1f },
+            frameInputs.add(
+                MultibandEquirectangularRenderer.FrameInput(
+                    pixels = frame.pixels,
+                    width = frame.width,
+                    height = frame.height,
+                    basis = frame.basis,
+                    intrinsics = frame.intrinsics,
+                    footprint = footprint,
+                    gain = gains.getOrElse(idx) { 1f },
+                )
             )
         }
+        // Clear `decoded` list references so `frameInputs` is the sole owner of the frame pixel arrays
+        decoded.clear()
 
         val outPixels = IntArray(canvasWidth * canvasHeight)
         val rowHasCoverage = BooleanArray(canvasHeight)
-        val fallbackBackdrop = computeNeutralBackdropColor(decoded, gains)
 
-        // 3. Render with Burt–Adelson Laplacian Pyramid Multi-Band Blending (smooth low-frequency
-        // illumination transitions + crisp full-resolution high-frequency detail, zero blocky seams)
+        // 3. Render with Burt–Adelson Laplacian Pyramid Multi-Band Blending
         val callerContext = coroutineContext
         MultibandEquirectangularRenderer.renderFullSphere(
             frames = frameInputs,
@@ -224,21 +225,25 @@ class PhotoSphereStitcher(
             },
         )
 
-        // 4. Apply masked Unsharp Mask on all captured pixels so fine room details are tack-sharp
+        // Free all 26 input frame pixel arrays immediately now that rendering is complete!
+        frameInputs.clear()
+
+        // 4. Apply masked Unsharp Mask in-place using a 3-row rolling buffer (48 KB instead of 33.5 MB!)
         coroutineContext.ensureActive()
         onProgress(0.90f)
-        applyMaskedUnsharpMask(outPixels, canvasWidth, canvasHeight, UNSHARP_AMOUNT)
+        applyMaskedUnsharpMaskInPlace(outPixels, canvasWidth, canvasHeight, UNSHARP_AMOUNT)
 
         // 5. Smoothly fill any uncaptured zenith/nadir spherical caps
         coroutineContext.ensureActive()
         onProgress(0.95f)
         fillUncapturedSphericalCaps(outPixels, canvasWidth, canvasHeight, rowHasCoverage, fallbackBackdrop)
 
-        // 6. Write high-quality JPEG atomically and inject GPano XMP metadata
+        // 6. Write high-quality JPEG atomically using setPixels into a mutable Bitmap
         outputFile.parentFile?.mkdirs()
         val tempFile = File(outputFile.parentFile, "${outputFile.name}.tmp")
-        val outBitmap = Bitmap.createBitmap(outPixels, canvasWidth, canvasHeight, Bitmap.Config.ARGB_8888)
+        val outBitmap = Bitmap.createBitmap(canvasWidth, canvasHeight, Bitmap.Config.ARGB_8888)
         try {
+            outBitmap.setPixels(outPixels, 0, canvasWidth, 0, 0, canvasWidth, canvasHeight)
             FileOutputStream(tempFile).use { fos ->
                 outBitmap.compress(Bitmap.CompressFormat.JPEG, 95, fos)
                 fos.flush()
@@ -267,7 +272,7 @@ class PhotoSphereStitcher(
             outputFile = outputFile,
             widthPx = canvasWidth,
             heightPx = canvasHeight,
-            frameCount = decoded.size,
+            frameCount = decodedCount,
             longitudeSpanDegrees = longitudeSpanDegrees,
             latitudeSpanDegrees = latitudeSpanDegrees,
             centerLongitudeDegrees = centerLongitudeDegrees,
@@ -276,12 +281,20 @@ class PhotoSphereStitcher(
     }
 
     private fun decodeUprightBitmap(
-        bytes: ByteArray,
+        captured: CapturedFrame,
         maxEdgePx: Int,
         fallbackRotationDegrees: Int,
     ): Bitmap? {
+        val file = captured.imageFile
+        val hasValidFile = file != null && file.exists() && file.length() > 0L
+        if (!hasValidFile && captured.imageBytes.isEmpty()) return null
+
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+        if (hasValidFile && file != null) {
+            BitmapFactory.decodeFile(file.absolutePath, bounds)
+        } else {
+            BitmapFactory.decodeByteArray(captured.imageBytes, 0, captured.imageBytes.size, bounds)
+        }
         if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
 
         var sampleSize = 1
@@ -293,10 +306,19 @@ class PhotoSphereStitcher(
             inSampleSize = sampleSize
             inPreferredConfig = Bitmap.Config.ARGB_8888
         }
-        val raw = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, decodeOpts) ?: return null
+        val raw = if (hasValidFile && file != null) {
+            BitmapFactory.decodeFile(file.absolutePath, decodeOpts)
+        } else {
+            BitmapFactory.decodeByteArray(captured.imageBytes, 0, captured.imageBytes.size, decodeOpts)
+        } ?: return null
 
         val exifOrientation = runCatching {
-            ExifInterface(ByteArrayInputStream(bytes)).getAttributeInt(
+            val exif = if (hasValidFile && file != null) {
+                ExifInterface(file.absolutePath)
+            } else {
+                ExifInterface(ByteArrayInputStream(captured.imageBytes))
+            }
+            exif.getAttributeInt(
                 ExifInterface.TAG_ORIENTATION,
                 ExifInterface.ORIENTATION_UNDEFINED,
             )
@@ -374,27 +396,37 @@ class PhotoSphereStitcher(
         return verticalFovDegrees to horizontalFovDegrees
     }
 
-    private fun applyMaskedUnsharpMask(
+    /**
+     * In-place masked unsharp mask using a 3-row rolling ring buffer (`3 × width` ints = 48 KB)
+     * instead of cloning the entire 33.5 MB `4096 × 2048` pixel array.
+     */
+    private fun applyMaskedUnsharpMaskInPlace(
         pixels: IntArray,
         width: Int,
         height: Int,
         amount: Float,
     ) {
         if (amount <= 0f || width < 3 || height < 3) return
-        val copy = pixels.copyOf()
+        var prevRow = IntArray(width)
+        var currRow = IntArray(width)
+        var nextRow = IntArray(width)
+
+        System.arraycopy(pixels, 0, prevRow, 0, width)
+        System.arraycopy(pixels, width, currRow, 0, width)
+
         for (row in 1 until height - 1) {
-            val rowOff = row * width
-            val prevOff = (row - 1) * width
             val nextOff = (row + 1) * width
+            System.arraycopy(pixels, nextOff, nextRow, 0, width)
+            val rowOff = row * width
+
             for (col in 1 until width - 1) {
-                val idx = rowOff + col
-                val center = copy[idx]
+                val center = currRow[col]
                 if ((center ushr 24) == 0) continue
 
-                val cLeft = copy[idx - 1]
-                val cRight = copy[idx + 1]
-                val cUp = copy[prevOff + col]
-                val cDown = copy[nextOff + col]
+                val cLeft = currRow[col - 1]
+                val cRight = currRow[col + 1]
+                val cUp = prevRow[col]
+                val cDown = nextRow[col]
                 if ((cLeft ushr 24) == 0 || (cRight ushr 24) == 0 ||
                     (cUp ushr 24) == 0 || (cDown ushr 24) == 0
                 ) {
@@ -426,8 +458,14 @@ class PhotoSphereStitcher(
                 val outR = (rC + amount * (rC - blurR)).roundToInt().coerceIn(0, 255)
                 val outG = (gC + amount * (gC - blurG)).roundToInt().coerceIn(0, 255)
                 val outB = (bC + amount * (bC - blurB)).roundToInt().coerceIn(0, 255)
-                pixels[idx] = (0xFF shl 24) or (outR shl 16) or (outG shl 8) or outB
+                pixels[rowOff + col] = (0xFF shl 24) or (outR shl 16) or (outG shl 8) or outB
             }
+
+            // Rotate rolling row buffers: prev <- curr, curr <- next, next <- old prev
+            val tmp = prevRow
+            prevRow = currRow
+            currRow = nextRow
+            nextRow = tmp
         }
     }
 
@@ -480,8 +518,7 @@ class PhotoSphereStitcher(
             }
         }
 
-        // 3. Smoothly synthesize the Zenith Cap (rows 0 until firstCoveredRow) using a continuous
-        // horizontal prefix-sum box average so there are zero step artifacts
+        // 3. Smoothly synthesize the Zenith Cap (rows 0 until firstCoveredRow)
         if (firstCoveredRow > 0) {
             val topEdgeOff = firstCoveredRow * width
             var avgR = 0.0

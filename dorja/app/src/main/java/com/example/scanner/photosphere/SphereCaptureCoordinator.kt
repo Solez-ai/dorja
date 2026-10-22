@@ -3,12 +3,14 @@ package com.example.scanner.photosphere
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import java.io.File
 
 data class CapturedFrame(
     val target: SphereTarget,
     val orientation: OrientationData,
-    val imageBytes: ByteArray,
+    val imageBytes: ByteArray = ByteArray(0),
     val capturedAtMillis: Long,
+    val imageFile: File? = null,
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -16,12 +18,14 @@ data class CapturedFrame(
         return target == other.target &&
             orientation == other.orientation &&
             capturedAtMillis == other.capturedAtMillis &&
+            imageFile?.absolutePath == other.imageFile?.absolutePath &&
             imageBytes.contentEquals(other.imageBytes)
     }
 
     override fun hashCode(): Int {
         var result = target.hashCode()
         result = 31 * result + orientation.hashCode()
+        result = 31 * result + (imageFile?.absolutePath?.hashCode() ?: 0)
         result = 31 * result + imageBytes.contentHashCode()
         result = 31 * result + capturedAtMillis.hashCode()
         return result
@@ -148,8 +152,9 @@ class SphereCaptureCoordinator(
 
     fun onFrameCaptured(
         target: SphereTarget,
-        imageBytes: ByteArray,
+        imageBytes: ByteArray = ByteArray(0),
         orientationAtCapture: OrientationData,
+        imageFile: File? = null,
     ): CapturedFrame? {
         val current = _state.value
         if (!current.isCapturingFrame || current.activeTarget?.id != target.id) return null
@@ -164,6 +169,7 @@ class SphereCaptureCoordinator(
             orientation = meanOrientation(samples),
             imageBytes = imageBytes,
             capturedAtMillis = clock(),
+            imageFile = imageFile,
         )
         val updatedFrames = current.capturedFrames + frame
         val capturedIds = updatedFrames.mapTo(HashSet()) { it.target.id }
@@ -201,6 +207,7 @@ class SphereCaptureCoordinator(
         val current = _state.value
         if (!current.canUndo) return null
         val undone = current.capturedFrames.last()
+        runCatching { undone.imageFile?.delete() }
         dwellSamples.clear()
         gate.reset()
         _state.value = current.copy(
@@ -212,6 +219,10 @@ class SphereCaptureCoordinator(
     }
 
     fun restart() {
+        val oldFrames = _state.value.capturedFrames
+        oldFrames.forEach { frame ->
+            runCatching { frame.imageFile?.delete() }
+        }
         isAnchored = false
         dwellSamples.clear()
         gate.reset()

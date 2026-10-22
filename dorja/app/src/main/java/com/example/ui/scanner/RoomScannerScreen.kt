@@ -147,7 +147,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
-import java.io.ByteArrayOutputStream
 import java.io.File
 import java.util.UUID
 import java.util.concurrent.Executors
@@ -364,8 +363,17 @@ private fun HorizonGuidedScannerContent(
 
     val flashAlpha = remember { Animatable(0f) }
     val captureExecutor = remember { Executors.newSingleThreadExecutor() }
+    val sessionTempDir = remember(selectedRoomIndex) {
+        File(context.cacheDir, "sphere_session_frames").apply {
+            mkdirs()
+            listFiles()?.forEach { runCatching { it.delete() } }
+        }
+    }
     DisposableEffect(Unit) {
-        onDispose { captureExecutor.shutdown() }
+        onDispose {
+            captureExecutor.shutdown()
+            runCatching { sessionTempDir.deleteRecursively() }
+        }
     }
 
     // Halfway dwell haptic tick so the user feels the dwell filling
@@ -407,6 +415,7 @@ private fun HorizonGuidedScannerContent(
                 }
                 isStitching = false
                 result.onSuccess { json ->
+                    framesToStitch.forEach { runCatching { it.imageFile?.delete() } }
                     onPanoramaStitched(json)
                 }.onFailure { err ->
                     Log.e(TAG, "Horizon stitch failed", err)
@@ -426,17 +435,19 @@ private fun HorizonGuidedScannerContent(
             return@LaunchedEffect
         }
 
-        val baos = ByteArrayOutputStream()
-        val outputOptions = ImageCapture.OutputFileOptions.Builder(baos).build()
+        val frameFile = File(
+            sessionTempDir,
+            "frame_${triggeredTarget.id}_${System.currentTimeMillis()}.jpg",
+        )
+        val outputOptions = ImageCapture.OutputFileOptions.Builder(frameFile).build()
         imageCapture.takePicture(
             outputOptions,
             captureExecutor,
             object : ImageCapture.OnImageSavedCallback {
                 override fun onImageSaved(outputFileResults: ImageCapture.OutputFileResults) {
-                    val bytes = baos.toByteArray()
                     val poseAtShutter = currentOrientation
                     coroutineScope.launch {
-                        if (bytes.isNotEmpty()) {
+                        if (frameFile.exists() && frameFile.length() > 0L) {
                             captureFeedback.onFrameCaptured()
                             launch {
                                 flashAlpha.snapTo(0.65f)
@@ -444,8 +455,8 @@ private fun HorizonGuidedScannerContent(
                             }
                             coordinator.onFrameCaptured(
                                 target = triggeredTarget,
-                                imageBytes = bytes,
                                 orientationAtCapture = poseAtShutter,
+                                imageFile = frameFile,
                             )
                             val updated = coordinator.state.value
                             if (updated.isComplete && updated.capturedFrames.isNotEmpty()) {
@@ -453,6 +464,7 @@ private fun HorizonGuidedScannerContent(
                                 runStitchAndSave(updated.capturedFrames, updated.scope)
                             }
                         } else {
+                            runCatching { frameFile.delete() }
                             coordinator.onFrameCaptureFailed()
                         }
                     }
@@ -460,6 +472,7 @@ private fun HorizonGuidedScannerContent(
 
                 override fun onError(exception: ImageCaptureException) {
                     Log.w(TAG, "Frame capture failed", exception)
+                    runCatching { frameFile.delete() }
                     coroutineScope.launch {
                         coordinator.onFrameCaptureFailed()
                     }

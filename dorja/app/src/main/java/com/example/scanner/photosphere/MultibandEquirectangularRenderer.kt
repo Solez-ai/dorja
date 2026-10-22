@@ -10,23 +10,13 @@ import kotlin.math.sin
  * Pure-Kotlin implementation of `360-photo-app`'s `MultibandBlender` + `EquirectangularRenderer`
  * Burt–Adelson Laplacian pyramid multi-band spherical renderer.
  *
- * Why multi-band pyramid blending eliminates all blockiness / stair-stepping / ghosting:
- * - Each frame is projected through the pinhole lens model (`FrameIntrinsics`) with radial
- *   distortion and handheld body-swivel parallax (`pivotRatio`) onto a pyramid of equirectangular
- *   levels (`0 .. L-1`, where level `l` has dimensions `(W shr l) × (H shr l)`).
- * - At each pyramid level `l`, frames are weighted by their continuous center-peaked feather mask
- *   `featherWeight(idealCol, idealRow, cx, cy) = ((1 - |dx|/cx) * (1 - |dy|/cy))^3`.
- * - Reconstruction proceeds from coarse (`L-1`) to fine (`0`):
- *   ```
- *   acc_L = color_L / (weight_L + ε)
- *   acc_l = EXPAND(acc_{l+1}) + (color_l - EXPAND(color_{l+1}) * r_l) / (weight_l + ε)
- *   where r_l = weight_l / (EXPAND(weight_{l+1}) + ε)
- *   ```
- * - High-frequency details (text on a calendar, clock hands, furniture edges) live in the finest
- *   Laplacian band (`l = 0`) and transition sharply right at the center-dominance midpoint, while
- *   low-frequency wall illumination and exposure differences live in the coarser bands (`l = 2..4`)
- *   and blend smoothly across the entire overlap — zero 11×11 pixelation blocks, zero stair-step
- *   jaggies, and zero double-exposure ghosting!
+ * Memory design (matching `360-photo-app/EquirectangularRenderer.kt`):
+ * - Instead of pre-allocating a full mipmap pyramid for all 26 frames at once, each frame is
+ *   box-downsampled on the fly during `accumulateLevelBand` for coarse levels (`level >= 1`) and
+ *   immediately released before moving to the next frame.
+ * - Level-0 (full `4096×2048` resolution) is accumulated and reconstructed in 64-row horizontal
+ *   bands (`4096 × 64` floats = ~1 MB per channel), keeping peak memory footprint minimal even
+ *   on 256 MB heap devices.
  */
 internal object MultibandEquirectangularRenderer {
 
@@ -92,12 +82,6 @@ internal object MultibandEquirectangularRenderer {
     ) {
         val levelCount = levelCountFor(canvasHeight)
 
-        // Precompute box-downsampled mipmaps for each frame so coarser pyramid levels sample
-        // pre-filtered anti-aliased source pixels (just like EquirectangularRenderer's INTER_AREA resize)
-        val framePyramids = Array(frames.size) { fi ->
-            buildFrameMipmaps(frames[fi], levelCount)
-        }
-
         // 1. Accumulate coarse levels (levelCount - 1 downTo 1)
         val coarseLevels = arrayOfNulls<PyramidLevel>(levelCount)
         for (level in 1 until levelCount) {
@@ -113,7 +97,6 @@ internal object MultibandEquirectangularRenderer {
             )
             accumulateLevelBand(
                 frames = frames,
-                frameMipmaps = framePyramids,
                 level = level,
                 levelWidth = lw,
                 levelHeight = lh,
@@ -130,7 +113,7 @@ internal object MultibandEquirectangularRenderer {
                 centerLatitudeDegrees = centerLatitudeDegrees,
             )
             coarseLevels[level] = pyr
-            onProgress(0.12f * (level.toFloat() / levelCount))
+            onProgress(0.15f * (level.toFloat() / levelCount))
         }
 
         // 2. Reconstruct coarse levels from top (levelCount - 1) down to level 1
@@ -148,13 +131,13 @@ internal object MultibandEquirectangularRenderer {
                     coarseAcc = coarseAcc!!,
                     wrapLongitude = longitudeSpanDegrees >= 360f,
                 )
-                // Free level + 1 arrays now that level is reconstructed
+                // Free level + 1 arrays immediately now that level is reconstructed
                 coarseLevels[level + 1] = null
             }
         }
 
-        // 3. Reconstruct level 0 (full resolution) in memory-friendly horizontal bands of 128 rows
-        val bandHeight = 128
+        // 3. Reconstruct level 0 (full resolution) in memory-friendly horizontal bands of 64 rows
+        val bandHeight = 64
         val bandCount = (canvasHeight + bandHeight - 1) / bandHeight
         val level1 = if (levelCount >= 2) coarseLevels[1] else null
         val level1Acc = coarseAcc
@@ -177,7 +160,6 @@ internal object MultibandEquirectangularRenderer {
 
             accumulateLevelBand(
                 frames = frames,
-                frameMipmaps = framePyramids,
                 level = 0,
                 levelWidth = canvasWidth,
                 levelHeight = canvasHeight,
@@ -199,7 +181,6 @@ internal object MultibandEquirectangularRenderer {
                     bandTop = bandTop,
                     bandRows = rows,
                     canvasWidth = canvasWidth,
-                    canvasHeight = canvasHeight,
                     bandColorR = bandColorR,
                     bandColorG = bandColorG,
                     bandColorB = bandColorB,
@@ -233,62 +214,72 @@ internal object MultibandEquirectangularRenderer {
                 }
             }
 
-            onProgress(0.12f + 0.88f * ((bandIdx + 1).toFloat() / bandCount))
+            onProgress(0.15f + 0.85f * ((bandIdx + 1).toFloat() / bandCount))
         }
+
+        // Release level 1 references before returning
+        coarseLevels[1] = null
     }
 
-    private class FrameMipmap(
+    private class DownsampledSource(
         val pixels: IntArray,
         val width: Int,
         val height: Int,
         val scaleDivisor: Double,
     )
 
-    private fun buildFrameMipmaps(frame: FrameInput, levelCount: Int): Array<FrameMipmap> {
-        val list = ArrayList<FrameMipmap>(levelCount)
-        list.add(FrameMipmap(frame.pixels, frame.width, frame.height, 1.0))
-        var prevPixels = frame.pixels
-        var prevW = frame.width
-        var prevH = frame.height
-        var scale = 1.0
-        for (level in 1 until levelCount) {
-            scale *= 2.0
-            val nextW = (prevW / 2).coerceAtLeast(1)
-            val nextH = (prevH / 2).coerceAtLeast(1)
-            val nextPixels = IntArray(nextW * nextH)
-            for (y in 0 until nextH) {
-                val y0 = (y * 2).coerceAtMost(prevH - 1)
-                val y1 = (y * 2 + 1).coerceAtMost(prevH - 1)
-                val row0 = y0 * prevW
-                val row1 = y1 * prevW
-                val dstRow = y * nextW
-                for (x in 0 until nextW) {
-                    val x0 = (x * 2).coerceAtMost(prevW - 1)
-                    val x1 = (x * 2 + 1).coerceAtMost(prevW - 1)
-                    val p00 = prevPixels[row0 + x0]
-                    val p10 = prevPixels[row0 + x1]
-                    val p01 = prevPixels[row1 + x0]
-                    val p11 = prevPixels[row1 + x1]
-                    val r = (((p00 ushr 16) and 0xFF) + ((p10 ushr 16) and 0xFF) +
-                        ((p01 ushr 16) and 0xFF) + ((p11 ushr 16) and 0xFF) + 2) shr 2
-                    val g = (((p00 ushr 8) and 0xFF) + ((p10 ushr 8) and 0xFF) +
-                        ((p01 ushr 8) and 0xFF) + ((p11 ushr 8) and 0xFF) + 2) shr 2
-                    val b = ((p00 and 0xFF) + (p10 and 0xFF) +
-                        (p01 and 0xFF) + (p11 and 0xFF) + 2) shr 2
-                    nextPixels[dstRow + x] = (0xFF shl 24) or (r shl 16) or (g shl 8) or b
+    /**
+     * Downsamples a single frame on-the-fly by `2^level` using an exact `scale × scale` area average
+     * (matching `Imgproc.INTER_AREA` in `360-photo-app/EquirectangularRenderer.kt`).
+     * At `level == 0`, returns the frame's own pixel array with zero allocation.
+     */
+    private fun prepareSourceForLevel(frame: FrameInput, level: Int): DownsampledSource {
+        if (level <= 0) {
+            return DownsampledSource(frame.pixels, frame.width, frame.height, 1.0)
+        }
+        val step = 1 shl level
+        val outW = (frame.width shr level).coerceAtLeast(1)
+        val outH = (frame.height shr level).coerceAtLeast(1)
+        val out = IntArray(outW * outH)
+        val src = frame.pixels
+        val srcW = frame.width
+        val srcH = frame.height
+
+        for (y in 0 until outH) {
+            val yStart = y shl level
+            val yEnd = min(srcH, yStart + step)
+            val dstRow = y * outW
+            for (x in 0 until outW) {
+                val xStart = x shl level
+                val xEnd = min(srcW, xStart + step)
+                var sumR = 0
+                var sumG = 0
+                var sumB = 0
+                var count = 0
+                for (sy in yStart until yEnd) {
+                    val rowOff = sy * srcW
+                    for (sx in xStart until xEnd) {
+                        val p = src[rowOff + sx]
+                        sumR += (p ushr 16) and 0xFF
+                        sumG += (p ushr 8) and 0xFF
+                        sumB += p and 0xFF
+                        count++
+                    }
+                }
+                if (count > 0) {
+                    val half = count shr 1
+                    val r = (sumR + half) / count
+                    val g = (sumG + half) / count
+                    val b = (sumB + half) / count
+                    out[dstRow + x] = (0xFF shl 24) or (r shl 16) or (g shl 8) or b
                 }
             }
-            list.add(FrameMipmap(nextPixels, nextW, nextH, scale))
-            prevPixels = nextPixels
-            prevW = nextW
-            prevH = nextH
         }
-        return list.toTypedArray()
+        return DownsampledSource(out, outW, outH, step.toDouble())
     }
 
     private fun accumulateLevelBand(
         frames: List<FrameInput>,
-        frameMipmaps: Array<Array<FrameMipmap>>,
         level: Int,
         levelWidth: Int,
         levelHeight: Int,
@@ -326,7 +317,7 @@ internal object MultibandEquirectangularRenderer {
             val rowEnd = min(bandTop + bandRows, fp.startRow + fp.rowSpan)
             if (rowEnd <= rowStart) continue
 
-            val mip = frameMipmaps[fi][level]
+            val mip = prepareSourceForLevel(frame, level)
             val basis = frame.basis
             val intr = frame.intrinsics
             val cx = intr.centerXPx
@@ -499,7 +490,6 @@ internal object MultibandEquirectangularRenderer {
         bandTop: Int,
         bandRows: Int,
         canvasWidth: Int,
-        canvasHeight: Int,
         bandColorR: FloatArray,
         bandColorG: FloatArray,
         bandColorB: FloatArray,
